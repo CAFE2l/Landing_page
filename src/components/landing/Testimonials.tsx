@@ -2,36 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion"
 import SectionHeading from "./SectionHeading"
-
-const testimonials = [
-  {
-    quote: "Professional work, delivered on time. The communication was smooth and the final product exceeded our expectations.",
-    name: "Carlos Mendez",
-    role: "Founder",
-    company: "TechFlow",
-    flag: "\ud83c\uddfa\ud83c\uddf8",
-    initials: "CM",
-    rating: 5,
-  },
-  {
-    quote: "Rare to find someone who combines technical skill with design sense. The dashboard we built together is used daily by our entire team.",
-    name: "Sarah Chen",
-    role: "CTO",
-    company: "GreenMarket",
-    flag: "\ud83c\udde8\ud83c\udde6",
-    initials: "SC",
-    rating: 5,
-  },
-  {
-    quote: "Handled our full rebrand and platform migration without a hitch. Clear timelines, honest communication, great results.",
-    name: "Michael Torres",
-    role: "CEO",
-    company: "FinFlow",
-    flag: "\ud83c\uddfa\ud83c\uddf8",
-    initials: "MT",
-    rating: 5,
-  },
-]
+import { testimonials } from "../../data/testimonials"
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -63,9 +34,9 @@ export default function Testimonials() {
               whileInView="visible"
               viewport={{ once: true, amount: 0.2 }}
               variants={!reduceMotion ? fadeUp : undefined}
-              className="group relative rounded-2xl border border-white/[0.08] bg-[#0f0f0f] backdrop-blur-sm p-8 transition-all duration-300 border-t-2 border-t-blue-500/60 hover:shadow-[0_0_30px_rgba(59,130,246,0.12)]"
+              className="group relative rounded-2xl border border-white/[0.08] bg-[#0a1628] backdrop-blur-sm p-8 transition-all duration-300 border-t-2 border-t-blue-500/60 hover:shadow-[0_0_30px_rgba(37,99,235,0.12)]"
             >
-              <span className="absolute top-4 left-5 text-6xl font-serif text-blue-500/20 leading-none select-none">
+                <span className="absolute top-4 left-5 text-6xl font-serif text-[#2563eb]/20 leading-none select-none">
                 &ldquo;
               </span>
 
@@ -91,7 +62,7 @@ export default function Testimonials() {
               </blockquote>
 
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 ring-2 ring-blue-500/40 flex items-center justify-center text-xs font-semibold text-zinc-400">
+                  <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 ring-2 ring-[#2563eb]/40 flex items-center justify-center text-xs font-semibold text-zinc-400">
                   {t.initials}
                 </div>
                 <div>
@@ -99,7 +70,7 @@ export default function Testimonials() {
                     <span className="text-sm font-medium text-white">
                       {t.name}
                     </span>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-medium border border-blue-500/20 leading-none">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-500/10 text-[#0ea5e9] text-[10px] font-medium border border-blue-500/20 leading-none">
                       Verified Client
                     </span>
                     <span className="text-sm">{t.flag}</span>

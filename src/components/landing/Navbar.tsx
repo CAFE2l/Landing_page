@@ -49,7 +49,7 @@ export default function Navbar() {
       transition={{ duration: 0.5, ease: "easeOut" as const }}
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled
-          ? "bg-[#050505]/80 backdrop-blur-xl border-b border-white/[0.08] py-3"
+          ? "bg-[#020408]/80 backdrop-blur-xl border-b border-white/[0.08] py-3"
           : "bg-transparent py-5"
       }`}
     >
@@ -65,7 +65,7 @@ export default function Navbar() {
             className="w-8 h-8 rounded-lg"
           />
           <span className="text-xl font-bold text-white tracking-tight">
-            CAFÉ<span className="text-[#ff6b00]"> SERVICES</span>
+            CAFÉ<span className="text-[#3b82f6]"> SERVICES</span>
           </span>
         </motion.a>
 
@@ -84,7 +84,7 @@ export default function Navbar() {
                 <span
                   className={`absolute bottom-0 left-4 right-4 h-[2px] rounded-full transition-all duration-300 ${
                     isActive
-                      ? "bg-[#ff6b00] shadow-[0_0_8px_rgba(255,107,0,0.5)]"
+                      ? "bg-[#3b82f6] shadow-[0_0_8px_rgba(59,130,246,0.5)]"
                       : "bg-transparent group-hover:bg-zinc-600 scale-x-0 group-hover:scale-x-100"
                   }`}
                 />
@@ -98,10 +98,9 @@ export default function Navbar() {
           whileHover={{ scale: 1.04 }}
           whileTap={{ scale: 0.97 }}
           onClick={(e) => { e.preventDefault(); handleClick("#contact") }}
-          className="hidden lg:inline-flex items-center gap-2 bg-[#ff6b00] text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-[0_0_20px_rgba(255,107,0,0.3)] hover:shadow-[0_0_30px_rgba(255,107,0,0.5)] transition-all duration-300"
+          className="hidden lg:inline-flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
         >
-          <img src="/imgs/icons/Whatsapp.png" alt="WhatsApp" className="w-4 h-4 object-contain" />
-          Falar comigo
+          Talk to me
         </motion.a>
 
         <button
@@ -119,7 +118,7 @@ export default function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden bg-[#050505]/95 backdrop-blur-xl border-t border-white/[0.08] overflow-hidden"
+            className="lg:hidden bg-[#020408]/95 backdrop-blur-xl border-t border-white/[0.08] overflow-hidden"
           >
             <div className="container mx-auto px-6 py-6 flex flex-col gap-3">
               {links.map((link) => {
@@ -140,7 +139,7 @@ export default function Navbar() {
               href="#contact"
               whileTap={{ scale: 0.97 }}
               onClick={(e) => { e.preventDefault(); handleClick("#contact") }}
-              className="text-center bg-[#ff6b00] text-white px-6 py-3 rounded-xl text-sm font-semibold shadow-[0_0_20px_rgba(255,107,0,0.3)] mt-2"
+              className="text-center bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-6 py-3 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] mt-2"
               >
               Talk to me
               </motion.a>

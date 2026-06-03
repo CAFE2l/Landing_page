@@ -75,7 +75,7 @@ export default function Hero() {
       <div className="absolute inset-0 bg-dot-grid" />
 
       <motion.div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#ff6b00] rounded-full pointer-events-none"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#2563eb] rounded-full pointer-events-none"
         style={{ filter: "blur(150px)" }}
         animate={
           !reduceMotion
@@ -122,7 +122,7 @@ export default function Hero() {
               </motion.span>
             ))}
             <br />
-            <span className="animate-gradient-text text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-600">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#60a5fa] via-[#38bdf8] to-[#2563eb]">
               {titleLine2.split(" ").map((word, i) => (
                 <motion.span
                   key={`l2-${i}`}
@@ -152,9 +152,8 @@ export default function Hero() {
             href="#contact"
             whileHover={!reduceMotion ? { scale: 1.04 } : undefined}
             whileTap={!reduceMotion ? { scale: 0.97 } : undefined}
-            className="inline-flex items-center gap-2 bg-[#ff6b00] text-white px-8 py-3.5 rounded-xl text-sm font-semibold shadow-[0_0_25px_rgba(255,107,0,0.35)] hover:shadow-[0_0_45px_rgba(255,107,0,0.55)] transition-all duration-300 animate-glow-pulse"
+            className="inline-flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-8 py-3.5 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
           >
-            <img src="/imgs/icons/Whatsapp.png" alt="WhatsApp" className="w-5 h-5 object-contain" />
             Start a Project
           </motion.a>
           <motion.a
@@ -172,21 +171,21 @@ export default function Hero() {
           className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm text-zinc-600"
         >
           <span className="flex items-center gap-1.5">
-            <span className="text-[#ff6b00] font-semibold">
+            <span className="text-[#3b82f6] font-semibold">
               <AnimatedNumber end={20} suffix="+" />
             </span>
             Clients
           </span>
           <span className="w-1 h-1 rounded-full bg-zinc-700 hidden sm:block" />
           <span className="flex items-center gap-1.5">
-            <span className="text-[#ff6b00] font-semibold">
+            <span className="text-[#3b82f6] font-semibold">
               <AnimatedNumber end={50} suffix="+" />
             </span>
             Projects delivered
           </span>
           <span className="w-1 h-1 rounded-full bg-zinc-700 hidden sm:block" />
           <span className="flex items-center gap-1.5">
-            <span className="text-[#ff6b00] font-semibold">
+            <span className="text-[#3b82f6] font-semibold">
               <AnimatedNumber end={12} suffix="+" />
             </span>
             Countries

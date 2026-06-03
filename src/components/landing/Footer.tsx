@@ -22,7 +22,7 @@ export default function Footer() {
               className="w-7 h-7 rounded-md"
             />
             <span className="text-base font-bold text-white">
-              CAFÉ<span className="text-[#ff6b00]"> SERVICES</span>
+              CAFÉ<span className="text-[#3b82f6]"> SERVICES</span>
             </span>
           </div>
 
@@ -39,10 +39,7 @@ export default function Footer() {
           </div>
 
           <div className="text-center md:text-right">
-            <p className="text-sm text-zinc-600">
-              Built with ♥ in Brazil
-            </p>
-            <p className="text-xs text-zinc-700 mt-1">
+            <p className="text-xs text-zinc-700">
               &copy; {year} CAFÉ SERVICES. All rights reserved.
             </p>
           </div>

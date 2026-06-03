@@ -146,8 +146,8 @@ export default function TerminalFAQ() {
           transition={{ duration: 0.6 }}
           className="max-w-3xl mx-auto"
         >
-          <div className="rounded-2xl border border-orange-500/20 bg-[#0a0a0f] shadow-[0_0_40px_rgba(249,115,22,0.06)] overflow-hidden backdrop-blur-sm">
-            <div className="flex items-center gap-3 px-5 py-3.5 bg-[#0d0d14] border-b border-orange-500/10">
+          <div className="rounded-2xl border border-blue-500/20 bg-[#0a1628] shadow-[0_0_40px_rgba(37,99,235,0.06)] overflow-hidden backdrop-blur-sm">
+            <div className="flex items-center gap-3 px-5 py-3.5 bg-[#060d14] border-b border-blue-500/10">
               <div className="flex gap-2">
                 <span className="w-3 h-3 rounded-full bg-red-500/80" />
                 <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
@@ -163,18 +163,18 @@ export default function TerminalFAQ() {
               className="p-5 sm:p-6 font-mono text-sm leading-relaxed max-h-[560px] overflow-y-auto"
               style={{
                 scrollbarWidth: "thin",
-                scrollbarColor: "rgba(249,115,22,0.15) transparent",
+                scrollbarColor: "rgba(37,99,235,0.15) transparent",
               }}
             >
               <div className="text-zinc-500/70 mb-5">
-                <span className="text-orange-500 font-semibold">$</span> Hello,
+                <span className="text-blue-500 font-semibold">$</span> Hello,
                 I&apos;m the{" "}
-                <span className="text-orange-500 font-semibold">
+                <span className="text-blue-500 font-semibold">
                   CAFÉ SERVICES
                 </span>{" "}
                 assistant.
                 <br />
-                <span className="text-orange-500 font-semibold">$</span> Choose a
+                <span className="text-blue-500 font-semibold">$</span> Choose a
                 question below:
               </div>
 
@@ -192,8 +192,8 @@ export default function TerminalFAQ() {
                       onClick={() => handleSelect(q)}
                       className={`text-left px-4 py-2.5 rounded-lg border text-sm font-mono transition-all duration-200 ${
                         isSelected
-                          ? "border-orange-500/50 bg-orange-500/10 text-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.12)]"
-                          : "border-white/10 bg-white/[0.03] text-zinc-500/70 hover:border-orange-500/30 hover:text-zinc-300 hover:bg-orange-500/5 hover:shadow-[0_0_15px_rgba(249,115,22,0.06)]"
+                          ? "border-blue-500/50 bg-blue-500/10 text-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.12)]"
+                          : "border-white/10 bg-white/[0.03] text-zinc-500/70 hover:border-blue-500/30 hover:text-zinc-300 hover:bg-blue-500/5 hover:shadow-[0_0_15px_rgba(37,99,235,0.06)]"
                       }`}
                     >
                       <span className="text-zinc-600 text-xs mr-2">
@@ -215,15 +215,15 @@ export default function TerminalFAQ() {
                     transition={{ duration: 0.25 }}
                     className="mb-4 pb-4 border-b border-white/[0.04] last:border-0"
                   >
-                    <div className="text-orange-500 mb-1.5">
-                      <span className="text-orange-500 font-semibold">$</span>{" "}
+                    <div className="text-blue-500 mb-1.5">
+                      <span className="text-blue-500 font-semibold">$</span>{" "}
                       selected question:{" "}
                       <span className="text-zinc-200 font-semibold">
                         {entry.question}
                       </span>
                     </div>
                     <div className="text-zinc-400/80 pl-0">
-                      <span className="text-yellow-500/80 font-semibold">
+                      <span className="text-blue-500/80 font-semibold">
                         &gt;
                       </span>{" "}
                       {showAnswer && entry.id === selectedId ? (
@@ -232,7 +232,7 @@ export default function TerminalFAQ() {
                         <span>{entry.answer}</span>
                       ) : null}
                       {entry.id === selectedId && typing && (
-                        <span className="inline-block w-2 h-4 bg-orange-500/70 ml-0.5 animate-pulse" />
+                        <span className="inline-block w-2 h-4 bg-blue-500/70 ml-0.5 animate-pulse" />
                       )}
                     </div>
                   </motion.div>
@@ -245,7 +245,7 @@ export default function TerminalFAQ() {
                   animate={{ opacity: 1 }}
                   className="flex items-center gap-2 text-zinc-600 text-xs"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500/50 animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500/50 animate-pulse" />
                   waiting for input...
                 </motion.div>
               )}
@@ -261,7 +261,7 @@ export default function TerminalFAQ() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 onClick={clearHistory}
-                className="text-xs font-mono text-zinc-600 hover:text-orange-500 transition-colors duration-200 px-3 py-1 rounded-md border border-transparent hover:border-orange-500/20"
+                className="text-xs font-mono text-zinc-600 hover:text-blue-500 transition-colors duration-200 px-3 py-1 rounded-md border border-transparent hover:border-blue-500/20"
               >
                 clear terminal
               </motion.button>

@@ -19,7 +19,7 @@ const projects = [
   {
     name: "DevPort",
     tags: ["Next.js", "Framer Motion", "MDX", "Vercel"],
-    gradient: "from-orange-500/15 via-amber-500/10 to-transparent",
+    gradient: "from-blue-500/15 via-cyan-500/10 to-transparent",
     desc: "Portfolio platform for developers with drag-and-drop sections and live preview.",
   },
 ]
@@ -55,14 +55,14 @@ export default function FeaturedWork() {
               viewport={{ once: true, amount: 0.2 }}
               variants={!reduceMotion ? fadeUp : undefined}
               whileHover={!reduceMotion ? { y: -6, transition: { duration: 0.2 } } : undefined}
-              className="group rounded-2xl border border-white/[0.08] bg-white/[0.03] overflow-hidden transition-all duration-300 hover:border-blue-500/20 hover:shadow-[0_0_30px_rgba(59,130,246,0.08)]"
+              className="group rounded-2xl border border-white/[0.08] bg-white/[0.03] overflow-hidden transition-all duration-300 hover:border-blue-500/20 hover:shadow-[0_0_30px_rgba(37,99,235,0.08)]"
             >
               <div className={`relative h-52 bg-gradient-to-br ${project.gradient} flex items-center justify-center overflow-hidden`}>
                 <div className="absolute inset-0 bg-dot-grid opacity-50" />
                 <div className="relative z-10 text-6xl font-bold text-white/10 select-none">
                   {project.name.charAt(0)}
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#020408] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </div>
 
               <div className="p-6">
@@ -84,7 +84,7 @@ export default function FeaturedWork() {
                 </p>
                 <a
                   href="#"
-                  className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 group-hover:text-blue-400 transition-colors duration-200"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 group-hover:text-[#0ea5e9] transition-colors duration-200"
                 >
                   View case
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>

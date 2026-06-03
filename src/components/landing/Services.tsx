@@ -58,10 +58,10 @@ export default function Services() {
               viewport={{ once: true, amount: 0.2 }}
               variants={!reduceMotion ? fadeUp : undefined}
               whileHover={!reduceMotion ? { y: -6, transition: { duration: 0.2 } } : undefined}
-              className="group relative rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8 transition-all duration-300 hover:bg-white/[0.05] hover:border-blue-500/20 hover:shadow-[0_0_30px_rgba(59,130,246,0.08)]"
+              className="group relative rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8 transition-all duration-300 hover:bg-white/[0.05] hover:border-blue-500/20 hover:shadow-[0_0_30px_rgba(37,99,235,0.08)]"
             >
               <div className="w-12 h-12 rounded-xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center mb-5 group-hover:border-blue-500/20 group-hover:bg-blue-500/5 transition-all duration-300">
-                <service.icon className="text-zinc-400 group-hover:text-blue-400 transition-colors duration-300" size={22} />
+                <service.icon className="text-zinc-400 group-hover:text-[#0ea5e9] transition-colors duration-300" size={22} />
               </div>
 
               <h3 className="text-lg font-semibold text-white mb-3">
@@ -72,7 +72,7 @@ export default function Services() {
               </p>
               <a
                 href="#contact"
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 group-hover:text-blue-400 transition-colors duration-200"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 group-hover:text-[#0ea5e9] transition-colors duration-200"
               >
                 Learn more
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>

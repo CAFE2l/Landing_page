@@ -18,7 +18,7 @@ export default function SectionHeading({ label, title, subtitle }: SectionHeadin
       className="text-center mb-16"
     >
       {label && (
-        <span className="inline-block px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold tracking-wider uppercase mb-5">
+        <span className="inline-block px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[#0ea5e9] text-xs font-semibold tracking-wider uppercase mb-5">
           {label}
         </span>
       )}

@@ -1,14 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --color-cafe-bg: #050505;
-  --color-cafe-surface: #0f0f0f;
-  --color-cafe-card: #141414;
-  --color-cafe-elevated: #1a1a1a;
-  --color-cafe-blue: #3b82f6;
-  --color-cafe-cyan: #06b6d4;
-  --color-cafe-orange: #f97316;
-  --color-cafe-accent: #3b82f6;
+  --color-cafe-bg: #020408;
+  --color-cafe-surface: #060d14;
+  --color-cafe-card: #0a1628;
+  --color-cafe-elevated: #0a1628;
+  --color-cafe-blue: #2563eb;
+  --color-cafe-cyan: #0ea5e9;
+  --color-cafe-accent: #2563eb;
+  --color-blue-500: #2563eb;
+  --color-blue-600: #1d4ed8;
 }
 
 @layer base {
@@ -17,7 +18,7 @@
   }
 
   body {
-    background-color: #050505;
+    background-color: #020408;
     color: #a1a1aa;
     font-family: "Inter", system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -26,7 +27,7 @@
   }
 
   ::selection {
-    background-color: rgba(59, 130, 246, 0.3);
+    background-color: rgba(37, 99, 235, 0.3);
     color: #ffffff;
   }
 }
@@ -60,8 +61,8 @@
 }
 
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
-  50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.5); }
+  0%, 100% { box-shadow: 0 0 20px rgba(37, 99, 235, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(37, 99, 235, 0.5); }
 }
 
 @utility animate-marquee {
@@ -92,7 +93,7 @@
 }
 
 .bg-gradient-mesh {
-  background: linear-gradient(-45deg, #050505, #0a0a1a, #050505, #0a0a0f);
+  background: linear-gradient(-45deg, #020408, #060d14, #020408, #0a1628);
   background-size: 400% 400%;
   animation: mesh-shift 20s ease infinite;
 }
