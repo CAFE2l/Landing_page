@@ -2,15 +2,13 @@
 
 @theme {
   --color-cafe-bg: #050505;
-  --color-cafe-dark: #0a0a0a;
-  --color-cafe-card: #0f0f0f;
-  --color-cafe-border: rgba(249, 115, 22, 0.2);
+  --color-cafe-surface: #0f0f0f;
+  --color-cafe-card: #141414;
+  --color-cafe-elevated: #1a1a1a;
+  --color-cafe-blue: #3b82f6;
+  --color-cafe-cyan: #06b6d4;
   --color-cafe-orange: #f97316;
-  --color-cafe-orange-light: #fb923c;
-  --color-cafe-red: #ef4444;
-  --color-cafe-text: #a1a1aa;
-  --color-cafe-text-light: #f4f4f5;
-  --color-cafe-white: #ffffff;
+  --color-cafe-accent: #3b82f6;
 }
 
 @layer base {
@@ -28,52 +26,78 @@
   }
 
   ::selection {
-    background-color: rgba(249, 115, 22, 0.3);
+    background-color: rgba(59, 130, 246, 0.3);
     color: #ffffff;
   }
 }
 
-@layer utilities {
-  .glass {
-    @apply bg-white/5 backdrop-blur-xl border border-white/10;
-  }
+@utility glass {
+  background-color: color-mix(in srgb, white 5%, transparent);
+  backdrop-filter: blur(24px);
+  border: 1px solid color-mix(in srgb, white 8%, transparent);
+}
 
-  .glass-orange {
-    @apply bg-orange-500/5 backdrop-blur-xl border border-orange-500/20;
-  }
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
 
-  .text-glow-orange {
-    text-shadow: 0 0 20px rgba(249, 115, 22, 0.5);
-  }
-
-  .shadow-led-orange {
-    box-shadow: 0 0 40px rgba(249, 115, 22, 0.15);
-  }
-
-  .shadow-led-orange-strong {
-    box-shadow: 0 0 60px rgba(249, 115, 22, 0.35);
-  }
-
-  .bg-grid-pattern {
-    background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.05) 1px, transparent 0);
-    background-size: 40px 40px;
-  }
+@keyframes mesh-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-15px); }
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33% { transform: translateY(-8px) rotate(0.5deg); }
+  66% { transform: translateY(4px) rotate(-0.5deg); }
 }
 
-.animate-float {
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.5); }
+}
+
+@utility animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+
+@utility animate-mesh {
+  animation: mesh-shift 20s ease infinite;
+  background-size: 400% 400%;
+}
+
+@utility animate-float {
   animation: float 6s ease-in-out infinite;
 }
 
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.1); }
+@utility animate-gradient-text {
+  background-size: 200% 200%;
+  animation: gradient-shift 4s ease infinite;
 }
 
-.animate-pulse-glow {
-  animation: pulse-glow 4s ease-in-out infinite;
+@utility animate-glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+.bg-dot-grid {
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.035) 1px, transparent 0);
+  background-size: 32px 32px;
+}
+
+.bg-gradient-mesh {
+  background: linear-gradient(-45deg, #050505, #0a0a1a, #050505, #0a0a0f);
+  background-size: 400% 400%;
+  animation: mesh-shift 20s ease infinite;
+}
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
 }

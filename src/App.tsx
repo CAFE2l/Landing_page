@@ -1,27 +1,31 @@
-import Navbar from "./components/Navbar"
-import Hero from "./components/Hero"
-import Services from "./components/Services"
-import CompletePackage from "./components/CompletePackage"
-import WhyPrices from "./components/WhyPrices"
-import Payment from "./components/Payment"
-import Process from "./components/Process"
-import Community from "./components/Community"
-import FAQ from "./components/FAQ"
-import Footer from "./components/Footer"
+import FloatingOrbs from "./components/landing/FloatingOrbs"
+import Navbar from "./components/landing/Navbar"
+import Hero from "./components/landing/Hero"
+import TechMarquee from "./components/landing/TechMarquee"
+import Services from "./components/landing/Services"
+import Process from "./components/landing/Process"
+import FeaturedWork from "./components/landing/FeaturedWork"
+import Differentials from "./components/landing/Differentials"
+import Testimonials from "./components/landing/Testimonials"
+import TerminalFAQ from "./components/landing/TerminalFAQ"
+import Contact from "./components/landing/Contact"
+import Footer from "./components/landing/Footer"
 
 function App() {
   return (
     <>
+      <FloatingOrbs />
       <Navbar />
       <main>
         <Hero />
+        <TechMarquee />
         <Services />
-        <CompletePackage />
-        <WhyPrices />
-        <Payment />
         <Process />
-        <Community />
-        <FAQ />
+        <FeaturedWork />
+        <Differentials />
+        <Testimonials />
+        <TerminalFAQ />
+        <Contact />
       </main>
       <Footer />
     </>
