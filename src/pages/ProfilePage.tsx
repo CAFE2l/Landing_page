@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react"
 import { Link, Navigate } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
 import {
-  Camera,
   CheckCircle2,
   ChevronRight,
   Eye,
@@ -20,6 +19,7 @@ import {
 } from "lucide-react"
 import AuthBackground from "../components/auth/AuthBackground"
 import Navbar from "../components/landing/Navbar"
+import { AvatarUpload } from "../components/profile/AvatarUpload"
 import { getInitials, saveCurrentUser, type FeedbackEntry, type UserProfile } from "../data/feedbackStore"
 import { isCloudinaryConfigured, uploadToCloudinary } from "../lib/cloudinary"
 
@@ -202,7 +202,6 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
     subtitle: "Your changes were saved.",
   })
   const [avatarUrl, setAvatarUrl] = useState(user?.photoUrl || "")
-  const [avatarUploading, setAvatarUploading] = useState(false)
   const [feedbackMediaUrl, setFeedbackMediaUrl] = useState("")
   const [feedbackMediaType, setFeedbackMediaType] = useState<"image" | "video">("image")
   const [feedbackMediaName, setFeedbackMediaName] = useState("")
@@ -220,7 +219,6 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
   const [savedForm, setSavedForm] = useState(form)
 
   const displayName = savedForm.fullName || user?.name || "Client"
-  const initials = useMemo(() => getInitials(displayName), [displayName])
   const passwordStrength = useMemo(() => getPasswordStrength(newPassword), [newPassword])
   const passwordsMatch = !confirmPassword || newPassword === confirmPassword
 
@@ -239,29 +237,6 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
   const notify = (title: string, subtitle: string) => {
     setToastCopy({ title, subtitle })
     setShowToast(true)
-  }
-
-  const handleAvatarUpload = async (file?: File) => {
-    if (!file) return
-    setAvatarUploading(true)
-    const localPreview = URL.createObjectURL(file)
-    setAvatarUrl(localPreview)
-
-    try {
-      if (!isCloudinaryConfigured()) {
-        notify("Preview ready", "Add Cloudinary env vars to upload permanently.")
-        return
-      }
-
-      const result = await uploadToCloudinary(file, "cafe-services/users/profile-photos")
-      setAvatarUrl(result.secure_url)
-      saveCurrentUser({ ...user, photoUrl: result.secure_url })
-      notify("Photo updated", "Your profile photo was uploaded.")
-    } catch {
-      notify("Upload failed", "Could not upload the profile photo.")
-    } finally {
-      setAvatarUploading(false)
-    }
   }
 
   const handleFeedbackMediaUpload = async (file?: File) => {
@@ -369,23 +344,13 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
                 animate={{ opacity: [0.4, 0.8, 0.4], scale: [1.2, 1.4, 1.2] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               />
-              <label className="group relative flex h-28 w-28 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#2563eb] to-[#0ea5e9] text-3xl font-bold text-white ring-4 ring-[#2563eb]/30 ring-offset-4 ring-offset-[#0a1628]">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
-                ) : (
-                  initials
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  onChange={(event) => handleAvatarUpload(event.target.files?.[0])}
-                />
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-full bg-black/70 opacity-0 backdrop-blur-sm transition-opacity duration-300 group-hover:opacity-100">
-                  {avatarUploading ? <Loader2 size={20} className="animate-spin text-white" /> : <Camera size={20} className="text-white" />}
-                  <span className="text-xs font-medium text-white">{avatarUploading ? "Uploading" : "Change photo"}</span>
-                </div>
-              </label>
+              <AvatarUpload
+                currentAvatarUrl={avatarUrl}
+                onUploadComplete={(url) => {
+                  setAvatarUrl(url)
+                  saveCurrentUser({ ...user!, photoUrl: url })
+                }}
+              />
               <motion.span
                 className="absolute bottom-1 right-1 h-4 w-4 rounded-full border-2 border-[#0a1628] bg-[#22c55e]"
                 animate={{ scale: [1, 1.4, 1] }}

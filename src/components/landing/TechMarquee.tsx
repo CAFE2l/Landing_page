@@ -14,7 +14,7 @@ const row1: Tech[] = [
   { name: "PostgreSQL", slug: "postgresql", color: "4169E1" },
   { name: "Prisma", slug: "prisma", color: "ffffff" },
   { name: "Framer Motion", slug: "framer", color: "0055FF" },
-  { name: "Figma", slug: "figma", color: "F24E1E" },
+  { name: "Vite", slug: "vite", color: "646CFF" },
   { name: "Vercel", slug: "vercel", color: "ffffff" },
   { name: "Next.js", slug: "nextdotjs", color: "ffffff" },
   { name: "Git", slug: "git", color: "F05032" },
@@ -26,7 +26,7 @@ const row2: Tech[] = [
   { name: "Git", slug: "git", color: "F05032" },
   { name: "Next.js", slug: "nextdotjs", color: "ffffff" },
   { name: "Vercel", slug: "vercel", color: "ffffff" },
-  { name: "Figma", slug: "figma", color: "F24E1E" },
+  { name: "Vite", slug: "vite", color: "646CFF" },
   { name: "Framer Motion", slug: "framer", color: "0055FF" },
   { name: "Prisma", slug: "prisma", color: "ffffff" },
   { name: "PostgreSQL", slug: "postgresql", color: "4169E1" },
@@ -52,7 +52,7 @@ function Badge({ tech }: { tech: Tech }) {
 
 export default function TechMarquee() {
   return (
-    <section className="py-20 relative overflow-hidden">
+    <section className="py-16 md:py-20 relative overflow-hidden">
       <div
         className="absolute inset-0 pointer-events-none z-10"
         style={{

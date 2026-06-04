@@ -120,7 +120,7 @@ export default function TerminalFAQ() {
   }, [history, showAnswer, typing])
 
   return (
-    <section id="faq" className="py-32 relative">
+    <section id="faq" className="py-20 md:py-32 relative">
       <div className="container mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

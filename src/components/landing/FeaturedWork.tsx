@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion"
 import { ArrowRight, Check, Code2, LayoutDashboard, MonitorSmartphone } from "lucide-react"
 import SectionHeading from "./SectionHeading"
 import WhatsAppIcon from "./WhatsAppIcon"
+import { wa, WA_MESSAGES } from "../../lib/utils"
 
 type PlanPreviewType = "landing" | "website" | "saas"
 
@@ -23,6 +24,7 @@ const plans = [
       "Basic SEO setup and deploy included",
     ],
     cta: "Start a Landing Page",
+    waMessage: WA_MESSAGES.planLanding,
     gradient: "from-blue-600/25 via-cyan-500/10 to-transparent",
     preview: "landing",
     previewUrl: "https://e-commerce-landing-page-lime.vercel.app/",
@@ -42,6 +44,7 @@ const plans = [
       "Contact forms, tracking, and production deploy",
     ],
     cta: "Build My Website",
+    waMessage: WA_MESSAGES.planWebsite,
     gradient: "from-sky-600/25 via-blue-500/10 to-transparent",
     preview: "website",
     previewUrl: "https://main-portfolio-sigma-flame.vercel.app/",
@@ -61,6 +64,7 @@ const plans = [
       "Stripe, automations, and deployment pipeline",
     ],
     cta: "Discuss My Product",
+    waMessage: WA_MESSAGES.planSaaS,
     featured: true,
     gradient: "from-blue-500/30 via-cyan-400/10 to-transparent",
     preview: "saas",
@@ -76,6 +80,7 @@ const plans = [
   tags: string[]
   features: string[]
   cta: string
+  waMessage: string
   gradient: string
   preview: PlanPreviewType
   previewUrl?: string
@@ -141,7 +146,7 @@ export default function FeaturedWork() {
   const reduceMotion = useReducedMotion()
 
   return (
-    <section id="work" className="py-32 relative">
+    <section id="work" className="py-20 md:py-32 relative">
       <div className="container mx-auto px-6">
         <SectionHeading
           label="Pricing"
@@ -149,7 +154,7 @@ export default function FeaturedWork() {
           subtitle="Clear starting points for modern web projects. Every plan is built with a tech-focused stack, clean motion, and production-ready delivery."
         />
 
-        <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {plans.map((plan, i) => {
             const Icon = plan.icon
             return (
@@ -181,7 +186,7 @@ export default function FeaturedWork() {
                   Most requested
                 </div>
               )}
-              <div className={`relative h-56 bg-gradient-to-br ${plan.gradient} overflow-hidden`}>
+              <div className={`relative h-48 sm:h-56 bg-gradient-to-br ${plan.gradient} overflow-hidden`}>
                 <div className="absolute inset-0 bg-dot-grid opacity-50" />
                 <PlanPreview type={plan.preview} />
                 <div className="absolute left-6 top-6 text-[10px] uppercase tracking-[0.32em] text-zinc-600 font-semibold">
@@ -196,7 +201,7 @@ export default function FeaturedWork() {
                 <div className="absolute inset-0 bg-gradient-to-t from-[#020408] via-[#020408]/10 to-transparent" />
               </div>
 
-              <div className="p-6">
+              <div className="p-5 sm:p-6">
                 <div className="flex flex-wrap gap-2 mb-4">
                   {plan.tags.map((tag) => (
                     <span
@@ -229,7 +234,9 @@ export default function FeaturedWork() {
                   ))}
                 </ul>
                 <a
-                  href="https://wa.me/5511999999999"
+                  href={wa(plan.waMessage)}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-300 ${
                     plan.featured
                       ? "bg-[#2563eb] text-white border border-[#3b82f6]/50 shadow-[0_0_20px_rgba(37,99,235,0.35)] hover:bg-[#1d4ed8]"

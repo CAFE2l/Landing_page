@@ -1,10 +1,24 @@
 import { useEffect, useState } from "react"
 import { BrowserRouter, Route, Routes } from "react-router-dom"
+import { AuthProvider } from "./contexts/AuthContext"
 import AdminPage from "./pages/AdminPage"
 import AuthPage from "./pages/AuthPage"
+import AuthCallback from "./pages/AuthCallback"
 import FeedbackPage from "./pages/FeedbackPage"
+import ForumPage from "./pages/ForumPage"
+import ForumDetailPage from "./pages/ForumDetailPage"
 import LandingPage from "./pages/LandingPage"
 import ProfilePage from "./pages/ProfilePage"
+import AdminShell from "./components/admin/AdminShell"
+import AdminLogin from "./pages/admin/Login"
+import AdminDashboard from "./pages/admin/Dashboard"
+import AdminFeedback from "./pages/admin/FeedbackPage"
+import AdminClients from "./pages/admin/Clients"
+import AdminAnalytics from "./pages/admin/Analytics"
+import AdminSettings from "./pages/admin/Settings"
+import AdminForum from "./pages/admin/ForumManagement"
+import { ProtectedRoute } from "./components/auth/ProtectedRoute"
+import { AdminRoute } from "./components/auth/AdminRoute"
 import {
   loadCurrentUser,
   loadFeedbacks,
@@ -33,20 +47,41 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage feedbacks={feedbacks} />} />
-        <Route path="/feedback" element={<FeedbackPage feedbacks={feedbacks} />} />
-        <Route path="/login" element={<AuthPage mode="login" onAuth={setUser} />} />
-        <Route path="/signup" element={<AuthPage mode="signup" onAuth={setUser} />} />
-        <Route path="/profile" element={<ProfilePage user={user} onSubmitFeedback={addFeedback} />} />
-        <Route path="/perfil" element={<ProfilePage user={user} onSubmitFeedback={addFeedback} />} />
-        <Route
-          path="/admin"
-          element={<AdminPage user={user} />}
-        />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage feedbacks={feedbacks} />} />
+          <Route path="/feedback" element={<FeedbackPage feedbacks={feedbacks} />} />
+          <Route path="/forum" element={<ForumPage />} />
+          <Route path="/forum/:slug" element={<ForumDetailPage />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/login" element={<AuthPage mode="login" onAuth={setUser} />} />
+          <Route path="/signup" element={<AuthPage mode="signup" onAuth={setUser} />} />
+          <Route path="/profile" element={<ProtectedRoute><ProfilePage user={user} onSubmitFeedback={addFeedback} /></ProtectedRoute>} />
+          <Route path="/perfil" element={<ProtectedRoute><ProfilePage user={user} onSubmitFeedback={addFeedback} /></ProtectedRoute>} />
+          <Route path="/admin" element={<AdminRoute><AdminPage user={user} /></AdminRoute>} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/dashboard" element={<AdminRoute><AdminShell /></AdminRoute>}>
+            <Route index element={<AdminDashboard />} />
+          </Route>
+          <Route path="/admin/feedback" element={<AdminRoute><AdminShell /></AdminRoute>}>
+            <Route index element={<AdminFeedback />} />
+          </Route>
+          <Route path="/admin/clients" element={<AdminRoute><AdminShell /></AdminRoute>}>
+            <Route index element={<AdminClients />} />
+          </Route>
+          <Route path="/admin/forum" element={<AdminRoute><AdminShell /></AdminRoute>}>
+            <Route index element={<AdminForum />} />
+          </Route>
+          <Route path="/admin/analytics" element={<AdminRoute><AdminShell /></AdminRoute>}>
+            <Route index element={<AdminAnalytics />} />
+          </Route>
+          <Route path="/admin/settings" element={<AdminRoute><AdminShell /></AdminRoute>}>
+            <Route index element={<AdminSettings />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }
 

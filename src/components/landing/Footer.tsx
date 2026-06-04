@@ -14,7 +14,7 @@ export default function Footer() {
   return (
     <footer className="border-t border-white/[0.06]">
       <div className="container mx-auto px-6 py-12">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8">
           <div className="flex items-center gap-2.5">
             <img
               src="/favicon.png"

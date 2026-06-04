@@ -2,12 +2,13 @@
 
 import { motion, useReducedMotion } from "framer-motion"
 import WhatsAppIcon from "./WhatsAppIcon"
+import { wa, WA_MESSAGES } from "../../lib/utils"
 
 export default function Contact() {
   const reduceMotion = useReducedMotion()
 
   return (
-    <section id="contact" className="py-32 relative overflow-hidden">
+    <section id="contact" className="py-20 md:py-32 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-[#2563eb]/[0.03] via-transparent to-transparent pointer-events-none" />
       
       <div className="container mx-auto px-6 relative z-10">
@@ -20,7 +21,7 @@ export default function Contact() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto mb-32">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto mb-20 md:mb-32">
           {/* Discord Card */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -36,7 +37,9 @@ export default function Contact() {
               An open space to exchange ideas, ask questions, follow the behind-the-scenes and connect with people who are also creating digital projects.
             </p>
             <a
-              href="#"
+              href="https://discord.com/invite/gW2tShPFxf"
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-white/[0.1] text-white text-sm font-semibold hover:bg-white/5 transition-colors mb-4"
             >
               <img src="/imgs/icons/Discord.png" alt="" className="w-4 h-4 opacity-70" />
@@ -63,8 +66,10 @@ export default function Contact() {
               Exclusive area for clients who have already completed their services. Receive support, news, exclusive content and post-delivery follow-up.
             </p>
             <a
-              href="#"
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all mb-4"
+              href="https://t.me/CafeAgenciasDigitais"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px rgba(37,99,235,0.35)] transition-all mb-4"
             >
               <img src="/imgs/icons/Telegram.png" alt="" className="w-4 h-4 opacity-70" />
               Request VIP access
@@ -83,15 +88,17 @@ export default function Contact() {
           <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 tracking-tight">
             Still have questions?
           </h2>
-          <p className="text-zinc-500 text-sm leading-relaxed mb-10 max-w-md mx-auto">
+          <p className="text-zinc-500 text-sm leading-relaxed mb-8 md:mb-10 max-w-md mx-auto">
             Talk to me on WhatsApp and we can align everything in 15 minutes.
           </p>
 
           <motion.a
-            href="https://wa.me/5541996713782"
+            href={wa(WA_MESSAGES.contact)}
+            target="_blank"
+            rel="noopener noreferrer"
             whileHover={!reduceMotion ? { scale: 1.04 } : undefined}
             whileTap={!reduceMotion ? { scale: 0.97 } : undefined}
-            className="inline-flex items-center gap-2.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-10 py-4 rounded-xl text-base font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
+            className="inline-flex items-center gap-2.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-8 md:px-10 py-4 rounded-xl text-base font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
           >
             <WhatsAppIcon className="w-5 h-5" />
             Talk to me

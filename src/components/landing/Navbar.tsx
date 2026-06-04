@@ -5,12 +5,16 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import WhatsAppIcon from "./WhatsAppIcon"
+import UserMenu from "../auth/UserMenu"
+import { useAuth } from "../../contexts/AuthContext"
+import { wa, WA_MESSAGES } from "../../lib/utils"
 
 const links = [
   { name: "Services", href: "#services" },
   { name: "Process", href: "#process" },
   { name: "Work", href: "#work" },
   { name: "Feedbacks", href: "/feedback" },
+  { name: "Forum", href: "/forum" },
   { name: "FAQ", href: "#faq" },
   { name: "Contact", href: "#contact" },
 ]
@@ -19,6 +23,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState("")
+  const { user, isAdmin, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const isLanding = location.pathname === "/"
@@ -107,21 +112,26 @@ export default function Navbar() {
           })}
         </div>
 
-        <motion.a
-          href="https://wa.me/5511999999999"
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.97 }}
-          className="hidden lg:inline-flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
-        >
-          <WhatsAppIcon />
-          Talk to me
-        </motion.a>
+        <div className="hidden lg:flex items-center gap-3">
+          <UserMenu />
+          <motion.a
+            href={wa(WA_MESSAGES.general)}
+            target="_blank"
+            rel="noopener noreferrer"
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.97 }}
+            className="inline-flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
+          >
+            <WhatsAppIcon />
+            Talk to me
+          </motion.a>
+        </div>
 
-        <button
-          className="lg:hidden text-zinc-400 p-2"
-          onClick={() => setOpen(!open)}
-          aria-label="Menu"
-        >
+          <button
+            className="lg:hidden text-zinc-400 p-3 -mr-2"
+            onClick={() => setOpen(!open)}
+            aria-label="Menu"
+          >
           {open ? <X size={22} /> : <Menu size={22} />}
         </button>
       </div>
@@ -149,8 +159,59 @@ export default function Navbar() {
                   </button>
                 )
               })}
+
+              <div className="mt-4 border-t border-white/[0.08] pt-4">
+                {user ? (
+                  <div className="space-y-2">
+                    {[
+                      { label: "My Profile", href: "/profile" },
+                      { label: "My Posts", href: "/profile?tab=posts" },
+                      { label: "Saved Posts", href: "/profile?tab=saved" },
+                      { label: "Settings", href: "/profile?tab=settings" },
+                      ...(isAdmin ? [{ label: "Admin Panel", href: "/admin" }] : []),
+                    ].map((item) => (
+                      <Link
+                        key={item.label}
+                        to={item.href}
+                        onClick={() => setOpen(false)}
+                        className={`block text-left text-base font-medium transition-colors py-2 ${
+                          item.label === "Admin Panel" ? "text-[#3b82f6]" : "text-zinc-500 hover:text-zinc-200"
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                    <button
+                      onClick={() => { setOpen(false); signOut(); navigate("/") }}
+                      className="block text-left text-base font-medium text-zinc-500 hover:text-red-400 transition-colors py-2"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <Link
+                      to="/login"
+                      onClick={() => setOpen(false)}
+                      className="block text-center text-base font-medium text-zinc-300 hover:text-white border border-white/[0.08] rounded-xl px-6 py-3 transition-colors"
+                    >
+                      Login
+                    </Link>
+                    <Link
+                      to="/signup"
+                      onClick={() => setOpen(false)}
+                      className="block text-center text-base font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-xl px-6 py-3 border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
+                    >
+                      Sign Up
+                    </Link>
+                  </div>
+                )}
+              </div>
+
               <motion.a
-              href="https://wa.me/5511999999999"
+          href={wa(WA_MESSAGES.general)}
+          target="_blank"
+          rel="noopener noreferrer"
               whileTap={{ scale: 0.97 }}
               className="inline-flex items-center justify-center gap-2 text-center bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-6 py-3 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] mt-2"
               >

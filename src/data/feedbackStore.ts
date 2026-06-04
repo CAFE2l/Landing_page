@@ -9,6 +9,7 @@ export interface UserProfile {
   role: UserRole
   username?: string
   company?: string
+  country?: string
   photoUrl?: string
   createdAt?: string
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, useReducedMotion } from "framer-motion"
+import { countUsers, countProjects, countCountries } from "../../data/firestoreStore"
 
 const titleLine1 = "I Build Digital Products"
 const titleLine2 = "That Win Clients"
@@ -39,6 +40,7 @@ function AnimatedNumber({ end, suffix = "" }: { end: number; suffix?: string }) 
   const hasAnimated = useRef(false)
 
   useEffect(() => {
+    if (end === 0) return
     const el = ref.current
     if (!el) return
     const observer = new IntersectionObserver(
@@ -67,15 +69,39 @@ function AnimatedNumber({ end, suffix = "" }: { end: number; suffix?: string }) 
   return <span ref={ref}>{count}{suffix}</span>
 }
 
+const statLabels = [
+  { key: "clients", label: "Clients" },
+  { key: "projects", label: "Projects delivered" },
+  { key: "countries", label: "Countries" },
+] as const
+
 export default function Hero() {
   const reduceMotion = useReducedMotion()
+  const [stats, setStats] = useState({ clients: 0, projects: 0, countries: 0 })
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    const fetch = async () => {
+      const [clients, projects, countries] = await Promise.all([
+        countUsers(),
+        countProjects(),
+        countCountries(),
+      ])
+      if (cancelled) return
+      setStats({ clients, projects, countries })
+      setLoaded(true)
+    }
+    fetch()
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-32 pb-24 overflow-hidden">
       <div className="absolute inset-0 bg-dot-grid" />
 
       <motion.div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#2563eb] rounded-full pointer-events-none"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[450px] sm:h-[450px] lg:w-[600px] lg:h-[600px] bg-[#2563eb] rounded-full pointer-events-none"
         style={{ filter: "blur(150px)" }}
         animate={
           !reduceMotion
@@ -170,26 +196,17 @@ export default function Hero() {
           {...fadeUp(0.9)}
           className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm text-zinc-600"
         >
-          <span className="flex items-center gap-1.5">
-            <span className="text-[#3b82f6] font-semibold">
-              <AnimatedNumber end={20} suffix="+" />
+          {statLabels.map((s, i) => (
+            <span key={s.key} className="flex items-center gap-1.5">
+              <span className="text-[#3b82f6] font-semibold">
+                {loaded ? <AnimatedNumber end={stats[s.key]} suffix="+" /> : <span className="text-zinc-600">--</span>}
+              </span>
+              {s.label}
+              {i < statLabels.length - 1 && (
+                <span className="w-1 h-1 rounded-full bg-zinc-700 hidden sm:inline-block ml-6" />
+              )}
             </span>
-            Clients
-          </span>
-          <span className="w-1 h-1 rounded-full bg-zinc-700 hidden sm:block" />
-          <span className="flex items-center gap-1.5">
-            <span className="text-[#3b82f6] font-semibold">
-              <AnimatedNumber end={50} suffix="+" />
-            </span>
-            Projects delivered
-          </span>
-          <span className="w-1 h-1 rounded-full bg-zinc-700 hidden sm:block" />
-          <span className="flex items-center gap-1.5">
-            <span className="text-[#3b82f6] font-semibold">
-              <AnimatedNumber end={12} suffix="+" />
-            </span>
-            Countries
-          </span>
+          ))}
         </motion.div>
 
         <motion.div

@@ -79,7 +79,7 @@ export default function Process() {
   const reduceMotion = useReducedMotion()
 
   return (
-    <section id="process" className="py-32 relative">
+    <section id="process" className="py-20 md:py-32 relative">
       <div className="container mx-auto px-6">
         <SectionHeading
           label="Process"

@@ -1,35 +1,31 @@
 import { useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { ArrowRight, Building2, CheckCircle, Loader2, LockKeyhole, Mail, ShieldCheck, Sparkles, User, XCircle } from "lucide-react"
+import { ArrowRight, Building2, CheckCircle, Globe, Loader2, LockKeyhole, Mail, ShieldCheck, Sparkles, User, XCircle } from "lucide-react"
 import { motion } from "framer-motion"
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  updateProfile,
-} from "firebase/auth"
 import AuthBackground from "../components/auth/AuthBackground"
 import Navbar from "../components/landing/Navbar"
 import { saveCurrentUser, type UserProfile } from "../data/feedbackStore"
 import { checkUsernameAvailability, normalizeUsername } from "../data/firestoreStore"
-import { auth, googleProvider } from "../lib/firebase"
-import { resolveUserProfile } from "../lib/userRoles"
+import { supabase, supabaseConfigured } from "../lib/supabase/client"
+import { upsertPublicUser } from "../lib/supabaseProfile"
 
 interface AuthPageProps {
   mode: "login" | "signup"
   onAuth: (user: UserProfile) => void
 }
 
-const getAuthErrorMessage = (error: unknown) => {
+const getSupabaseErrorMessage = (error: unknown) => {
   if (!(error instanceof Error)) return "Could not authenticate. Try again."
 
-  if (error.message.includes("auth/email-already-in-use")) return "This email is already registered."
-  if (error.message.includes("auth/invalid-credential")) return "Invalid email or password."
-  if (error.message.includes("auth/popup-closed-by-user")) return "Google login was cancelled."
-  if (error.message.includes("auth/unauthorized-domain")) return "This domain is not authorized in Firebase."
-  if (error.message.includes("auth/weak-password")) return "Password must have at least 6 characters."
+  const msg = error.message
+  if (msg.includes("User already registered")) return "This email is already registered."
+  if (msg.includes("Invalid login credentials")) return "Invalid email or password."
+  if (msg.includes("popup_closed_by_user")) return "Google login was cancelled."
+  if (msg.includes("Password should be at least 6 characters")) return "Password must have at least 6 characters."
+  if (msg.includes("Email not confirmed")) return "Please confirm your email before logging in."
+  if (msg.includes("rate_limit")) return "Too many attempts. Try again later."
 
-  return error.message
+  return msg
 }
 
 export default function AuthPage({ mode, onAuth }: AuthPageProps) {
@@ -37,6 +33,7 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
   const [name, setName] = useState("")
   const [username, setUsername] = useState("")
   const [company, setCompany] = useState("")
+  const [country, setCountry] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [authError, setAuthError] = useState("")
@@ -53,9 +50,14 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
     if (usernameState !== "checking") return
 
     const timeout = window.setTimeout(async () => {
-      const result = await checkUsernameAvailability(normalized)
-      setUsernameState(result.available ? "available" : result.message === "Invalid format" ? "invalid" : "taken")
-      setUsernameError(result.message)
+      try {
+        const result = await checkUsernameAvailability(normalized)
+        setUsernameState(result.available ? "available" : result.message === "Invalid format" ? "invalid" : "taken")
+        setUsernameError(result.message)
+      } catch {
+        setUsernameState("idle")
+        setUsernameError("")
+      }
     }, 600)
 
     return () => window.clearTimeout(timeout)
@@ -81,19 +83,10 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
     setUsernameError("")
   }
 
-  const finishAuth = async (uid: string, userEmail: string, userName?: string, selectedUsername?: string) => {
-    const normalizedEmail = userEmail.trim().toLowerCase()
-
-    const user = await resolveUserProfile({
-      uid,
-      name: userName || "Client",
-      email: normalizedEmail,
-      username: selectedUsername,
-      company: isSignup && company.trim() ? company.trim() : undefined,
-    })
-
+  const finishAuth = async (user: UserProfile) => {
     saveCurrentUser(user)
     onAuth(user)
+    upsertPublicUser(user)
     navigate(user.role === "admin" ? "/admin" : "/profile")
   }
 
@@ -103,8 +96,8 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
     setEmailLoading(true)
 
     try {
-      if (!auth) {
-        setAuthError("Firebase authentication is not configured.")
+      if (!supabase || !supabaseConfigured) {
+        setAuthError("Authentication is not configured.")
         return
       }
 
@@ -133,6 +126,11 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
           return
         }
 
+        if (!country.trim()) {
+          setAuthError("Country is required.")
+          return
+        }
+
         const usernameCheck = await checkUsernameAvailability(normalizedUsername)
         if (!usernameCheck.available) {
           setUsernameError(usernameCheck.message)
@@ -140,18 +138,58 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
           return
         }
 
-        const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, password)
-        const displayName = name.trim() || "Client"
+        const meta = {
+          name: name.trim() || "Client",
+          username: normalizedUsername,
+          company: company.trim() || undefined,
+          country: country.trim(),
+          role: "client",
+        }
 
-        await updateProfile(credential.user, { displayName })
-        await finishAuth(credential.user.uid, normalizedEmail, displayName, normalizedUsername)
+        const { data, error } = await supabase.auth.signUp({
+          email: normalizedEmail,
+          password,
+          options: { data: meta },
+        })
+
+        if (error) throw error
+        if (!data.user) throw new Error("Could not create account.")
+
+        const profile: UserProfile = {
+          uid: data.user.id,
+          name: meta.name,
+          email: normalizedEmail,
+          role: meta.role as "client",
+          username: meta.username,
+          company: meta.company,
+          country: meta.country,
+        }
+        await finishAuth(profile)
         return
       }
 
-      const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password)
-      await finishAuth(credential.user.uid, normalizedEmail, credential.user.displayName || undefined)
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      })
+
+      if (error) throw error
+      if (!data.user) throw new Error("Could not sign in.")
+
+      const meta = data.user.user_metadata || {}
+      const profile: UserProfile = {
+        uid: data.user.id,
+        name: meta.name || data.user.email?.split("@")[0] || "User",
+        email: data.user.email || normalizedEmail,
+        role: meta.role || "client",
+        username: meta.username || undefined,
+        company: meta.company || undefined,
+        country: meta.country || undefined,
+        photoUrl: meta.avatar_url || meta.photoUrl || undefined,
+      }
+      await finishAuth(profile)
     } catch (error) {
-      setAuthError(getAuthErrorMessage(error))
+      setAuthError(getSupabaseErrorMessage(error))
     } finally {
       setEmailLoading(false)
     }
@@ -162,24 +200,22 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
     setGoogleLoading(true)
 
     try {
-      if (!auth) {
-        setAuthError("Firebase authentication is not configured.")
+      if (!supabase || !supabaseConfigured) {
+        setAuthError("Authentication is not configured.")
         return
       }
 
-      const credential = await signInWithPopup(auth, googleProvider)
-      const googleUser = credential.user
-      const userEmail = googleUser.email
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: { access_type: "offline", prompt: "consent" },
+        },
+      })
 
-      if (!userEmail) {
-        setAuthError("Your Google account did not return an email address.")
-        return
-      }
-
-      await finishAuth(googleUser.uid, userEmail, googleUser.displayName || undefined)
+      if (error) throw error
     } catch (error) {
-      setAuthError(getAuthErrorMessage(error))
-    } finally {
+      setAuthError(getSupabaseErrorMessage(error))
       setGoogleLoading(false)
     }
   }
@@ -340,13 +376,51 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
                 </label>
 
                 {isSignup && (
-                  <label className="block">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Company <span className="font-medium tracking-normal text-zinc-700">(optional)</span></span>
-                    <span className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/25 px-4 py-3.5 transition-colors focus-within:border-[#3b82f6]/50 focus-within:bg-[#020408]/70">
-                      <Building2 size={18} className="text-zinc-500" />
-                      <input value={company} onChange={(event) => setCompany(event.target.value)} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700" placeholder="Company name, if you have one" />
-                    </span>
-                  </label>
+                  <>
+                    <label className="block">
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Company <span className="font-medium tracking-normal text-zinc-700">(optional)</span></span>
+                      <span className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/25 px-4 py-3.5 transition-colors focus-within:border-[#3b82f6]/50 focus-within:bg-[#020408]/70">
+                        <Building2 size={18} className="text-zinc-500" />
+                        <input value={company} onChange={(event) => setCompany(event.target.value)} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700" placeholder="Company name, if you have one" />
+                      </span>
+                    </label>
+                    <label className="block">
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Country <span className="text-red-400">*</span></span>
+                      <span className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/25 px-4 py-3.5 transition-colors focus-within:border-[#3b82f6]/50 focus-within:bg-[#020408]/70">
+                        <Globe size={18} className="text-zinc-500" />
+                        <input
+                          required
+                          value={country}
+                          onChange={(event) => setCountry(event.target.value)}
+                          className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700"
+                          placeholder="e.g. Brazil"
+                          list="countries"
+                        />
+                      </span>
+                      <datalist id="countries">
+                        <option value="Brazil" />
+                        <option value="United States" />
+                        <option value="Canada" />
+                        <option value="United Kingdom" />
+                        <option value="Germany" />
+                        <option value="France" />
+                        <option value="Spain" />
+                        <option value="Portugal" />
+                        <option value="Italy" />
+                        <option value="Netherlands" />
+                        <option value="Argentina" />
+                        <option value="Colombia" />
+                        <option value="Chile" />
+                        <option value="Mexico" />
+                        <option value="Australia" />
+                        <option value="Japan" />
+                        <option value="India" />
+                        <option value="China" />
+                        <option value="South Africa" />
+                        <option value="Other" />
+                      </datalist>
+                    </label>
+                  </>
                 )}
 
                 <button disabled={emailLoading} className="group mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#3b82f6]/50 bg-[#2563eb] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_0_28px_rgba(37,99,235,0.38)] transition-all hover:bg-[#1d4ed8] hover:shadow-[0_0_42px_rgba(37,99,235,0.48)] disabled:cursor-not-allowed disabled:opacity-70">

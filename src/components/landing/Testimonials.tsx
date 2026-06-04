@@ -15,7 +15,7 @@ export default function Testimonials({ feedbacks }: TestimonialsProps) {
   const approved = feedbacks.filter((item) => item.approved).slice(0, 3)
 
   return (
-    <section className="py-32 relative">
+    <section className="py-20 md:py-32 relative">
       <div className="container mx-auto px-6">
         <SectionHeading
           label="Testimonials"
@@ -24,7 +24,7 @@ export default function Testimonials({ feedbacks }: TestimonialsProps) {
         />
 
         {approved.length > 0 ? (
-          <div className="grid md:grid-cols-3 gap-5 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-6xl mx-auto">
             {approved.map((item) => (
               <article key={item.id} className="rounded-2xl border border-white/[0.08] bg-[#0a1628] p-7">
                 <p className="text-sm text-zinc-400 leading-relaxed mb-5">&ldquo;{item.quote}&rdquo;</p>

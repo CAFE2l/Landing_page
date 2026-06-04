@@ -14,6 +14,7 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore"
 import { db } from "../lib/firebase"
+import { supabase, supabaseConfigured } from "../lib/supabase/client"
 import type { FeedbackEntry, UserProfile, UserRole } from "./feedbackStore"
 
 export type FeedbackStatus = "pending" | "approved" | "rejected"
@@ -63,6 +64,7 @@ const mapUser = (snapshot: QueryDocumentSnapshot<DocumentData>): UserProfile => 
     username: readString(data, "username"),
     role,
     company: readString(data, "company") || undefined,
+    country: readString(data, "country") || undefined,
     photoUrl: readString(data, "photoUrl") || undefined,
     createdAt: toIsoDate(data.createdAt),
   }
@@ -109,114 +111,231 @@ export const checkUsernameAvailability = async (username: string, currentUid?: s
     return { available: false, message: "Firebase is not configured", username: normalized }
   }
 
-  const usernameQuery = query(collection(db, "users"), where("username", "==", normalized), limit(1))
-  const snapshot = await getDocs(usernameQuery)
-  const existing = snapshot.docs[0]
-  const available = !existing || existing.id === currentUid
+  try {
+    const usernameQuery = query(collection(db, "users"), where("username", "==", normalized), limit(1))
+    const snapshot = await getDocs(usernameQuery)
+    const existing = snapshot.docs[0]
+    const available = !existing || existing.id === currentUid
 
-  return {
-    available,
-    message: available ? "Username available" : "Username already taken",
-    username: normalized,
+    return {
+      available,
+      message: available ? "Username available" : "Username already taken",
+      username: normalized,
+    }
+  } catch {
+    return { available: false, message: "Unable to verify username", username: normalized }
   }
 }
 
 export const saveUserProfile = async (user: UserProfile) => {
   if (!db || !user.uid) return
 
-  await setDoc(
-    doc(db, "users", user.uid),
-    {
-      uid: user.uid,
-      name: user.name,
-      email: user.email,
-      username: user.username || "",
-      role: user.role,
-      company: user.company || "",
-      photoUrl: user.photoUrl || "",
-      updatedAt: serverTimestamp(),
-      createdAt: user.createdAt || serverTimestamp(),
-    },
-    { merge: true },
-  )
+  try {
+    await setDoc(
+      doc(db, "users", user.uid),
+      {
+        uid: user.uid,
+        name: user.name,
+        email: user.email,
+        username: user.username || "",
+        role: user.role,
+        company: user.company || "",
+        country: user.country || "",
+        photoUrl: user.photoUrl || "",
+        updatedAt: serverTimestamp(),
+        createdAt: user.createdAt || serverTimestamp(),
+      },
+      { merge: true },
+    )
+  } catch {
+    // Silently fail — Firestore may not be configured or permissions may be denied
+  }
 }
 
 export const listUsers = async () => {
   if (!db) return []
-  const snapshot = await getDocs(query(collection(db, "users"), orderBy("createdAt", "desc")))
-  return snapshot.docs.map(mapUser)
+  try {
+    const snapshot = await getDocs(query(collection(db, "users"), orderBy("createdAt", "desc")))
+    return snapshot.docs.map(mapUser)
+  } catch {
+    return []
+  }
 }
 
 export const listFeedbacks = async () => {
   if (!db) return []
-  const snapshot = await getDocs(query(collection(db, "feedbacks"), orderBy("createdAt", "desc")))
-  return snapshot.docs.map(mapFeedback)
+  try {
+    const snapshot = await getDocs(query(collection(db, "feedbacks"), orderBy("createdAt", "desc")))
+    return snapshot.docs.map(mapFeedback)
+  } catch {
+    return []
+  }
 }
 
 export const listPublicFeedbacks = async () => {
   if (!db) return []
-  const snapshot = await getDocs(
-    query(
-      collection(db, "feedbacks"),
-      where("status", "==", "approved"),
-      where("showOnPublicPage", "==", true),
-    ),
-  )
-  return snapshot.docs.map(mapFeedback).sort((a, b) => (a.order || 0) - (b.order || 0))
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(db, "feedbacks"),
+        where("status", "==", "approved"),
+        where("showOnPublicPage", "==", true),
+      ),
+    )
+    return snapshot.docs.map(mapFeedback).sort((a, b) => (a.order || 0) - (b.order || 0))
+  } catch {
+    return []
+  }
 }
 
 export const createFeedback = async (feedback: FeedbackEntry) => {
   if (!db) return
-  const feedbackRef = doc(collection(db, "feedbacks"))
+  try {
+    const feedbackRef = doc(collection(db, "feedbacks"))
 
-  await setDoc(feedbackRef, {
-    ...feedback,
-    id: feedbackRef.id,
-    status: feedback.status || "pending",
-    approved: feedback.status === "approved" || feedback.approved === true,
-    showOnPublicPage: feedback.showOnPublicPage || false,
-    order: feedback.order || Date.now(),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
+    await setDoc(feedbackRef, {
+      ...feedback,
+      id: feedbackRef.id,
+      status: feedback.status || "pending",
+      approved: feedback.status === "approved" || feedback.approved === true,
+      showOnPublicPage: feedback.showOnPublicPage || false,
+      order: feedback.order || Date.now(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+  } catch {
+    // Silently fail
+  }
 }
 
 export const updateUserRole = async (uid: string, role: UserRole) => {
   if (!db) return
-  await updateDoc(doc(db, "users", uid), { role, updatedAt: serverTimestamp() })
+  try {
+    await updateDoc(doc(db, "users", uid), { role, updatedAt: serverTimestamp() })
+  } catch {
+    // Silently fail
+  }
 }
 
 export const deleteUserProfile = async (uid: string) => {
   if (!db) return
-  await deleteDoc(doc(db, "users", uid))
+  try {
+    await deleteDoc(doc(db, "users", uid))
+  } catch {
+    // Silently fail
+  }
 }
 
 export const updateFeedbackStatus = async (id: string, status: FeedbackStatus) => {
   if (!db) return
-  await updateDoc(doc(db, "feedbacks", id), {
-    status,
-    approved: status === "approved",
-    updatedAt: serverTimestamp(),
-  })
+  try {
+    await updateDoc(doc(db, "feedbacks", id), {
+      status,
+      approved: status === "approved",
+      updatedAt: serverTimestamp(),
+    })
+  } catch {
+    // Silently fail
+  }
 }
 
 export const deleteFeedbackEntry = async (id: string) => {
   if (!db) return
-  await deleteDoc(doc(db, "feedbacks", id))
+  try {
+    await deleteDoc(doc(db, "feedbacks", id))
+  } catch {
+    // Silently fail
+  }
 }
 
 export const updateTestimonialVisibility = async (id: string, showOnPublicPage: boolean) => {
   if (!db) return
-  await updateDoc(doc(db, "feedbacks", id), {
-    showOnPublicPage,
-    updatedAt: serverTimestamp(),
-  })
+  try {
+    await updateDoc(doc(db, "feedbacks", id), {
+      showOnPublicPage,
+      updatedAt: serverTimestamp(),
+    })
+  } catch {
+    // Silently fail
+  }
 }
 
 export const updateTestimonialOrder = async (id: string, order: number) => {
   if (!db) return
-  await updateDoc(doc(db, "feedbacks", id), {
-    order,
-    updatedAt: serverTimestamp(),
-  })
+  try {
+    await updateDoc(doc(db, "feedbacks", id), {
+      order,
+      updatedAt: serverTimestamp(),
+    })
+  } catch {
+    // Silently fail
+  }
+}
+
+export const countUsers = async (): Promise<number> => {
+  if (supabase && supabaseConfigured) {
+    try {
+      const { count, error } = await supabase
+        .from("users")
+        .select("*", { count: "exact", head: true })
+      if (!error && count !== null) return count
+    } catch {
+      // Fall through to Firestore
+    }
+  }
+
+  if (!db) return 0
+  try {
+    const snapshot = await getDocs(collection(db, "users"))
+    return snapshot.size
+  } catch {
+    return 0
+  }
+}
+
+export const countProjects = async (): Promise<number> => {
+  if (!db) return 0
+  try {
+    const snapshot = await getDocs(
+      query(collection(db, "feedbacks"), where("status", "in", ["approved", "completed", "done"])),
+    )
+    return snapshot.size
+  } catch {
+    return 0
+  }
+}
+
+export const countCountries = async (): Promise<number> => {
+  if (supabase && supabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("country")
+        .not("country", "is", null)
+
+      if (!error && data) {
+        const countries = new Set<string>()
+        data.forEach((row) => {
+          if (row.country && typeof row.country === "string" && row.country.trim())
+            countries.add(row.country.trim().toLowerCase())
+        })
+        return countries.size
+      }
+    } catch {
+      // Fall through to Firestore
+    }
+  }
+
+  if (!db) return 0
+  try {
+    const snapshot = await getDocs(collection(db, "users"))
+    const countries = new Set<string>()
+    snapshot.docs.forEach((d) => {
+      const c = d.data().country
+      if (c && typeof c === "string" && c.trim()) countries.add(c.trim().toLowerCase())
+    })
+    return countries.size
+  } catch {
+    return 0
+  }
 }

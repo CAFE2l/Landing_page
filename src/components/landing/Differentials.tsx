@@ -1,7 +1,7 @@
 "use client"
 
 import { motion, useReducedMotion } from "framer-motion"
-import { Palette, Zap, Code, Languages, LifeBuoy, Search } from "lucide-react"
+import { Palette, Zap, Code, LifeBuoy, Search } from "lucide-react"
 import SectionHeading from "./SectionHeading"
 
 const items = [
@@ -21,7 +21,7 @@ const items = [
     desc: "Modular, typed, and documented codebases. Easy to maintain, scale, or hand off.",
   },
   {
-    icon: Languages,
+    imgSrc: "/imgs/icons/Google_Translate.png",
     title: "Bilingual",
     desc: "Fluent in English and Portuguese. Clear communication across time zones and cultures.",
   },
@@ -50,7 +50,7 @@ export default function Differentials() {
   const reduceMotion = useReducedMotion()
 
   return (
-    <section className="py-32 relative">
+    <section className="py-20 md:py-32 relative">
       <div className="container mx-auto px-6">
         <SectionHeading
           label="Why hire me"
@@ -70,7 +70,11 @@ export default function Differentials() {
               className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-all duration-300 hover:bg-white/[0.04] hover:border-white/[0.10]"
             >
               <div className="w-10 h-10 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-4">
-                <item.icon className="text-zinc-400" size={18} />
+                {"imgSrc" in item ? (
+                  <img src={item.imgSrc} alt="" className="w-5 h-5 object-contain" />
+                ) : (
+                  <item.icon className="text-zinc-400" size={18} />
+                )}
               </div>
               <h3 className="text-base font-semibold text-white mb-1.5">
                 {item.title}
