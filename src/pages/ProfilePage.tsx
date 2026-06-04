@@ -17,8 +17,7 @@ import {
 import AuthBackground from "../components/auth/AuthBackground"
 import Navbar from "../components/landing/Navbar"
 import { AvatarUpload } from "../components/profile/AvatarUpload"
-import { getInitials, loadCurrentUser, saveCurrentUser, type FeedbackEntry, type UserProfile } from "../data/feedbackStore"
-import { isCloudinaryConfigured, uploadToCloudinary } from "../lib/cloudinary"
+import { loadCurrentUser, saveCurrentUser, type FeedbackEntry, type UserProfile } from "../data/feedbackStore"
 import { updateProfileMetadata, upsertPublicUser } from "../lib/supabaseProfile"
 import { supabase } from "../lib/supabase/client"
 
@@ -470,6 +469,8 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
   }, [showToast])
 
   if (!user) return <Navigate to="/login" replace />
+  // keep onSubmitFeedback reachable (some routes still pass it)
+  void onSubmitFeedback
 
   const updateField = (field: keyof ProfileForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }))
