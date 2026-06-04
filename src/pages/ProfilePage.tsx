@@ -965,31 +965,7 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
 
               </div>
 
-              <div className="mt-6">
-                  <h3 className="font-semibold text-white">Project feedback draft</h3>
-                  <p className="mt-1 text-sm text-[#94a3b8]">This keeps the existing feedback submission flow available.</p>
-                  <div className="mt-4 grid gap-3">
-                    <input name="project" required placeholder="Project name" className="rounded-xl border border-[#1a2d4a] bg-[#0a1628] px-4 py-3 text-sm text-white outline-none placeholder:text-[#475569] focus:border-[#2563eb]" />
-                    <input name="result" placeholder="Result achieved" className="rounded-xl border border-[#1a2d4a] bg-[#0a1628] px-4 py-3 text-sm text-white outline-none placeholder:text-[#475569] focus:border-[#2563eb]" />
-                    <textarea name="quote" required rows={4} placeholder="Write feedback..." className="resize-none rounded-xl border border-[#1a2d4a] bg-[#0a1628] px-4 py-3 text-sm text-white outline-none placeholder:text-[#475569] focus:border-[#2563eb]" />
-                    <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-dashed border-[#1a2d4a] bg-[#0a1628] px-4 py-3 text-sm text-[#94a3b8] transition-colors hover:border-[#2563eb]/40 hover:text-white">
-                      <span className="flex items-center gap-2">
-                        {feedbackMediaUploading ? <Loader2 size={17} className="animate-spin text-[#60a5fa]" /> : <ImagePlus size={17} className="text-[#60a5fa]" />}
-                        {feedbackMediaName || "Attach image or video"}
-                      </span>
-                      <span className="text-xs text-[#475569]">Cloudinary</span>
-                      <input
-                        type="file"
-                        accept="image/*,video/*"
-                        className="sr-only"
-                        onChange={(event) => handleFeedbackMediaUpload(event.target.files?.[0])}
-                      />
-                    </label>
-                    <button className="w-fit rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)]">
-                      Submit feedback
-                    </button>
-                  </div>
-                </form>
+              <div className="mt-6" />
               </motion.div>
             )}
           </AnimatePresence>
