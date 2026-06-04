@@ -3,10 +3,14 @@ const SESSION_KEY = "cafe-services-user"
 export type UserRole = "client" | "admin"
 
 export interface UserProfile {
+  uid?: string
   name: string
   email: string
   role: UserRole
+  username?: string
   company?: string
+  photoUrl?: string
+  createdAt?: string
 }
 
 export interface FeedbackEntry {
@@ -22,8 +26,14 @@ export interface FeedbackEntry {
   result?: string
   mediaType?: "image" | "video"
   mediaUrl?: string
+  status?: "pending" | "approved" | "rejected"
   approved?: boolean
+  userId?: string
+  username?: string
+  showOnPublicPage?: boolean
+  order?: number
   createdAt: string
+  updatedAt?: string
 }
 
 export const getInitials = (name: string) =>

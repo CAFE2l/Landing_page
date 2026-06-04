@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { BrowserRouter, Route, Routes } from "react-router-dom"
 import AdminPage from "./pages/AdminPage"
 import AuthPage from "./pages/AuthPage"
@@ -12,26 +12,24 @@ import {
   type FeedbackEntry,
   type UserProfile,
 } from "./data/feedbackStore"
+import { createFeedback, listPublicFeedbacks } from "./data/firestoreStore"
 
 function App() {
   const [feedbacks, setFeedbacks] = useState<FeedbackEntry[]>(() => loadFeedbacks())
   const [user, setUser] = useState<UserProfile | null>(() => loadCurrentUser())
+
+  useEffect(() => {
+    listPublicFeedbacks().then(setFeedbacks).catch(() => setFeedbacks([]))
+  }, [])
 
   const persistFeedbacks = (nextFeedbacks: FeedbackEntry[]) => {
     setFeedbacks(nextFeedbacks)
     saveFeedbacks(nextFeedbacks)
   }
 
-  const addFeedback = (feedback: FeedbackEntry) => {
+  const addFeedback = async (feedback: FeedbackEntry) => {
+    await createFeedback(feedback)
     persistFeedbacks([feedback, ...feedbacks])
-  }
-
-  const updateApproval = (id: string, approved: boolean) => {
-    persistFeedbacks(feedbacks.map((item) => (item.id === id ? { ...item, approved } : item)))
-  }
-
-  const deleteFeedback = (id: string) => {
-    persistFeedbacks(feedbacks.filter((item) => item.id !== id))
   }
 
   return (
@@ -45,15 +43,7 @@ function App() {
         <Route path="/perfil" element={<ProfilePage user={user} onSubmitFeedback={addFeedback} />} />
         <Route
           path="/admin"
-          element={
-            <AdminPage
-              user={user}
-              feedbacks={feedbacks}
-              onApprove={(id) => updateApproval(id, true)}
-              onReject={(id) => updateApproval(id, false)}
-              onDelete={deleteFeedback}
-            />
-          }
+          element={<AdminPage user={user} />}
         />
       </Routes>
     </BrowserRouter>

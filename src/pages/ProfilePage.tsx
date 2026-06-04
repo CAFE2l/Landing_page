@@ -2,22 +2,26 @@ import { useEffect, useMemo, useState } from "react"
 import { Link, Navigate } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
 import {
-  BadgeCheck,
   Camera,
   CheckCircle2,
   ChevronRight,
+  Eye,
+  EyeOff,
+  ImagePlus,
   KeyRound,
   Lock,
+  Loader2,
+  MessageSquareText,
   Save,
   Shield,
   ShoppingBag,
-  Smartphone,
   User,
   Wrench,
 } from "lucide-react"
 import AuthBackground from "../components/auth/AuthBackground"
 import Navbar from "../components/landing/Navbar"
-import { getInitials, type FeedbackEntry, type UserProfile } from "../data/feedbackStore"
+import { getInitials, saveCurrentUser, type FeedbackEntry, type UserProfile } from "../data/feedbackStore"
+import { isCloudinaryConfigured, uploadToCloudinary } from "../lib/cloudinary"
 
 interface ProfilePageProps {
   user: UserProfile | null
@@ -44,7 +48,7 @@ const tabs = [
 const links = [
   { label: "My Orders", icon: ShoppingBag, href: "/pedidos" },
   { label: "My Services", icon: Wrench, href: "/meus-servicos" },
-  { label: "My Warranties", icon: BadgeCheck, href: "/minhas-garantias" },
+  { label: "My Feedbacks", icon: MessageSquareText, href: "/feedback" },
 ]
 
 const countryCodes = [
@@ -164,10 +168,49 @@ function Field({
   )
 }
 
+function getPasswordStrength(password: string) {
+  const checks = [
+    password.length >= 8,
+    /[A-Z]/.test(password),
+    /[a-z]/.test(password),
+    /\d/.test(password),
+    /[^A-Za-z0-9]/.test(password),
+  ]
+  const score = checks.filter(Boolean).length
+
+  if (!password) {
+    return { score: 0, label: "No password", color: "#475569", width: "0%" }
+  }
+
+  if (score <= 2) {
+    return { score, label: "Weak password", color: "#ef4444", width: "33%" }
+  }
+
+  if (score <= 4) {
+    return { score, label: "Medium password", color: "#f59e0b", width: "66%" }
+  }
+
+  return { score, label: "Strong password", color: "#22c55e", width: "100%" }
+}
+
 export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>("profile")
   const [isEditing, setIsEditing] = useState(false)
   const [showToast, setShowToast] = useState(false)
+  const [toastCopy, setToastCopy] = useState({
+    title: "Profile updated",
+    subtitle: "Your changes were saved.",
+  })
+  const [avatarUrl, setAvatarUrl] = useState(user?.photoUrl || "")
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [feedbackMediaUrl, setFeedbackMediaUrl] = useState("")
+  const [feedbackMediaType, setFeedbackMediaType] = useState<"image" | "video">("image")
+  const [feedbackMediaName, setFeedbackMediaName] = useState("")
+  const [feedbackMediaUploading, setFeedbackMediaUploading] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPasswords, setShowPasswords] = useState(false)
   const [form, setForm] = useState<ProfileForm>({
     fullName: user?.name || "",
     email: user?.email || "",
@@ -178,6 +221,8 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
 
   const displayName = savedForm.fullName || user?.name || "Client"
   const initials = useMemo(() => getInitials(displayName), [displayName])
+  const passwordStrength = useMemo(() => getPasswordStrength(newPassword), [newPassword])
+  const passwordsMatch = !confirmPassword || newPassword === confirmPassword
 
   useEffect(() => {
     if (!showToast) return
@@ -191,10 +236,61 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
     setForm((current) => ({ ...current, [field]: value }))
   }
 
+  const notify = (title: string, subtitle: string) => {
+    setToastCopy({ title, subtitle })
+    setShowToast(true)
+  }
+
+  const handleAvatarUpload = async (file?: File) => {
+    if (!file) return
+    setAvatarUploading(true)
+    const localPreview = URL.createObjectURL(file)
+    setAvatarUrl(localPreview)
+
+    try {
+      if (!isCloudinaryConfigured()) {
+        notify("Preview ready", "Add Cloudinary env vars to upload permanently.")
+        return
+      }
+
+      const result = await uploadToCloudinary(file, "cafe-services/users/profile-photos")
+      setAvatarUrl(result.secure_url)
+      saveCurrentUser({ ...user, photoUrl: result.secure_url })
+      notify("Photo updated", "Your profile photo was uploaded.")
+    } catch {
+      notify("Upload failed", "Could not upload the profile photo.")
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
+
+  const handleFeedbackMediaUpload = async (file?: File) => {
+    if (!file) return
+    setFeedbackMediaUploading(true)
+    setFeedbackMediaName(file.name)
+    setFeedbackMediaType(file.type.startsWith("video") ? "video" : "image")
+
+    try {
+      if (!isCloudinaryConfigured()) {
+        setFeedbackMediaUrl(URL.createObjectURL(file))
+        notify("Media preview ready", "Add Cloudinary env vars to upload permanently.")
+        return
+      }
+
+      const result = await uploadToCloudinary(file, "cafe-services/feedback-media")
+      setFeedbackMediaUrl(result.secure_url)
+      notify("Media uploaded", "The feedback media is ready.")
+    } catch {
+      notify("Upload failed", "Could not upload the feedback media.")
+    } finally {
+      setFeedbackMediaUploading(false)
+    }
+  }
+
   const saveProfile = () => {
     setSavedForm(form)
     setIsEditing(false)
-    setShowToast(true)
+    notify("Profile updated", "Your changes were saved.")
   }
 
   const cancelEdit = () => {
@@ -214,25 +310,44 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
       quote,
       project,
       result,
-      mediaUrl: "",
-      mediaType: "image",
+      mediaUrl: feedbackMediaUrl,
+      mediaType: feedbackMediaType,
       name: displayName,
       role: "Client",
       company: user.company || "CAFÉ SERVICES Client",
       flag: "🌎",
       initials: getInitials(displayName),
       rating: 5,
+      status: "pending",
       approved: false,
+      userId: user.uid,
+      username: user.username,
+      showOnPublicPage: false,
       createdAt: new Date().toISOString(),
     })
     event.currentTarget.reset()
-    setShowToast(true)
+    setFeedbackMediaUrl("")
+    setFeedbackMediaName("")
+    notify("Feedback submitted", "Your feedback is waiting for review.")
+  }
+
+  const submitPassword = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!passwordsMatch || passwordStrength.score < 3) {
+      notify("Password not updated", "Use a stronger password and make sure both fields match.")
+      return
+    }
+
+    setCurrentPassword("")
+    setNewPassword("")
+    setConfirmPassword("")
+    notify("Password updated", "Your new password was saved.")
   }
 
   const statItems = [
     { value: 0, label: "Orders" },
     { value: 0, label: "Services" },
-    { value: 0, label: "Warranties" },
+    { value: 0, label: "Feedbacks" },
   ]
 
   return (
@@ -254,13 +369,23 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
                 animate={{ opacity: [0.4, 0.8, 0.4], scale: [1.2, 1.4, 1.2] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               />
-              <div className="group relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#2563eb] to-[#0ea5e9] text-3xl font-bold text-white ring-4 ring-[#2563eb]/30 ring-offset-4 ring-offset-[#0a1628]">
-                {initials}
-                <div className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-full bg-black/70 opacity-0 backdrop-blur-sm transition-opacity duration-300 group-hover:opacity-100">
-                  <Camera size={20} className="text-white" />
-                  <span className="text-xs font-medium text-white">Change photo</span>
+              <label className="group relative flex h-28 w-28 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#2563eb] to-[#0ea5e9] text-3xl font-bold text-white ring-4 ring-[#2563eb]/30 ring-offset-4 ring-offset-[#0a1628]">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                ) : (
+                  initials
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(event) => handleAvatarUpload(event.target.files?.[0])}
+                />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-full bg-black/70 opacity-0 backdrop-blur-sm transition-opacity duration-300 group-hover:opacity-100">
+                  {avatarUploading ? <Loader2 size={20} className="animate-spin text-white" /> : <Camera size={20} className="text-white" />}
+                  <span className="text-xs font-medium text-white">{avatarUploading ? "Uploading" : "Change photo"}</span>
                 </div>
-              </div>
+              </label>
               <motion.span
                 className="absolute bottom-1 right-1 h-4 w-4 rounded-full border-2 border-[#0a1628] bg-[#22c55e]"
                 animate={{ scale: [1, 1.4, 1] }}
@@ -417,34 +542,143 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
               <motion.div key="security" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
                 <div className="mb-6 border-b border-[#1a2d4a] pb-6">
                   <h2 className="text-xl font-bold text-white">Security</h2>
-                  <p className="mt-1 text-sm text-[#94a3b8]">Review access and account protection settings</p>
+                  <p className="mt-1 text-sm text-[#94a3b8]">Update your password and review password strength</p>
                 </div>
-                <div className="space-y-4">
-                  {[
-                    { icon: KeyRound, title: "Password", text: "Password management will be connected when backend auth is available.", action: "Update password" },
-                    { icon: Smartphone, title: "Two-factor authentication", text: "Add an extra verification layer for sensitive account actions.", action: "Configure 2FA" },
-                    { icon: Shield, title: "Session security", text: "Active sessions and device history will appear here.", action: "View sessions" },
-                  ].map((item) => {
-                    const Icon = item.icon
-                    return (
-                      <div key={item.title} className="rounded-2xl border border-[#1a2d4a] bg-[#060d14] p-6">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex gap-4">
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/10 text-[#60a5fa]">
-                              <Icon size={20} />
-                            </div>
-                            <div>
-                              <h3 className="font-semibold text-white">{item.title}</h3>
-                              <p className="mt-1 text-sm leading-relaxed text-[#94a3b8]">{item.text}</p>
-                            </div>
-                          </div>
-                          <button className="rounded-xl border border-[#1a2d4a] px-4 py-2.5 text-sm font-semibold text-[#94a3b8] transition-colors hover:border-[#2a4a7a] hover:text-white">
-                            {item.action}
-                          </button>
-                        </div>
+
+                <form onSubmit={submitPassword} className="rounded-2xl border border-[#1a2d4a] bg-[#060d14] p-6">
+                  <div className="mb-6 flex items-start gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/10 text-[#60a5fa]">
+                      <KeyRound size={21} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white">Change password</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-[#94a3b8]">
+                        Choose a password with uppercase, lowercase, numbers, and symbols for stronger protection.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswords((current) => !current)}
+                      className="ml-auto rounded-xl border border-[#1a2d4a] p-2.5 text-[#94a3b8] transition-colors hover:border-[#2a4a7a] hover:text-white"
+                      aria-label={showPasswords ? "Hide passwords" : "Show passwords"}
+                    >
+                      {showPasswords ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+
+                  <div className="grid gap-4">
+                    {[
+                      {
+                        label: "Current password",
+                        value: currentPassword,
+                        setValue: setCurrentPassword,
+                        placeholder: "Enter current password",
+                      },
+                      {
+                        label: "New password",
+                        value: newPassword,
+                        setValue: setNewPassword,
+                        placeholder: "Create a strong password",
+                      },
+                      {
+                        label: "Confirm password",
+                        value: confirmPassword,
+                        setValue: setConfirmPassword,
+                        placeholder: "Repeat new password",
+                      },
+                    ].map((field, index) => (
+                      <motion.label
+                        key={field.label}
+                        initial={{ opacity: 0, x: -12 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.06 }}
+                        className="block"
+                      >
+                        <span className="mb-2 block font-mono text-xs uppercase tracking-wider text-[#475569]">{field.label}</span>
+                        <input
+                          type={showPasswords ? "text" : "password"}
+                          value={field.value}
+                          onChange={(event) => field.setValue(event.target.value)}
+                          placeholder={field.placeholder}
+                          className="w-full rounded-xl border border-[#1a2d4a] bg-[#0a1628] px-4 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-[#475569] focus:border-[#2563eb] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
+                        />
+                      </motion.label>
+                    ))}
+
+                    <div className="rounded-2xl border border-[#1a2d4a] bg-[#0a1628] p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="font-mono text-xs uppercase tracking-wider text-[#475569]">Password strength</span>
+                        <motion.span
+                          key={passwordStrength.label}
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-sm font-semibold"
+                          style={{ color: passwordStrength.color }}
+                        >
+                          {passwordStrength.label}
+                        </motion.span>
                       </div>
-                    )
-                  })}
+                      <div className="h-2 overflow-hidden rounded-full bg-[#060d14]">
+                        <motion.div
+                          className="h-full rounded-full"
+                          animate={{ width: passwordStrength.width, backgroundColor: passwordStrength.color }}
+                          transition={{ duration: 0.35, ease: "easeOut" }}
+                        />
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-[#94a3b8] sm:grid-cols-4">
+                        {[
+                          { label: "8+ chars", active: newPassword.length >= 8 },
+                          { label: "Uppercase", active: /[A-Z]/.test(newPassword) },
+                          { label: "Number", active: /\d/.test(newPassword) },
+                          { label: "Symbol", active: /[^A-Za-z0-9]/.test(newPassword) },
+                        ].map((rule) => (
+                          <span key={rule.label} className={rule.active ? "text-[#22c55e]" : "text-[#475569]"}>
+                            {rule.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {!passwordsMatch && (
+                      <p className="text-sm text-red-400">Passwords do not match.</p>
+                    )}
+
+                    <div className="flex items-center gap-3 border-t border-[#1a2d4a] pt-6">
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.97 }}
+                        className="flex items-center gap-2 rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300 hover:bg-[#1d4ed8] hover:shadow-[0_0_32px_rgba(37,99,235,0.55)]"
+                      >
+                        <Save size={16} />
+                        Update password
+                      </motion.button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentPassword("")
+                          setNewPassword("")
+                          setConfirmPassword("")
+                        }}
+                        className="rounded-xl border border-[#1a2d4a] px-6 py-2.5 text-sm text-[#94a3b8] transition-all duration-200 hover:border-[#2a4a7a] hover:text-white"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                </form>
+
+                <div className="mt-4 rounded-2xl border border-[#1a2d4a] bg-[#060d14] p-6">
+                  <div className="flex gap-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/10 text-[#60a5fa]">
+                      <Shield size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white">Session security</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-[#94a3b8]">
+                        Active sessions and device history will appear here when backend auth is connected.
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <form onSubmit={submitFeedback} className="mt-6 rounded-2xl border border-[#1a2d4a] bg-[#060d14] p-6">
@@ -454,6 +688,19 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
                     <input name="project" required placeholder="Project name" className="rounded-xl border border-[#1a2d4a] bg-[#0a1628] px-4 py-3 text-sm text-white outline-none placeholder:text-[#475569] focus:border-[#2563eb]" />
                     <input name="result" placeholder="Result achieved" className="rounded-xl border border-[#1a2d4a] bg-[#0a1628] px-4 py-3 text-sm text-white outline-none placeholder:text-[#475569] focus:border-[#2563eb]" />
                     <textarea name="quote" required rows={4} placeholder="Write feedback..." className="resize-none rounded-xl border border-[#1a2d4a] bg-[#0a1628] px-4 py-3 text-sm text-white outline-none placeholder:text-[#475569] focus:border-[#2563eb]" />
+                    <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-dashed border-[#1a2d4a] bg-[#0a1628] px-4 py-3 text-sm text-[#94a3b8] transition-colors hover:border-[#2563eb]/40 hover:text-white">
+                      <span className="flex items-center gap-2">
+                        {feedbackMediaUploading ? <Loader2 size={17} className="animate-spin text-[#60a5fa]" /> : <ImagePlus size={17} className="text-[#60a5fa]" />}
+                        {feedbackMediaName || "Attach image or video"}
+                      </span>
+                      <span className="text-xs text-[#475569]">Cloudinary</span>
+                      <input
+                        type="file"
+                        accept="image/*,video/*"
+                        className="sr-only"
+                        onChange={(event) => handleFeedbackMediaUpload(event.target.files?.[0])}
+                      />
+                    </label>
                     <button className="w-fit rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)]">
                       Submit feedback
                     </button>
@@ -476,8 +723,8 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
           >
             <CheckCircle2 size={22} className="text-[#22c55e]" />
             <div>
-              <p className="font-semibold text-white">Profile updated</p>
-              <p className="text-sm text-[#94a3b8]">Your changes were saved.</p>
+              <p className="font-semibold text-white">{toastCopy.title}</p>
+              <p className="text-sm text-[#94a3b8]">{toastCopy.subtitle}</p>
             </div>
           </motion.div>
         )}

@@ -1,46 +1,160 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { ArrowRight, Building2, LockKeyhole, Mail, ShieldCheck, Sparkles, User } from "lucide-react"
+import { ArrowRight, Building2, CheckCircle, Loader2, LockKeyhole, Mail, ShieldCheck, Sparkles, User, XCircle } from "lucide-react"
 import { motion } from "framer-motion"
-import { signInWithPopup } from "firebase/auth"
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  updateProfile,
+} from "firebase/auth"
 import AuthBackground from "../components/auth/AuthBackground"
 import Navbar from "../components/landing/Navbar"
-import { saveCurrentUser, type UserProfile, type UserRole } from "../data/feedbackStore"
+import { saveCurrentUser, type UserProfile } from "../data/feedbackStore"
+import { checkUsernameAvailability, normalizeUsername } from "../data/firestoreStore"
 import { auth, googleProvider } from "../lib/firebase"
+import { resolveUserProfile } from "../lib/userRoles"
 
 interface AuthPageProps {
   mode: "login" | "signup"
   onAuth: (user: UserProfile) => void
 }
 
+const getAuthErrorMessage = (error: unknown) => {
+  if (!(error instanceof Error)) return "Could not authenticate. Try again."
+
+  if (error.message.includes("auth/email-already-in-use")) return "This email is already registered."
+  if (error.message.includes("auth/invalid-credential")) return "Invalid email or password."
+  if (error.message.includes("auth/popup-closed-by-user")) return "Google login was cancelled."
+  if (error.message.includes("auth/unauthorized-domain")) return "This domain is not authorized in Firebase."
+  if (error.message.includes("auth/weak-password")) return "Password must have at least 6 characters."
+
+  return error.message
+}
+
 export default function AuthPage({ mode, onAuth }: AuthPageProps) {
   const navigate = useNavigate()
   const [name, setName] = useState("")
+  const [username, setUsername] = useState("")
   const [company, setCompany] = useState("")
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [authError, setAuthError] = useState("")
+  const [usernameError, setUsernameError] = useState("")
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [emailLoading, setEmailLoading] = useState(false)
+  const [usernameState, setUsernameState] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle")
   const isSignup = mode === "signup"
-  const adminEmail = "gutiajs@gmail.com"
 
-  const finishAuth = (userEmail: string, userName?: string) => {
-    const normalizedEmail = userEmail.trim().toLowerCase()
-    const role: UserRole = normalizedEmail === adminEmail ? "admin" : "client"
-    const user = {
-      name: userName || (role === "admin" ? "Admin" : "Client"),
-      email: normalizedEmail || (role === "admin" ? adminEmail : "client@company.com"),
-      role,
-      company: isSignup && company.trim() ? company.trim() : undefined,
+  useEffect(() => {
+    if (!isSignup) return
+
+    const normalized = normalizeUsername(username)
+    if (usernameState !== "checking") return
+
+    const timeout = window.setTimeout(async () => {
+      const result = await checkUsernameAvailability(normalized)
+      setUsernameState(result.available ? "available" : result.message === "Invalid format" ? "invalid" : "taken")
+      setUsernameError(result.message)
+    }, 600)
+
+    return () => window.clearTimeout(timeout)
+  }, [isSignup, username, usernameState])
+
+  const handleUsernameChange = (value: string) => {
+    const normalized = normalizeUsername(value)
+    setUsername(normalized)
+
+    if (!normalized) {
+      setUsernameState("idle")
+      setUsernameError("")
+      return
     }
-    saveCurrentUser(user)
-    onAuth(user)
-    navigate(role === "admin" ? "/admin" : "/profile")
+
+    if (normalized.length < 3) {
+      setUsernameState("invalid")
+      setUsernameError("Invalid format")
+      return
+    }
+
+    setUsernameState("checking")
+    setUsernameError("")
   }
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const finishAuth = async (uid: string, userEmail: string, userName?: string, selectedUsername?: string) => {
+    const normalizedEmail = userEmail.trim().toLowerCase()
+
+    const user = await resolveUserProfile({
+      uid,
+      name: userName || "Client",
+      email: normalizedEmail,
+      username: selectedUsername,
+      company: isSignup && company.trim() ? company.trim() : undefined,
+    })
+
+    saveCurrentUser(user)
+    onAuth(user)
+    navigate(user.role === "admin" ? "/admin" : "/profile")
+  }
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setAuthError("")
-    finishAuth(email || "client@company.com", isSignup ? name || "Client" : undefined)
+    setEmailLoading(true)
+
+    try {
+      if (!auth) {
+        setAuthError("Firebase authentication is not configured.")
+        return
+      }
+
+      const normalizedEmail = email.trim().toLowerCase()
+
+      if (!normalizedEmail || !password) {
+        setAuthError("Enter your email and password.")
+        return
+      }
+
+      if (isSignup && password.length < 6) {
+        setAuthError("Password must have at least 6 characters.")
+        return
+      }
+
+      if (isSignup) {
+        const normalizedUsername = normalizeUsername(username)
+        if (!normalizedUsername) {
+          setUsernameError("Please choose a username")
+          setUsernameState("invalid")
+          return
+        }
+
+        if (usernameState === "checking") {
+          setUsernameError("Wait until username checking finishes.")
+          return
+        }
+
+        const usernameCheck = await checkUsernameAvailability(normalizedUsername)
+        if (!usernameCheck.available) {
+          setUsernameError(usernameCheck.message)
+          setUsernameState(usernameCheck.message === "Invalid format" ? "invalid" : "taken")
+          return
+        }
+
+        const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, password)
+        const displayName = name.trim() || "Client"
+
+        await updateProfile(credential.user, { displayName })
+        await finishAuth(credential.user.uid, normalizedEmail, displayName, normalizedUsername)
+        return
+      }
+
+      const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password)
+      await finishAuth(credential.user.uid, normalizedEmail, credential.user.displayName || undefined)
+    } catch (error) {
+      setAuthError(getAuthErrorMessage(error))
+    } finally {
+      setEmailLoading(false)
+    }
   }
 
   const handleGoogleAuth = async () => {
@@ -62,10 +176,9 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
         return
       }
 
-      finishAuth(userEmail, googleUser.displayName || undefined)
+      await finishAuth(googleUser.uid, userEmail, googleUser.displayName || undefined)
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not login with Google."
-      setAuthError(message)
+      setAuthError(getAuthErrorMessage(error))
     } finally {
       setGoogleLoading(false)
     }
@@ -156,20 +269,73 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
                 </div>
 
                 {isSignup && (
-                  <label className="block">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Full name</span>
-                    <span className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/25 px-4 py-3.5 transition-colors focus-within:border-[#3b82f6]/50 focus-within:bg-[#020408]/70">
-                      <User size={18} className="text-zinc-500" />
-                      <input value={name} onChange={(event) => setName(event.target.value)} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700" placeholder="Client name" />
-                    </span>
-                  </label>
+                  <>
+                    <label className="block">
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Full name</span>
+                      <span className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/25 px-4 py-3.5 transition-colors focus-within:border-[#3b82f6]/50 focus-within:bg-[#020408]/70">
+                        <User size={18} className="text-zinc-500" />
+                        <input value={name} onChange={(event) => setName(event.target.value)} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700" placeholder="Client name" />
+                      </span>
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Username</span>
+                      <span
+                        className={`relative flex items-center gap-3 rounded-xl border bg-black/25 px-4 py-3.5 transition-colors focus-within:bg-[#020408]/70 ${
+                          usernameState === "taken" || usernameState === "invalid"
+                            ? "border-red-500/50 focus-within:border-red-500"
+                            : usernameState === "available"
+                              ? "border-green-500/50 focus-within:border-green-500"
+                              : "border-white/[0.08] focus-within:border-[#3b82f6]/50"
+                        }`}
+                      >
+                        <User size={18} className="text-zinc-500" />
+                        <input
+                          value={username}
+                          onChange={(event) => handleUsernameChange(event.target.value)}
+                          className="w-full bg-transparent pr-8 text-sm text-white outline-none placeholder:text-zinc-700"
+                          placeholder="cafe_dev"
+                        />
+                        {usernameState === "checking" && <Loader2 size={16} className="absolute right-4 animate-spin text-[#475569]" />}
+                      </span>
+                      {usernameState === "taken" && (
+                        <span className="mt-2 flex items-center gap-1 text-xs text-red-400">
+                          <XCircle size={12} />
+                          Username already taken
+                        </span>
+                      )}
+                      {usernameState === "invalid" && usernameError && (
+                        <span className="mt-2 flex items-center gap-1 text-xs text-red-400">
+                          <XCircle size={12} />
+                          {usernameError === "Please choose a username" ? usernameError : "Invalid format"}
+                        </span>
+                      )}
+                      {usernameState === "available" && (
+                        <span className="mt-2 flex items-center gap-1 text-xs text-green-400">
+                          <CheckCircle size={12} />
+                          Username available
+                        </span>
+                      )}
+                      <span className="mt-2 block font-mono text-xs text-[#475569]">
+                        3-20 characters · letters, numbers, _ . - only
+                      </span>
+                    </label>
+                  </>
                 )}
 
                 <label className="block">
                   <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Email</span>
                   <span className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/25 px-4 py-3.5 transition-colors focus-within:border-[#3b82f6]/50 focus-within:bg-[#020408]/70">
                     <Mail size={18} className="text-zinc-500" />
-                    <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700" placeholder="client@company.com" />
+                    <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700" placeholder="client@company.com" />
+                  </span>
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Password</span>
+                  <span className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/25 px-4 py-3.5 transition-colors focus-within:border-[#3b82f6]/50 focus-within:bg-[#020408]/70">
+                    <LockKeyhole size={18} className="text-zinc-500" />
+                    <input required minLength={6} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700" placeholder="Minimum 6 characters" />
                   </span>
                 </label>
 
@@ -183,8 +349,8 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
                   </label>
                 )}
 
-                <button className="group mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#3b82f6]/50 bg-[#2563eb] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_0_28px_rgba(37,99,235,0.38)] transition-all hover:bg-[#1d4ed8] hover:shadow-[0_0_42px_rgba(37,99,235,0.48)]">
-                  {isSignup ? "Create account" : "Login"}
+                <button disabled={emailLoading} className="group mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#3b82f6]/50 bg-[#2563eb] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_0_28px_rgba(37,99,235,0.38)] transition-all hover:bg-[#1d4ed8] hover:shadow-[0_0_42px_rgba(37,99,235,0.48)] disabled:cursor-not-allowed disabled:opacity-70">
+                  {emailLoading ? "Connecting..." : isSignup ? "Create account" : "Login"}
                   <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
                 </button>
               </form>
