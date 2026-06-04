@@ -87,7 +87,8 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
     saveCurrentUser(user)
     onAuth(user)
     upsertPublicUser(user)
-    navigate(user.role === "admin" ? "/admin" : "/profile")
+    // Always redirect to site root after login
+    navigate("/")
   }
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
