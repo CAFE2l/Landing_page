@@ -67,7 +67,7 @@ function toSnake(data: Partial<FeedbackPost>): Record<string, unknown> {
   if (data.helpfulCount !== undefined) out.helpful_count = data.helpfulCount
   if (data.commentCount !== undefined) out.comment_count = data.commentCount
   if (data.improvementSuggestion !== undefined) out.improvement_suggestion = data.improvementSuggestion
-  if (data.adminReply !== undefined) out.admin_reply = data.adminReply as Record<string, unknown>
+  if (data.adminReply !== undefined) out.admin_reply = data.adminReply as unknown as Record<string, unknown>
   return out
 }
 

@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
-  ImagePlus,
   KeyRound,
   LayoutDashboard,
   Lock,
@@ -440,10 +439,6 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
     subtitle: "Your changes were saved.",
   })
   const [avatarUrl, setAvatarUrl] = useState(user?.photoUrl || "")
-  const [feedbackMediaUrl, setFeedbackMediaUrl] = useState("")
-  const [feedbackMediaType, setFeedbackMediaType] = useState<"image" | "video">("image")
-  const [feedbackMediaName, setFeedbackMediaName] = useState("")
-  const [feedbackMediaUploading, setFeedbackMediaUploading] = useState(false)
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -485,29 +480,6 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
     setShowToast(true)
   }
 
-  const handleFeedbackMediaUpload = async (file?: File) => {
-    if (!file) return
-    setFeedbackMediaUploading(true)
-    setFeedbackMediaName(file.name)
-    setFeedbackMediaType(file.type.startsWith("video") ? "video" : "image")
-
-    try {
-      if (!isCloudinaryConfigured()) {
-        setFeedbackMediaUrl(URL.createObjectURL(file))
-        notify("Media preview ready", "Add Cloudinary env vars to upload permanently.")
-        return
-      }
-
-      const result = await uploadToCloudinary(file, "cafe-services/feedback-media")
-      setFeedbackMediaUrl(result.secure_url)
-      notify("Media uploaded", "The feedback media is ready.")
-    } catch {
-      notify("Upload failed", "Could not upload the feedback media.")
-    } finally {
-      setFeedbackMediaUploading(false)
-    }
-  }
-
   const saveProfile = async () => {
     setSavedForm(form)
     setIsEditing(false)
@@ -523,7 +495,7 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
 
     const updated: UserProfile = {
       ...user!,
-      uid: user?.uid || user?.id,
+      uid: user!.uid,
       name: form.fullName,
       phone: rawPhone,
       countryCode: form.countryCode,
@@ -537,39 +509,6 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
   const cancelEdit = () => {
     setForm(savedForm)
     setIsEditing(false)
-  }
-
-  const submitFeedback = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const data = new FormData(event.currentTarget)
-    const project = String(data.get("project") || "")
-    const quote = String(data.get("quote") || "")
-    const result = String(data.get("result") || "")
-
-    onSubmitFeedback({
-      id: `feedback-${Date.now()}`,
-      quote,
-      project,
-      result,
-      mediaUrl: feedbackMediaUrl,
-      mediaType: feedbackMediaType,
-      name: displayName,
-      role: "Client",
-      company: user.company || "CAFÉ SERVICES Client",
-      flag: "🌎",
-      initials: getInitials(displayName),
-      rating: 5,
-      status: "pending",
-      approved: false,
-      userId: user.uid,
-      username: user.username,
-      showOnPublicPage: false,
-      createdAt: new Date().toISOString(),
-    })
-    event.currentTarget.reset()
-    setFeedbackMediaUrl("")
-    setFeedbackMediaName("")
-    notify("Feedback submitted", "Your feedback is waiting for review.")
   }
 
   const submitPassword = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -592,7 +531,7 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
     try {
       setPasswordLoading(true)
       // Re-authenticate with current password to validate ownership
-      const { data: signData, error: signError } = await supabase.auth.signInWithPassword({
+      const { error: signError } = await supabase.auth.signInWithPassword({
         email: user.email || "",
         password: currentPassword,
       })
@@ -602,7 +541,7 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
         return
       }
 
-      const { data: updateData, error: updateError } = await supabase.auth.updateUser({ password: newPassword })
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
       if (updateError) {
         setPasswordError("Could not update password. Try again later.")
         notify("Password not updated", "Could not update password. Try again later.")
@@ -653,7 +592,7 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
                   setAvatarUrl(url)
                   const updated: UserProfile = {
                     ...user!,
-                    uid: user?.uid || user?.id,
+                    uid: user!.uid,
                     photoUrl: url,
                   }
                   saveCurrentUser(updated)
