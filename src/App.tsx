@@ -67,9 +67,6 @@ function App() {
           <Route path="/admin/clients" element={<AdminRoute><AdminShell /></AdminRoute>}>
             <Route index element={<AdminClients />} />
           </Route>
-          <Route path="/admin/forum" element={<AdminRoute><AdminShell /></AdminRoute>}>
-            <Route index element={<AdminForum />} />
-          </Route>
           <Route path="/admin/analytics" element={<AdminRoute><AdminShell /></AdminRoute>}>
             <Route index element={<AdminAnalytics />} />
           </Route>

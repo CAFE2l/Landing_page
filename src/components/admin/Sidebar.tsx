@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
-import {
-  LayoutDashboard, MessageSquare, Users, BarChart3, Settings, LogOut, MessageCircle,
-} from "lucide-react"
+import { LayoutDashboard, MessageSquare, Users, BarChart3, Settings, LogOut } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { useAdminStore } from "../../lib/store/adminStore"
 import { useAuth } from "../../contexts/AuthContext"
