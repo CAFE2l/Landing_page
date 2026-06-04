@@ -13,7 +13,6 @@ const navItems = [
   { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/admin/feedback", label: "Feedback", icon: MessageSquare },
   { path: "/admin/clients", label: "Clients", icon: Users },
-  { path: "/admin/forum", label: "Forum", icon: MessageCircle },
   { path: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { path: "/admin/settings", label: "Settings", icon: Settings },
 ]
