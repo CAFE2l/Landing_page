@@ -3,11 +3,14 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X } from "lucide-react"
+import { Link, useLocation, useNavigate } from "react-router-dom"
+import WhatsAppIcon from "./WhatsAppIcon"
 
 const links = [
   { name: "Services", href: "#services" },
   { name: "Process", href: "#process" },
   { name: "Work", href: "#work" },
+  { name: "Feedbacks", href: "/feedback" },
   { name: "FAQ", href: "#faq" },
   { name: "Contact", href: "#contact" },
 ]
@@ -16,13 +19,16 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState("")
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isLanding = location.pathname === "/"
 
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY
       setScrolled(y > 30)
 
-      const sections = links.map((l) => l.href.slice(1))
+      const sections = links.filter((l) => l.href.startsWith("#")).map((l) => l.href.slice(1))
       for (const id of sections.reverse()) {
         const el = document.getElementById(id)
         if (el && el.offsetTop <= y + 200) {
@@ -38,7 +44,15 @@ export default function Navbar() {
 
   const handleClick = (href: string) => {
     setOpen(false)
+    if (href.startsWith("/")) {
+      navigate(href)
+      return
+    }
     const id = href.slice(1)
+    if (!isLanding) {
+      navigate(`/${href}`)
+      return
+    }
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })
   }
 
@@ -54,11 +68,10 @@ export default function Navbar() {
       }`}
     >
       <div className="container mx-auto px-6 flex items-center justify-between">
-        <motion.a
-          href="#"
+        <motion.div
           whileHover={{ scale: 1.02 }}
-          className="flex items-center gap-2.5"
         >
+        <Link to="/" className="flex items-center gap-2.5">
           <img
             src="/favicon.png"
             alt="CAFÉ SERVICES"
@@ -67,11 +80,12 @@ export default function Navbar() {
           <span className="text-xl font-bold text-white tracking-tight">
             CAFÉ<span className="text-[#3b82f6]"> SERVICES</span>
           </span>
-        </motion.a>
+        </Link>
+        </motion.div>
 
         <div className="hidden lg:flex items-center gap-1">
           {links.map((link) => {
-            const isActive = active === link.href.slice(1)
+            const isActive = isLanding && active === link.href.slice(1)
             return (
               <button
                 key={link.href}
@@ -94,12 +108,12 @@ export default function Navbar() {
         </div>
 
         <motion.a
-          href="#contact"
+          href="https://wa.me/5511999999999"
           whileHover={{ scale: 1.04 }}
           whileTap={{ scale: 0.97 }}
-          onClick={(e) => { e.preventDefault(); handleClick("#contact") }}
           className="hidden lg:inline-flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
         >
+          <WhatsAppIcon />
           Talk to me
         </motion.a>
 
@@ -122,7 +136,7 @@ export default function Navbar() {
           >
             <div className="container mx-auto px-6 py-6 flex flex-col gap-3">
               {links.map((link) => {
-                const isActive = active === link.href.slice(1)
+                const isActive = isLanding && active === link.href.slice(1)
                 return (
                   <button
                     key={link.href}
@@ -136,11 +150,11 @@ export default function Navbar() {
                 )
               })}
               <motion.a
-              href="#contact"
+              href="https://wa.me/5511999999999"
               whileTap={{ scale: 0.97 }}
-              onClick={(e) => { e.preventDefault(); handleClick("#contact") }}
-              className="text-center bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-6 py-3 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] mt-2"
+              className="inline-flex items-center justify-center gap-2 text-center bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-6 py-3 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] mt-2"
               >
+              <WhatsAppIcon />
               Talk to me
               </motion.a>
             </div>

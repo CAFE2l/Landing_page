@@ -65,6 +65,11 @@
   50% { box-shadow: 0 0 40px rgba(37, 99, 235, 0.5); }
 }
 
+@keyframes grid-move {
+  from { transform: perspective(500px) rotateX(45deg) translateY(0); }
+  to { transform: perspective(500px) rotateX(45deg) translateY(60px); }
+}
+
 @utility animate-marquee {
   animation: marquee 40s linear infinite;
 }
@@ -96,6 +101,15 @@
   background: linear-gradient(-45deg, #020408, #060d14, #020408, #0a1628);
   background-size: 400% 400%;
   animation: mesh-shift 20s ease infinite;
+}
+
+.auth-perspective-grid {
+  background-image:
+    linear-gradient(rgba(37, 99, 235, 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.15) 1px, transparent 1px);
+  background-size: 60px 60px;
+  animation: grid-move 3s linear infinite;
+  mask-image: linear-gradient(to top, black 0%, rgba(0, 0, 0, 0.75) 48%, transparent 100%);
 }
 
 html {

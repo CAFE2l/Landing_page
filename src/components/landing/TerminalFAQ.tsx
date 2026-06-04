@@ -66,7 +66,6 @@ function Typewriter({ text, onDone }: { text: string; onDone?: () => void }) {
 
   useEffect(() => {
     idx.current = 0
-    setDisplayed("")
     const interval = setInterval(() => {
       idx.current++
       setDisplayed(text.slice(0, idx.current))

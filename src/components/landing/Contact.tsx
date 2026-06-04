@@ -1,6 +1,7 @@
 "use client"
 
 import { motion, useReducedMotion } from "framer-motion"
+import WhatsAppIcon from "./WhatsAppIcon"
 
 export default function Contact() {
   const reduceMotion = useReducedMotion()
@@ -92,6 +93,7 @@ export default function Contact() {
             whileTap={!reduceMotion ? { scale: 0.97 } : undefined}
             className="inline-flex items-center gap-2.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-10 py-4 rounded-xl text-base font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
           >
+            <WhatsAppIcon className="w-5 h-5" />
             Talk to me
           </motion.a>
         </motion.div>
