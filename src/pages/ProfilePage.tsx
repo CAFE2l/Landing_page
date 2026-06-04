@@ -7,10 +7,8 @@ import {
   CheckCircle2,
   ChevronRight,
   KeyRound,
-  Loader2,
   Lock,
   Save,
-  Search,
   Shield,
   ShoppingBag,
   Smartphone,
@@ -18,6 +16,7 @@ import {
   Wrench,
 } from "lucide-react"
 import AuthBackground from "../components/auth/AuthBackground"
+import Navbar from "../components/landing/Navbar"
 import { getInitials, type FeedbackEntry, type UserProfile } from "../data/feedbackStore"
 
 interface ProfilePageProps {
@@ -30,12 +29,8 @@ type ActiveTab = "profile" | "security"
 interface ProfileForm {
   fullName: string
   email: string
-  cpf: string
+  countryCode: string
   phone: string
-  cep: string
-  address: string
-  city: string
-  state: string
 }
 
 const cardClass =
@@ -52,26 +47,44 @@ const links = [
   { label: "My Warranties", icon: BadgeCheck, href: "/minhas-garantias" },
 ]
 
-const maskCpf = (value: string) =>
-  value
-    .replace(/\D/g, "")
-    .slice(0, 11)
-    .replace(/(\d{3})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d{1,2})$/, "$1-$2")
-
-const maskCep = (value: string) =>
-  value
-    .replace(/\D/g, "")
-    .slice(0, 8)
-    .replace(/(\d{5})(\d)/, "$1-$2")
+const countryCodes = [
+  { country: "United States", code: "+1" },
+  { country: "Canada", code: "+1" },
+  { country: "United Kingdom", code: "+44" },
+  { country: "Brazil", code: "+55" },
+  { country: "Portugal", code: "+351" },
+  { country: "Spain", code: "+34" },
+  { country: "France", code: "+33" },
+  { country: "Germany", code: "+49" },
+  { country: "Italy", code: "+39" },
+  { country: "Netherlands", code: "+31" },
+  { country: "Ireland", code: "+353" },
+  { country: "Mexico", code: "+52" },
+  { country: "Argentina", code: "+54" },
+  { country: "Chile", code: "+56" },
+  { country: "Colombia", code: "+57" },
+  { country: "Peru", code: "+51" },
+  { country: "Uruguay", code: "+598" },
+  { country: "Paraguay", code: "+595" },
+  { country: "Japan", code: "+81" },
+  { country: "South Korea", code: "+82" },
+  { country: "China", code: "+86" },
+  { country: "India", code: "+91" },
+  { country: "Australia", code: "+61" },
+  { country: "New Zealand", code: "+64" },
+  { country: "South Africa", code: "+27" },
+  { country: "Nigeria", code: "+234" },
+  { country: "Kenya", code: "+254" },
+  { country: "South Sudan", code: "+211" },
+  { country: "United Arab Emirates", code: "+971" },
+  { country: "Saudi Arabia", code: "+966" },
+  { country: "Turkey", code: "+90" },
+  { country: "Israel", code: "+972" },
+]
 
 const maskPhone = (value: string) => {
-  const digits = value.replace(/\D/g, "").slice(0, 13)
-  if (digits.length <= 2) return digits ? `+${digits}` : ""
-  if (digits.length <= 4) return `+${digits.slice(0, 2)} (${digits.slice(2)}`
-  if (digits.length <= 9) return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4)}`
-  return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`
+  const digits = value.replace(/\D/g, "").slice(0, 15)
+  return digits.replace(/(\d{3})(?=\d)/g, "$1 ").trim()
 }
 
 function CountUp({ value }: { value: number }) {
@@ -155,20 +168,16 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
   const [activeTab, setActiveTab] = useState<ActiveTab>("profile")
   const [isEditing, setIsEditing] = useState(false)
   const [showToast, setShowToast] = useState(false)
-  const [cepLoading, setCepLoading] = useState(false)
   const [form, setForm] = useState<ProfileForm>({
     fullName: user?.name || "",
     email: user?.email || "",
-    cpf: "",
+    countryCode: "+1",
     phone: "",
-    cep: "",
-    address: "",
-    city: "",
-    state: "",
   })
   const [savedForm, setSavedForm] = useState(form)
 
-  const initials = useMemo(() => getInitials(user?.name || "Client"), [user?.name])
+  const displayName = savedForm.fullName || user?.name || "Client"
+  const initials = useMemo(() => getInitials(displayName), [displayName])
 
   useEffect(() => {
     if (!showToast) return
@@ -180,27 +189,6 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
 
   const updateField = (field: keyof ProfileForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }))
-  }
-
-  const fetchCep = async () => {
-    const cep = form.cep.replace(/\D/g, "")
-    if (cep.length !== 8) return
-
-    setCepLoading(true)
-    try {
-      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
-      const data = await response.json()
-      if (!data.erro) {
-        setForm((current) => ({
-          ...current,
-          address: data.logradouro || current.address,
-          city: data.localidade || current.city,
-          state: data.uf || current.state,
-        }))
-      }
-    } finally {
-      setCepLoading(false)
-    }
   }
 
   const saveProfile = () => {
@@ -228,11 +216,11 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
       result,
       mediaUrl: "",
       mediaType: "image",
-      name: user.name,
+      name: displayName,
       role: "Client",
       company: user.company || "CAFÉ SERVICES Client",
       flag: "🌎",
-      initials: getInitials(user.name),
+      initials: getInitials(displayName),
       rating: 5,
       approved: false,
       createdAt: new Date().toISOString(),
@@ -248,14 +236,15 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
   ]
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#020408] px-6 py-8 text-white">
+    <main className="relative min-h-screen overflow-hidden bg-[#020408] px-6 pb-8 pt-28 text-white">
       <AuthBackground />
+      <Navbar />
 
       <motion.div
         initial={{ opacity: 0, y: 32 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-6xl gap-6 py-8 lg:grid-cols-[0.3fr_0.7fr]"
+        className="relative z-10 mx-auto grid min-h-[calc(100vh-8rem)] w-full max-w-6xl gap-6 py-8 lg:grid-cols-[0.3fr_0.7fr]"
       >
         <aside className={`${cardClass} p-6`}>
           <div className="pb-2 pt-4 text-center">
@@ -279,7 +268,7 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
               />
             </div>
 
-            <h1 className="mt-4 text-center text-xl font-bold text-white">{user.name}</h1>
+            <h1 className="mt-4 text-center text-xl font-bold text-white">{displayName}</h1>
             <p className="mt-1 text-center text-sm text-[#94a3b8]">{user.email}</p>
             <div className="mt-4 inline-flex rounded-full border border-[#2563eb]/20 bg-[#2563eb]/10 px-3 py-1 font-mono text-xs text-[#60a5fa]">
               Client Account
@@ -369,12 +358,7 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
                     <motion.div key="view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                       <ReadOnlyRow label="Full name" value={savedForm.fullName} />
                       <ReadOnlyRow label="Email" value={savedForm.email} />
-                      <ReadOnlyRow label="CPF" value={savedForm.cpf} />
-                      <ReadOnlyRow label="Phone" value={savedForm.phone} />
-                      <ReadOnlyRow label="CEP" value={savedForm.cep} />
-                      <ReadOnlyRow label="Address" value={savedForm.address} />
-                      <ReadOnlyRow label="City" value={savedForm.city} />
-                      <ReadOnlyRow label="State" value={savedForm.state} />
+                      <ReadOnlyRow label="Phone" value={savedForm.phone ? `${savedForm.countryCode} ${savedForm.phone}` : ""} />
                     </motion.div>
                   ) : (
                     <motion.div key="edit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -385,19 +369,35 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
                         <div className="md:col-span-2">
                           <Field label="Email" value={form.email} readOnly delay={0.06} />
                         </div>
-                        <Field label="CPF" value={form.cpf} onChange={(value) => updateField("cpf", maskCpf(value))} placeholder="000.000.000-00" delay={0.12} />
-                        <Field label="Phone" value={form.phone} onChange={(value) => updateField("phone", maskPhone(value))} placeholder="+55 (11) 99999-9999" delay={0.18} />
-                        <Field label="CEP" value={form.cep} onChange={(value) => updateField("cep", maskCep(value))} onBlur={fetchCep} placeholder="00000-000" delay={0.24}>
-                          <button type="button" onClick={fetchCep} className="absolute right-2 top-1/2 flex h-9 -translate-y-1/2 items-center justify-center rounded-lg border border-[#2563eb]/20 bg-[#2563eb]/10 px-3 text-[#3b82f6] transition-all duration-200 hover:bg-[#2563eb]/20">
-                            {cepLoading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
-                          </button>
-                        </Field>
-                        <div />
                         <div className="md:col-span-2">
-                          <Field label="Street address" value={form.address} onChange={(value) => updateField("address", value)} delay={0.3} />
+                          <motion.label
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.12 }}
+                            className="block"
+                          >
+                            <span className="mb-2 block font-mono text-xs uppercase tracking-wider text-[#475569]">Phone</span>
+                            <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
+                              <select
+                                value={form.countryCode}
+                                onChange={(event) => updateField("countryCode", event.target.value)}
+                                className="w-full rounded-xl border border-[#1a2d4a] bg-[#060d14] px-4 py-3 text-sm text-white outline-none transition-all duration-200 focus:border-[#2563eb] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
+                              >
+                                {countryCodes.map((item) => (
+                                  <option key={`${item.country}-${item.code}`} value={item.code}>
+                                    {item.code} - {item.country}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                value={form.phone}
+                                onChange={(event) => updateField("phone", maskPhone(event.target.value))}
+                                placeholder="Phone number"
+                                className="w-full rounded-xl border border-[#1a2d4a] bg-[#060d14] px-4 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-[#475569] focus:border-[#2563eb] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
+                              />
+                            </div>
+                          </motion.label>
                         </div>
-                        <Field label="City" value={form.city} readOnly delay={0.36} />
-                        <Field label="State" value={form.state} readOnly delay={0.42} />
                       </div>
 
                       <div className="mt-6 flex items-center gap-3 border-t border-[#1a2d4a] pt-6">

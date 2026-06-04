@@ -2,8 +2,11 @@ import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { ArrowRight, Building2, LockKeyhole, Mail, ShieldCheck, Sparkles, User } from "lucide-react"
 import { motion } from "framer-motion"
+import { signInWithPopup } from "firebase/auth"
 import AuthBackground from "../components/auth/AuthBackground"
+import Navbar from "../components/landing/Navbar"
 import { saveCurrentUser, type UserProfile, type UserRole } from "../data/feedbackStore"
+import { auth, googleProvider } from "../lib/firebase"
 
 interface AuthPageProps {
   mode: "login" | "signup"
@@ -15,6 +18,8 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
   const [name, setName] = useState("")
   const [company, setCompany] = useState("")
   const [email, setEmail] = useState("")
+  const [authError, setAuthError] = useState("")
+  const [googleLoading, setGoogleLoading] = useState(false)
   const isSignup = mode === "signup"
   const adminEmail = "gutiajs@gmail.com"
 
@@ -34,30 +39,44 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    setAuthError("")
     finishAuth(email || "client@company.com", isSignup ? name || "Client" : undefined)
   }
 
-  const handleGoogleAuth = () => {
-    finishAuth(email || "google@cafeservices.dev", isSignup ? name || "Google User" : undefined)
+  const handleGoogleAuth = async () => {
+    setAuthError("")
+    setGoogleLoading(true)
+
+    try {
+      if (!auth) {
+        setAuthError("Firebase authentication is not configured.")
+        return
+      }
+
+      const credential = await signInWithPopup(auth, googleProvider)
+      const googleUser = credential.user
+      const userEmail = googleUser.email
+
+      if (!userEmail) {
+        setAuthError("Your Google account did not return an email address.")
+        return
+      }
+
+      finishAuth(userEmail, googleUser.displayName || undefined)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not login with Google."
+      setAuthError(message)
+    } finally {
+      setGoogleLoading(false)
+    }
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#020408] px-6 py-8 text-white">
+    <main className="relative min-h-screen overflow-hidden bg-[#020408] px-6 pb-8 pt-28 text-white">
       <AuthBackground />
+      <Navbar />
 
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl flex-col">
-        <header className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
-            <img src="/favicon.png" alt="CAFÉ SERVICES" className="h-8 w-8 rounded-lg" />
-            <span className="text-sm font-bold tracking-tight text-white sm:text-base">
-              CAFÉ<span className="text-[#3b82f6]"> SERVICES</span>
-            </span>
-          </Link>
-          <Link to="/" className="rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-xs font-semibold text-zinc-400 backdrop-blur-xl transition-colors hover:border-[#3b82f6]/30 hover:text-white">
-            Back to site
-          </Link>
-        </header>
-
+      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-6xl flex-col">
         <section className="grid flex-1 items-center gap-10 py-10 lg:grid-cols-[1fr_460px]">
           <motion.div
             initial={{ opacity: 0, x: -24 }}
@@ -117,11 +136,18 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
                 <button
                   type="button"
                   onClick={handleGoogleAuth}
+                  disabled={googleLoading}
                   className="inline-flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.04] px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:border-[#3b82f6]/35 hover:bg-white/[0.07]"
                 >
                   <img src="/imgs/icons/Google.png" alt="" aria-hidden="true" className="h-5 w-5 object-contain" />
-                  {isSignup ? "Sign up with Google" : "Login with Google"}
+                  {googleLoading ? "Connecting..." : isSignup ? "Sign up with Google" : "Login with Google"}
                 </button>
+
+                {authError && (
+                  <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                    {authError}
+                  </p>
+                )}
 
                 <div className="flex items-center gap-3 py-1">
                   <span className="h-px flex-1 bg-white/[0.08]" />

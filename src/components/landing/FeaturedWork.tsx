@@ -44,6 +44,7 @@ const plans = [
     cta: "Build My Website",
     gradient: "from-sky-600/25 via-blue-500/10 to-transparent",
     preview: "website",
+    previewUrl: "https://main-portfolio-sigma-flame.vercel.app/",
   },
   {
     number: "Plan 03",
@@ -98,26 +99,14 @@ function PlanPreview({ type }: { type: PlanPreviewType }) {
 
   if (type === "website") {
     return (
-      <div className="absolute inset-x-5 top-12 h-36 rounded-xl border border-white/[0.08] bg-[#07111d]/85 shadow-2xl shadow-black/40 overflow-hidden">
-        <div className="flex h-5 items-center gap-1.5 border-b border-white/[0.06] bg-white/[0.03] px-3">
-          <span className="h-1.5 w-1.5 rounded-full bg-red-400/50" />
-          <span className="h-1.5 w-1.5 rounded-full bg-yellow-400/50" />
-          <span className="h-1.5 w-1.5 rounded-full bg-green-400/50" />
-          <span className="ml-2 h-1.5 w-16 rounded-full bg-white/[0.08]" />
-        </div>
-        <div className="grid h-[calc(100%-1.25rem)] grid-cols-[0.85fr_1.15fr] gap-3 p-3">
-          <div className="space-y-2">
-            <div className="h-2 w-16 rounded-full bg-[#60a5fa]/35" />
-            <div className="h-3 w-24 rounded bg-white/25" />
-            <div className="h-3 w-20 rounded bg-white/15" />
-            <div className="mt-3 h-5 w-20 rounded-md bg-[#2563eb]/55" />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg border border-white/[0.06] bg-white/[0.05]" />
-            <div className="rounded-lg border border-[#38bdf8]/15 bg-[#0ea5e9]/10" />
-            <div className="col-span-2 rounded-lg border border-white/[0.06] bg-white/[0.04]" />
-          </div>
-        </div>
+      <div className="absolute inset-x-5 top-12 h-36 overflow-hidden rounded-xl border border-white/[0.08] bg-[#07111d]/85 shadow-2xl shadow-black/40">
+        <img
+          src="/imgs/Plans/portfolio.png"
+          alt="Professional website example preview"
+          className="h-full w-full object-cover object-top"
+          loading="lazy"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#020408]/45 via-transparent to-transparent" />
       </div>
     )
   }
