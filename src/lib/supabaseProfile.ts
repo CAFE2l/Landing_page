@@ -16,6 +16,8 @@ export async function syncProfileToStorage() {
     company: meta.company || undefined,
     country: meta.country || undefined,
     photoUrl: meta.avatar_url || meta.photoUrl || undefined,
+    phone: meta.phone || undefined,
+    countryCode: meta.countryCode || undefined,
   }
   saveCurrentUser(profile)
   return profile
@@ -40,6 +42,8 @@ export async function upsertPublicUser(profile: UserProfile) {
         company: profile.company || null,
         country: profile.country || null,
         photo_url: profile.photoUrl || null,
+        phone: profile.phone || null,
+        country_code: profile.countryCode || null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "id" },

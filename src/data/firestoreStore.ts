@@ -172,6 +172,22 @@ export const listFeedbacks = async () => {
   }
 }
 
+export const listUserFeedbacks = async (userId: string) => {
+  if (!db) return []
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(db, "feedbacks"),
+        where("userId", "==", userId),
+        orderBy("createdAt", "desc"),
+      ),
+    )
+    return snapshot.docs.map(mapFeedback)
+  } catch {
+    return []
+  }
+}
+
 export const listPublicFeedbacks = async () => {
   if (!db) return []
   try {

@@ -47,7 +47,10 @@ export async function fetchFeedbackPostById(id: string): Promise<FeedbackPost | 
 export async function createFeedbackPost(
   post: Omit<FeedbackPost, "id" | "helpfulCount" | "commentCount" | "createdAt" | "updatedAt">,
 ): Promise<string | null> {
-  if (!db) return null
+  if (!db) {
+    console.error("createFeedbackPost: Firebase db is null — check VITE_FIREBASE_* env vars")
+    return null
+  }
   try {
     const data = toFirestore(post)
     data.helpfulCount = 0
@@ -57,7 +60,10 @@ export async function createFeedbackPost(
     data.updatedAt = Timestamp.fromDate(new Date())
     const ref = await addDoc(collection(db, POSTS_COL), data)
     return ref.id
-  } catch { return null }
+  } catch (e) {
+    console.error("createFeedbackPost failed", e)
+    return null
+  }
 }
 
 export async function updateFeedbackPost(id: string, updates: Partial<FeedbackPost>): Promise<void> {

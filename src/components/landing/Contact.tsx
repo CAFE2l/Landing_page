@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion"
 import WhatsAppIcon from "./WhatsAppIcon"
+import Magnetic from "./Magnetic"
 import { wa, WA_MESSAGES } from "../../lib/utils"
 
 export default function Contact() {
@@ -36,15 +37,17 @@ export default function Contact() {
             <p className="text-zinc-500 text-sm leading-relaxed mb-8">
               An open space to exchange ideas, ask questions, follow the behind-the-scenes and connect with people who are also creating digital projects.
             </p>
-            <a
-              href="https://discord.com/invite/gW2tShPFxf"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-white/[0.1] text-white text-sm font-semibold hover:bg-white/5 transition-colors mb-4"
-            >
-              <img src="/imgs/icons/Discord.png" alt="" className="w-4 h-4 opacity-70" />
-              Join Discord
-            </a>
+            <Magnetic strength={0.12}>
+              <a
+                href="https://discord.com/invite/gW2tShPFxf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-white/[0.1] text-white text-sm font-semibold hover:bg-white/5 transition-colors mb-4"
+              >
+                <img src="/imgs/icons/Discord.png" alt="" className="w-4 h-4 opacity-70" />
+                Join Discord
+              </a>
+            </Magnetic>
             <span className="text-[10px] text-zinc-600 uppercase tracking-widest font-medium">Open to everyone interested</span>
           </motion.div>
 
@@ -65,15 +68,17 @@ export default function Contact() {
             <p className="text-zinc-500 text-sm leading-relaxed mb-8">
               Exclusive area for clients who have already completed their services. Receive support, news, exclusive content and post-delivery follow-up.
             </p>
-            <a
-              href="https://t.me/CafeAgenciasDigitais"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px rgba(37,99,235,0.35)] transition-all mb-4"
-            >
-              <img src="/imgs/icons/Telegram.png" alt="" className="w-4 h-4 opacity-70" />
-              Request VIP access
-            </a>
+            <Magnetic strength={0.12}>
+              <a
+                href="https://t.me/CafeAgenciasDigitais"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px rgba(37,99,235,0.35)] transition-all mb-4"
+              >
+                <img src="/imgs/icons/Telegram.png" alt="" className="w-4 h-4 opacity-70" />
+                Request VIP access
+              </a>
+            </Magnetic>
             <span className="text-[10px] text-zinc-600 uppercase tracking-widest font-medium">Access released after project completion</span>
           </motion.div>
         </div>
@@ -92,17 +97,17 @@ export default function Contact() {
             Talk to me on WhatsApp and we can align everything in 15 minutes.
           </p>
 
-          <motion.a
-            href={wa(WA_MESSAGES.contact)}
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={!reduceMotion ? { scale: 1.04 } : undefined}
-            whileTap={!reduceMotion ? { scale: 0.97 } : undefined}
-            className="inline-flex items-center gap-2.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-8 md:px-10 py-4 rounded-xl text-base font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
-          >
-            <WhatsAppIcon className="w-5 h-5" />
-            Talk to me
-          </motion.a>
+          <Magnetic strength={0.12}>
+            <a
+              href={wa(WA_MESSAGES.contact)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-8 md:px-10 py-4 rounded-xl text-base font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
+            >
+              <WhatsAppIcon className="w-5 h-5" />
+              Talk to me
+            </a>
+          </Magnetic>
         </motion.div>
       </div>
     </section>

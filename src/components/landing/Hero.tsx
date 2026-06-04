@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, useReducedMotion } from "framer-motion"
 import { countUsers, countProjects, countCountries } from "../../data/firestoreStore"
+import Magnetic from "./Magnetic"
 
 const titleLine1 = "I Build Digital Products"
 const titleLine2 = "That Win Clients"
@@ -174,22 +175,22 @@ export default function Hero() {
           {...fadeUp(0.75)}
           className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-10 md:mb-16"
         >
-          <motion.a
-            href="#contact"
-            whileHover={!reduceMotion ? { scale: 1.04 } : undefined}
-            whileTap={!reduceMotion ? { scale: 0.97 } : undefined}
-            className="inline-flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-8 py-3.5 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
-          >
-            Start a Project
-          </motion.a>
-          <motion.a
-            href="#work"
-            whileHover={!reduceMotion ? { scale: 1.04 } : undefined}
-            whileTap={!reduceMotion ? { scale: 0.97 } : undefined}
-            className="glass glass-hover text-zinc-300 px-8 py-3.5 rounded-xl text-sm font-semibold transition-all duration-200"
-          >
-            View My Work
-          </motion.a>
+          <Magnetic strength={0.12}>
+            <a
+              href="#contact"
+              className="inline-flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-8 py-3.5 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
+            >
+              Start a Project
+            </a>
+          </Magnetic>
+          <Magnetic strength={0.12}>
+            <a
+              href="#work"
+              className="glass glass-hover text-zinc-300 px-8 py-3.5 rounded-xl text-sm font-semibold transition-all duration-200"
+            >
+              View My Work
+            </a>
+          </Magnetic>
         </motion.div>
 
         <motion.div

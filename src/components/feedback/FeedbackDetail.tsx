@@ -23,7 +23,7 @@ export default function FeedbackDetail({ post, open, onClose, onHelpful, helpful
   const [loaded, setLoaded] = useState(false)
   const { user: supabaseUser } = useAuth()
   const localUser = loadCurrentUser()
-  const currentUser = supabaseUser || localUser
+  const currentUser = localUser || supabaseUser
   const userProfile = currentUser ? (currentUser as unknown as { uid?: string; id: string; name?: string; email?: string; photoUrl?: string }) : null
 
   useEffect(() => {
@@ -55,6 +55,8 @@ export default function FeedbackDetail({ post, open, onClose, onHelpful, helpful
     if (id) {
       setComments((prev) => [...prev, { ...comment, id, postId: post.id, createdAt: new Date().toISOString() }])
       setCommentText("")
+    } else {
+      toast.error("Failed to post comment")
     }
     setPosting(false)
   }

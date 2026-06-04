@@ -8,20 +8,19 @@ import {
   EyeOff,
   ImagePlus,
   KeyRound,
+  LayoutDashboard,
   Lock,
   Loader2,
-  MessageSquareText,
   Save,
   Shield,
-  ShoppingBag,
   User,
-  Wrench,
 } from "lucide-react"
 import AuthBackground from "../components/auth/AuthBackground"
 import Navbar from "../components/landing/Navbar"
 import { AvatarUpload } from "../components/profile/AvatarUpload"
-import { getInitials, saveCurrentUser, type FeedbackEntry, type UserProfile } from "../data/feedbackStore"
+import { getInitials, loadCurrentUser, saveCurrentUser, type FeedbackEntry, type UserProfile } from "../data/feedbackStore"
 import { isCloudinaryConfigured, uploadToCloudinary } from "../lib/cloudinary"
+import { updateProfileMetadata, upsertPublicUser } from "../lib/supabaseProfile"
 
 interface ProfilePageProps {
   user: UserProfile | null
@@ -46,9 +45,7 @@ const tabs = [
 ] as const
 
 const links = [
-  { label: "My Orders", icon: ShoppingBag, href: "/pedidos" },
-  { label: "My Services", icon: Wrench, href: "/meus-servicos" },
-  { label: "My Feedbacks", icon: MessageSquareText, href: "/feedback" },
+  { label: "My Account", icon: LayoutDashboard, href: "/my-account" },
 ]
 
 const countryCodes = [
@@ -86,9 +83,249 @@ const countryCodes = [
   { country: "Israel", code: "+972" },
 ]
 
-const maskPhone = (value: string) => {
-  const digits = value.replace(/\D/g, "").slice(0, 15)
-  return digits.replace(/(\d{3})(?=\d)/g, "$1 ").trim()
+const phoneFormats: Record<string, { maxDigits: number; format: (d: string) => string }> = {
+  "+55": {
+    maxDigits: 11,
+    format: (d) => {
+      if (d.length <= 2) return d
+      if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`
+      if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
+      return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7, 11)}`
+    },
+  },
+  "+1": {
+    maxDigits: 11,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`
+      return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6, 10)}`
+    },
+  },
+  "+44": {
+    maxDigits: 11,
+    format: (d) => {
+      if (d.length <= 5) return d
+      return `${d.slice(0, 5)} ${d.slice(5)}`
+    },
+  },
+  "+351": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
+      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`
+    },
+  },
+  "+34": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
+      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`
+    },
+  },
+  "+33": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 2) return d
+      if (d.length <= 4) return `${d.slice(0, 2)} ${d.slice(2)}`
+      if (d.length <= 6) return `${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4)}`
+      if (d.length <= 8) return `${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 6)} ${d.slice(6)}`
+      return `${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 6)} ${d.slice(6, 8)} ${d.slice(8, 9)}`
+    },
+  },
+  "+49": {
+    maxDigits: 11,
+    format: (d) => {
+      if (d.length <= 4) return d
+      return `${d.slice(0, 4)} ${d.slice(4)}`
+    },
+  },
+  "+39": {
+    maxDigits: 10,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
+      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 10)}`
+    },
+  },
+  "+52": {
+    maxDigits: 10,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
+      return `${d.slice(0, 3)} ${d.slice(3, 6)}-${d.slice(6, 10)}`
+    },
+  },
+  "+54": {
+    maxDigits: 10,
+    format: (d) => {
+      if (d.length <= 2) return d
+      if (d.length <= 5) return `(${d.slice(0, 2)}) ${d.slice(2)}`
+      if (d.length <= 8) return `(${d.slice(0, 2)}) ${d.slice(2, 5)}-${d.slice(5)}`
+      return `(${d.slice(0, 2)}) ${d.slice(2, 5)}-${d.slice(5, 10)}`
+    },
+  },
+  "+56": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 2) return d
+      if (d.length <= 5) return `${d.slice(0, 2)} ${d.slice(2)}`
+      return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 9)}`
+    },
+  },
+  "+57": {
+    maxDigits: 10,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
+      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 10)}`
+    },
+  },
+  "+51": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
+      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`
+    },
+  },
+  "+598": {
+    maxDigits: 8,
+    format: (d) => {
+      if (d.length <= 4) return d
+      return `${d.slice(0, 4)} ${d.slice(4, 8)}`
+    },
+  },
+  "+595": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
+      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`
+    },
+  },
+  "+81": {
+    maxDigits: 11,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`
+      return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6, 11)}`
+    },
+  },
+  "+82": {
+    maxDigits: 11,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`
+      return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7, 11)}`
+    },
+  },
+  "+86": {
+    maxDigits: 11,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 7) return `${d.slice(0, 3)} ${d.slice(3)}`
+      return `${d.slice(0, 3)} ${d.slice(3, 7)} ${d.slice(7, 11)}`
+    },
+  },
+  "+91": {
+    maxDigits: 10,
+    format: (d) => {
+      if (d.length <= 5) return d
+      return `${d.slice(0, 5)} ${d.slice(5, 10)}`
+    },
+  },
+  "+61": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 4) return d
+      return `${d.slice(0, 4)} ${d.slice(4, 9)}`
+    },
+  },
+  "+64": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
+      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`
+    },
+  },
+  "+27": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 2) return d
+      if (d.length <= 5) return `${d.slice(0, 2)} ${d.slice(2)}`
+      return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 9)}`
+    },
+  },
+  "+234": {
+    maxDigits: 11,
+    format: (d) => {
+      if (d.length <= 4) return d
+      if (d.length <= 8) return `${d.slice(0, 4)} ${d.slice(4)}`
+      return `${d.slice(0, 4)} ${d.slice(4, 8)} ${d.slice(8, 11)}`
+    },
+  },
+  "+254": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
+      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`
+    },
+  },
+  "+211": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
+      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`
+    },
+  },
+  "+971": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
+      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`
+    },
+  },
+  "+966": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
+      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`
+    },
+  },
+  "+90": {
+    maxDigits: 10,
+    format: (d) => {
+      if (d.length <= 4) return d
+      if (d.length <= 7) return `${d.slice(0, 4)} ${d.slice(4)}`
+      return `${d.slice(0, 4)} ${d.slice(4, 7)} ${d.slice(7, 10)}`
+    },
+  },
+  "+972": {
+    maxDigits: 9,
+    format: (d) => {
+      if (d.length <= 3) return d
+      if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`
+      return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6, 9)}`
+    },
+  },
+}
+
+function getConfig(code: string) {
+  return phoneFormats[code] || { maxDigits: 15, format: (d: string) => d }
+}
+
+const maskPhone = (value: string, countryCode: string) => {
+  const digits = value.replace(/\D/g, "")
+  const config = getConfig(countryCode)
+  const limited = digits.slice(0, config.maxDigits)
+  return config.format(limited)
 }
 
 function CountUp({ value }: { value: number }) {
@@ -210,11 +447,16 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPasswords, setShowPasswords] = useState(false)
-  const [form, setForm] = useState<ProfileForm>({
-    fullName: user?.name || "",
-    email: user?.email || "",
-    countryCode: "+1",
-    phone: "",
+  const [form, setForm] = useState<ProfileForm>(() => {
+    const stored = loadCurrentUser()
+    const initialCode = stored?.countryCode || user?.countryCode || "+1"
+    const initialPhone = stored?.phone || user?.phone || ""
+    return {
+      fullName: user?.name || stored?.name || "",
+      email: user?.email || stored?.email || "",
+      countryCode: initialCode,
+      phone: initialPhone ? maskPhone(initialPhone, initialCode) : "",
+    }
   })
   const [savedForm, setSavedForm] = useState(form)
 
@@ -262,9 +504,29 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
     }
   }
 
-  const saveProfile = () => {
+  const saveProfile = async () => {
     setSavedForm(form)
     setIsEditing(false)
+
+    const rawPhone = form.phone.replace(/\D/g, "")
+    const payload = {
+      name: form.fullName,
+      phone: rawPhone,
+      countryCode: form.countryCode,
+    }
+
+    await updateProfileMetadata(payload)
+
+    const updated: UserProfile = {
+      ...user!,
+      uid: user?.uid || user?.id,
+      name: form.fullName,
+      phone: rawPhone,
+      countryCode: form.countryCode,
+    }
+    saveCurrentUser(updated)
+    upsertPublicUser(updated)
+
     notify("Profile updated", "Your changes were saved.")
   }
 
@@ -346,9 +608,16 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
               />
               <AvatarUpload
                 currentAvatarUrl={avatarUrl}
-                onUploadComplete={(url) => {
+                onUploadComplete={async (url) => {
                   setAvatarUrl(url)
-                  saveCurrentUser({ ...user!, photoUrl: url })
+                  const updated: UserProfile = {
+                    ...user!,
+                    uid: user?.uid || user?.id,
+                    photoUrl: url,
+                  }
+                  saveCurrentUser(updated)
+                  await updateProfileMetadata({ avatar_url: url, photoUrl: url })
+                  upsertPublicUser(updated)
                 }}
               />
               <motion.span
@@ -470,7 +739,11 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
                             <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
                               <select
                                 value={form.countryCode}
-                                onChange={(event) => updateField("countryCode", event.target.value)}
+                                onChange={(event) => {
+                                  const newCode = event.target.value
+                                  updateField("countryCode", newCode)
+                                  updateField("phone", maskPhone(form.phone, newCode))
+                                }}
                                 className="w-full rounded-xl border border-[#1a2d4a] bg-[#060d14] px-4 py-3 text-sm text-white outline-none transition-all duration-200 focus:border-[#2563eb] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
                               >
                                 {countryCodes.map((item) => (
@@ -481,8 +754,9 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
                               </select>
                               <input
                                 value={form.phone}
-                                onChange={(event) => updateField("phone", maskPhone(event.target.value))}
+                                onChange={(event) => updateField("phone", maskPhone(event.target.value, form.countryCode))}
                                 placeholder="Phone number"
+                                inputMode="numeric"
                                 className="w-full rounded-xl border border-[#1a2d4a] bg-[#060d14] px-4 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-[#475569] focus:border-[#2563eb] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
                               />
                             </div>

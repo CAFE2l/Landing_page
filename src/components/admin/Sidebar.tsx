@@ -7,7 +7,7 @@ import {
 import { cn } from "../../lib/utils"
 import { useAdminStore } from "../../lib/store/adminStore"
 import { useAuth } from "../../contexts/AuthContext"
-import { getPendingFeedbackCount } from "../../data/feedbackService"
+import { getPendingFeedbackCount } from "../../data/feedbackServiceSupabase"
 
 const navItems = [
   { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },

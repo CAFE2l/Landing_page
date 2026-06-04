@@ -7,7 +7,7 @@ import {
 import {
   fetchFeedbackPosts, updateFeedbackPost, deleteFeedbackPost,
   setAdminReply, getFeedbackStats,
-} from "../../data/feedbackService"
+} from "../../data/feedbackServiceSupabase"
 import type { FeedbackPost, FeedbackStatus } from "../../data/feedbackStore"
 import { SERVICE_CATEGORIES } from "../../data/feedbackStore"
 import { useAuth } from "../../contexts/AuthContext"

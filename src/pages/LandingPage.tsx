@@ -1,3 +1,5 @@
+import CursorSpotlight from "../components/landing/CursorSpotlight"
+import ReadingProgress from "../components/landing/ReadingProgress"
 import FloatingOrbs from "../components/landing/FloatingOrbs"
 import Navbar from "../components/landing/Navbar"
 import Hero from "../components/landing/Hero"
@@ -19,6 +21,8 @@ interface LandingPageProps {
 export default function LandingPage({ feedbacks }: LandingPageProps) {
   return (
     <>
+      <CursorSpotlight />
+      <ReadingProgress />
       <FloatingOrbs />
       <Navbar />
       <main>

@@ -24,8 +24,10 @@ export async function uploadToCloudinary(
   formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET)
   formData.append("folder", folder)
 
+  const resourceType = file.type.startsWith("video/") ? "video" : "image"
+
   const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`,
     { method: "POST", body: formData }
   )
 

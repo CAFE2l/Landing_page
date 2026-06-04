@@ -11,6 +11,8 @@ export interface UserProfile {
   company?: string
   country?: string
   photoUrl?: string
+  phone?: string
+  countryCode?: string
   createdAt?: string
 }
 
@@ -39,16 +41,13 @@ export interface FeedbackEntry {
 
 export type FeedbackStatus = "pending" | "approved" | "rejected" | "highlighted"
 
-export type ServiceCategory = "Landing Page" | "Website Profissional" | "Web App" | "SaaS/Dashboard" | "UI/UX" | "Manutenção" | "Outro"
+export type ServiceCategory = "Landing Page" | "Website Profissional" | "Web App" | "SaaS/Dashboard"
 
 export const SERVICE_CATEGORIES: ServiceCategory[] = [
   "Landing Page",
   "Website Profissional",
   "Web App",
   "SaaS/Dashboard",
-  "UI/UX",
-  "Manutenção",
-  "Outro",
 ]
 
 export interface FeedbackMedia {

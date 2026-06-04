@@ -9,7 +9,7 @@ import FeedbackSidebar from "../components/feedback/FeedbackSidebar"
 import FeedbackDetail from "../components/feedback/FeedbackDetail"
 import FeedbackForm, { type FeedbackFormData } from "../components/feedback/FeedbackForm"
 import type { FeedbackPost, ServiceCategory } from "../data/feedbackStore"
-import { searchFeedbackPosts, createFeedbackPost, toggleHelpfulVote, getUserHelpfulVote } from "../data/feedbackService"
+import { searchFeedbackPosts, createFeedbackPost, toggleHelpfulVote, getUserHelpfulVote } from "../data/feedbackServiceSupabase"
 import { useAuth } from "../contexts/AuthContext"
 import { loadCurrentUser } from "../data/feedbackStore"
 import { uploadToCloudinary, isCloudinaryConfigured } from "../lib/cloudinary"
@@ -18,7 +18,7 @@ import toast from "react-hot-toast"
 export default function FeedbackPage() {
   const { user: supabaseUser } = useAuth()
   const localUser = loadCurrentUser()
-  const currentUser = supabaseUser || localUser
+  const currentUser = localUser || supabaseUser
   const userProfile = currentUser ? (currentUser as unknown as { uid?: string; id: string; name?: string; email?: string; photoUrl?: string }) : null
   const uid = userProfile?.uid || userProfile?.id
 
@@ -130,16 +130,18 @@ export default function FeedbackPage() {
         isVerifiedClient: false,
         isVerifiedProject: false,
         isHighlighted: false,
+        improvementSuggestion: data.improvementSuggestion,
       })
 
       if (id) {
         toast.success("Feedback submitted! It will appear after admin approval.")
         setShowForm(false)
       } else {
-        toast.error("Failed to submit feedback")
+        toast.error("Failed to submit feedback — check console for details")
       }
-    } catch {
-      toast.error("Failed to submit feedback")
+    } catch (e) {
+      console.error("handleSubmitFeedback error", e)
+      toast.error(`Failed to submit feedback: ${e instanceof Error ? e.message : "Unknown error"}`)
     }
     setSubmitting(false)
   }
@@ -157,12 +159,13 @@ export default function FeedbackPage() {
     >
       {/* CTA Bar */}
       <div className="mb-6 flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 sm:p-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#4F6EF7]/10 text-sm font-bold text-[#4F6EF7]">
-          {userProfile?.name ? getInitials(userProfile.name) : "CS"}
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#4F6EF7]/10 text-sm font-bold text-[#4F6EF7] overflow-hidden">
+          {userProfile?.photoUrl ? (
+            <img src={userProfile.photoUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            userProfile?.name ? getInitials(userProfile.name) : "CS"
+          )}
         </div>
-        {userProfile?.photoUrl && (
-          <img src={userProfile.photoUrl} alt="" className="h-10 w-10 rounded-full object-cover hidden sm:block" />
-        )}
         <button
           onClick={() => uid ? setShowForm(true) : setShowLoginPrompt(true)}
           className="flex-1 rounded-xl border border-white/[0.08] bg-black/20 px-4 py-2.5 text-left text-sm text-[#6B6B80] transition-colors hover:border-[#4F6EF7]/30 hover:text-[#F0F0F5]"

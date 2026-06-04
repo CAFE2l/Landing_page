@@ -35,6 +35,8 @@ function syncSessionToStorage(session: Session | null) {
     company: meta.company || undefined,
     country: meta.country || undefined,
     photoUrl: meta.avatar_url || meta.photoUrl || undefined,
+    phone: meta.phone || undefined,
+    countryCode: meta.countryCode || undefined,
   })
 }
 

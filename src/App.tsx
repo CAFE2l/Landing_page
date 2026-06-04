@@ -8,6 +8,7 @@ import FeedbackPage from "./pages/FeedbackPage"
 import ForumPage from "./pages/ForumPage"
 import ForumDetailPage from "./pages/ForumDetailPage"
 import LandingPage from "./pages/LandingPage"
+import MyDashboardPage from "./pages/MyDashboardPage"
 import ProfilePage from "./pages/ProfilePage"
 import AdminShell from "./components/admin/AdminShell"
 import AdminLogin from "./pages/admin/Login"
@@ -57,6 +58,7 @@ function App() {
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/login" element={<AuthPage mode="login" onAuth={setUser} />} />
           <Route path="/signup" element={<AuthPage mode="signup" onAuth={setUser} />} />
+          <Route path="/my-account" element={<ProtectedRoute><MyDashboardPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage user={user} onSubmitFeedback={addFeedback} /></ProtectedRoute>} />
           <Route path="/perfil" element={<ProtectedRoute><ProfilePage user={user} onSubmitFeedback={addFeedback} /></ProtectedRoute>} />
           <Route path="/admin" element={<AdminRoute><AdminPage user={user} /></AdminRoute>} />

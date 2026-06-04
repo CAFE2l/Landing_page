@@ -53,10 +53,7 @@ export function AvatarUpload({ currentAvatarUrl, onUploadComplete }: AvatarUploa
             updated_at: new Date().toISOString(),
           })
           if (dbError) {
-            const msg = dbError.message || ""
-            if (!msg.includes("relation") && !msg.includes("does not exist")) {
-              throw dbError
-            }
+            console.warn("[AvatarUpload] Supabase profile save failed:", dbError.message)
           }
       }
 
