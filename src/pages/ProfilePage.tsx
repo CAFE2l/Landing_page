@@ -21,6 +21,7 @@ import { AvatarUpload } from "../components/profile/AvatarUpload"
 import { getInitials, loadCurrentUser, saveCurrentUser, type FeedbackEntry, type UserProfile } from "../data/feedbackStore"
 import { isCloudinaryConfigured, uploadToCloudinary } from "../lib/cloudinary"
 import { updateProfileMetadata, upsertPublicUser } from "../lib/supabaseProfile"
+import { supabase } from "../lib/supabase/client"
 
 interface ProfilePageProps {
   user: UserProfile | null
@@ -447,6 +448,9 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPasswords, setShowPasswords] = useState(false)
+  const [passwordLoading, setPasswordLoading] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
   const [form, setForm] = useState<ProfileForm>(() => {
     const stored = loadCurrentUser()
     const initialCode = stored?.countryCode || user?.countryCode || "+1"
@@ -568,17 +572,54 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
     notify("Feedback submitted", "Your feedback is waiting for review.")
   }
 
-  const submitPassword = (event: React.FormEvent<HTMLFormElement>) => {
+  const submitPassword = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    setPasswordError(null)
+    setPasswordSuccess(false)
+
     if (!passwordsMatch || passwordStrength.score < 3) {
+      setPasswordError("Use a stronger password and make sure both fields match.")
       notify("Password not updated", "Use a stronger password and make sure both fields match.")
       return
     }
 
-    setCurrentPassword("")
-    setNewPassword("")
-    setConfirmPassword("")
-    notify("Password updated", "Your new password was saved.")
+    if (!supabase) {
+      setPasswordError("Authentication not configured.")
+      notify("Password not updated", "Authentication is not configured.")
+      return
+    }
+
+    try {
+      setPasswordLoading(true)
+      // Re-authenticate with current password to validate ownership
+      const { data: signData, error: signError } = await supabase.auth.signInWithPassword({
+        email: user.email || "",
+        password: currentPassword,
+      })
+      if (signError) {
+        setPasswordError("Current password is incorrect.")
+        notify("Password not updated", "Current password is incorrect.")
+        return
+      }
+
+      const { data: updateData, error: updateError } = await supabase.auth.updateUser({ password: newPassword })
+      if (updateError) {
+        setPasswordError("Could not update password. Try again later.")
+        notify("Password not updated", "Could not update password. Try again later.")
+        return
+      }
+
+      setCurrentPassword("")
+      setNewPassword("")
+      setConfirmPassword("")
+      setPasswordSuccess(true)
+      notify("Password updated", "Your new password was saved.")
+    } catch (err) {
+      setPasswordError("Unexpected error updating password.")
+      notify("Password not updated", "Unexpected error updating password.")
+    } finally {
+      setPasswordLoading(false)
+    }
   }
 
   const statItems = [
@@ -600,7 +641,7 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
       >
         <aside className={`${cardClass} p-6`}>
           <div className="pb-2 pt-4 text-center">
-            <div className="relative mx-auto h-28 w-28">
+            <div className="relative mx-auto flex flex-col items-center">
               <motion.div
                 className="absolute inset-0 -z-10 scale-125 rounded-full bg-[#2563eb]/20 blur-xl"
                 animate={{ opacity: [0.4, 0.8, 0.4], scale: [1.2, 1.4, 1.2] }}
@@ -627,9 +668,9 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
               />
             </div>
 
-            <h1 className="mt-4 text-center text-xl font-bold text-white">{displayName}</h1>
+            <h1 className="mt-4 text-center text-xl font-bold text-white max-w-[12rem] break-words" style={{ display: '-webkit-box', WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>{displayName}</h1>
             <p className="mt-1 text-center text-sm text-[#94a3b8]">{user.email}</p>
-            <div className="mt-4 inline-flex rounded-full border border-[#2563eb]/20 bg-[#2563eb]/10 px-3 py-1 font-mono text-xs text-[#60a5fa]">
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#2563eb]/30 bg-gradient-to-r from-[#071029] via-[#081427] to-[#071029] px-3 py-1 text-sm font-semibold text-[#60a5fa] shadow-[0_6px_20px_rgba(59,130,246,0.12)]">
               Client Account
             </div>
           </div>
@@ -780,147 +821,151 @@ export default function ProfilePage({ user, onSubmitFeedback }: ProfilePageProps
             ) : (
               <motion.div key="security" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
                 <div className="mb-6 border-b border-[#1a2d4a] pb-6">
-                  <h2 className="text-xl font-bold text-white">Security</h2>
-                  <p className="mt-1 text-sm text-[#94a3b8]">Update your password and review password strength</p>
-                </div>
+                <h2 className="text-xl font-bold text-white">Security</h2>
+                <p className="mt-1 text-sm text-[#94a3b8]">Manage passwords, sessions and connected accounts.</p>
+              </div>
 
-                <form onSubmit={submitPassword} className="rounded-2xl border border-[#1a2d4a] bg-[#060d14] p-6">
-                  <div className="mb-6 flex items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/10 text-[#60a5fa]">
-                      <KeyRound size={21} />
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* Change Password */}
+                <div className="rounded-2xl border border-[#1a2d4a] bg-[#060d14] p-4">
+                  <div className="mb-4 flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/10 text-[#60a5fa]">
+                      <KeyRound size={18} />
                     </div>
                     <div>
                       <h3 className="font-semibold text-white">Change password</h3>
-                      <p className="mt-1 text-sm leading-relaxed text-[#94a3b8]">
-                        Choose a password with uppercase, lowercase, numbers, and symbols for stronger protection.
-                      </p>
+                      <p className="mt-1 text-sm text-[#94a3b8]">Update your password. Use a strong, unique password.</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowPasswords((current) => !current)}
-                      className="ml-auto rounded-xl border border-[#1a2d4a] p-2.5 text-[#94a3b8] transition-colors hover:border-[#2a4a7a] hover:text-white"
-                      aria-label={showPasswords ? "Hide passwords" : "Show passwords"}
-                    >
-                      {showPasswords ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
                   </div>
 
-                  <div className="grid gap-4">
-                    {[
-                      {
-                        label: "Current password",
-                        value: currentPassword,
-                        setValue: setCurrentPassword,
-                        placeholder: "Enter current password",
-                      },
-                      {
-                        label: "New password",
-                        value: newPassword,
-                        setValue: setNewPassword,
-                        placeholder: "Create a strong password",
-                      },
-                      {
-                        label: "Confirm password",
-                        value: confirmPassword,
-                        setValue: setConfirmPassword,
-                        placeholder: "Repeat new password",
-                      },
-                    ].map((field, index) => (
-                      <motion.label
-                        key={field.label}
-                        initial={{ opacity: 0, x: -12 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.06 }}
-                        className="block"
-                      >
-                        <span className="mb-2 block font-mono text-xs uppercase tracking-wider text-[#475569]">{field.label}</span>
+                  <form onSubmit={submitPassword} className="grid gap-3">
+                    <label className="block">
+                      <span className="mb-2 block font-mono text-xs uppercase tracking-wider text-[#475569]">Current password</span>
+                      <div className="relative">
                         <input
                           type={showPasswords ? "text" : "password"}
-                          value={field.value}
-                          onChange={(event) => field.setValue(event.target.value)}
-                          placeholder={field.placeholder}
-                          className="w-full rounded-xl border border-[#1a2d4a] bg-[#0a1628] px-4 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-[#475569] focus:border-[#2563eb] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="Enter current password"
+                          className="w-full rounded-xl border border-[#1a2d4a] bg-[#0a1628] px-4 py-3 pr-12 text-sm text-white outline-none placeholder:text-[#475569] focus:border-[#2563eb]"
                         />
-                      </motion.label>
-                    ))}
+                      </div>
+                    </label>
 
-                    <div className="rounded-2xl border border-[#1a2d4a] bg-[#0a1628] p-4">
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="font-mono text-xs uppercase tracking-wider text-[#475569]">Password strength</span>
-                        <motion.span
-                          key={passwordStrength.label}
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="text-sm font-semibold"
-                          style={{ color: passwordStrength.color }}
-                        >
-                          {passwordStrength.label}
-                        </motion.span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-[#060d14]">
-                        <motion.div
-                          className="h-full rounded-full"
-                          animate={{ width: passwordStrength.width, backgroundColor: passwordStrength.color }}
-                          transition={{ duration: 0.35, ease: "easeOut" }}
+                    <label className="block">
+                      <span className="mb-2 block font-mono text-xs uppercase tracking-wider text-[#475569]">New password</span>
+                      <div className="relative">
+                        <input
+                          type={showPasswords ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Create a strong password"
+                          className="w-full rounded-xl border border-[#1a2d4a] bg-[#0a1628] px-4 py-3 pr-12 text-sm text-white outline-none placeholder:text-[#475569] focus:border-[#2563eb]"
                         />
                       </div>
-                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-[#94a3b8] sm:grid-cols-4">
-                        {[
-                          { label: "8+ chars", active: newPassword.length >= 8 },
-                          { label: "Uppercase", active: /[A-Z]/.test(newPassword) },
-                          { label: "Number", active: /\d/.test(newPassword) },
-                          { label: "Symbol", active: /[^A-Za-z0-9]/.test(newPassword) },
-                        ].map((rule) => (
-                          <span key={rule.label} className={rule.active ? "text-[#22c55e]" : "text-[#475569]"}>
-                            {rule.label}
-                          </span>
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block font-mono text-xs uppercase tracking-wider text-[#475569]">Confirm password</span>
+                      <div className="relative">
+                        <input
+                          type={showPasswords ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Repeat new password"
+                          className="w-full rounded-xl border border-[#1a2d4a] bg-[#0a1628] px-4 py-3 pr-12 text-sm text-white outline-none placeholder:text-[#475569] focus:border-[#2563eb]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswords((s) => !s)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-2 text-[#94a3b8] hover:text-white"
+                          aria-label={showPasswords ? "Hide passwords" : "Show passwords"}
+                        >
+                          {showPasswords ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </label>
+
+                    <div className="rounded-xl border border-[#1a2d4a] bg-[#0a1628] p-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="font-mono text-xs uppercase tracking-wider text-[#475569]">Password strength</span>
+                        <span className="text-sm font-semibold" style={{ color: passwordStrength.color }}>{passwordStrength.label}</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-[#060d14] mb-2">
+                        <motion.div className="h-full rounded-full" animate={{ width: passwordStrength.width, backgroundColor: passwordStrength.color }} transition={{ duration: 0.35 }} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-[#94a3b8] sm:grid-cols-4">
+                        {[{ label: "8+ chars", active: newPassword.length >= 8 }, { label: "Uppercase", active: /[A-Z]/.test(newPassword) }, { label: "Number", active: /\d/.test(newPassword) }, { label: "Symbol", active: /[^A-Za-z0-9]/.test(newPassword) }].map((rule) => (
+                          <div key={rule.label} className={rule.active ? "flex items-center gap-2 text-[#22c55e]" : "flex items-center gap-2 text-[#475569]"}>
+                            <div className={rule.active ? "h-3 w-3 rounded-full bg-[#22c55e]" : "h-3 w-3 rounded-full bg-[#24354a]"} />
+                            <span>{rule.label}</span>
+                          </div>
                         ))}
                       </div>
                     </div>
 
-                    {!passwordsMatch && (
-                      <p className="text-sm text-red-400">Passwords do not match.</p>
-                    )}
+                    {passwordError && <p className="text-sm text-red-400">{passwordError}</p>}
+                    {passwordSuccess && <p className="text-sm text-green-400">Password updated successfully.</p>}
 
-                    <div className="flex items-center gap-3 border-t border-[#1a2d4a] pt-6">
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.97 }}
-                        className="flex items-center gap-2 rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300 hover:bg-[#1d4ed8] hover:shadow-[0_0_32px_rgba(37,99,235,0.55)]"
-                      >
-                        <Save size={16} />
+                    <div className="mt-2 flex items-center gap-3">
+                      <button type="submit" disabled={passwordLoading} className="inline-flex items-center gap-2 rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white shadow-[0_0_16px_rgba(37,99,235,0.25)] hover:bg-[#1d4ed8]">
+                        {passwordLoading ? <Loader2 size={16} className="animate-spin" /> : <Save size={14} />}
                         Update password
-                      </motion.button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCurrentPassword("")
-                          setNewPassword("")
-                          setConfirmPassword("")
-                        }}
-                        className="rounded-xl border border-[#1a2d4a] px-6 py-2.5 text-sm text-[#94a3b8] transition-all duration-200 hover:border-[#2a4a7a] hover:text-white"
-                      >
+                      </button>
+                      <button type="button" onClick={() => { setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} className="rounded-xl border border-[#1a2d4a] px-4 py-2 text-sm text-[#94a3b8]">
                         Clear
                       </button>
                     </div>
-                  </div>
-                </form>
+                  </form>
+                </div>
 
-                <div className="mt-4 rounded-2xl border border-[#1a2d4a] bg-[#060d14] p-6">
-                  <div className="flex gap-4">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/10 text-[#60a5fa]">
-                      <Shield size={20} />
+                {/* Two-Factor Authentication */}
+                <div className="rounded-2xl border border-[#1a2d4a] bg-[#060d14] p-4">
+                  <div className="mb-4 flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/10 text-[#60a5fa]">
+                      <Shield size={18} />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-white">Session security</h3>
-                      <p className="mt-1 text-sm leading-relaxed text-[#94a3b8]">
-                        Active sessions and device history will appear here when backend auth is connected.
-                      </p>
+                      <h3 className="font-semibold text-white">Two-Factor Authentication</h3>
+                      <p className="mt-1 text-sm text-[#94a3b8]">Add an extra layer of security to your account.</p>
                     </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-[#94a3b8]">Authenticator app (TOTP)</div>
+                    <button className="rounded-xl border border-[#1a2d4a] px-3 py-1 text-sm text-[#94a3b8]">Configure</button>
                   </div>
                 </div>
 
-                <form onSubmit={submitFeedback} className="mt-6 rounded-2xl border border-[#1a2d4a] bg-[#060d14] p-6">
+                {/* Active Sessions */}
+                <div className="rounded-2xl border border-[#1a2d4a] bg-[#060d14] p-4">
+                  <h3 className="font-semibold text-white">Active sessions</h3>
+                  <p className="mt-2 text-sm text-[#94a3b8]">Manage devices currently signed in to your account.</p>
+                  <div className="mt-3 text-sm text-[#94a3b8]">No active sessions found.</div>
+                </div>
+
+                {/* Connected Accounts */}
+                <div className="rounded-2xl border border-[#1a2d4a] bg-[#060d14] p-4">
+                  <h3 className="font-semibold text-white">Connected accounts</h3>
+                  <p className="mt-2 text-sm text-[#94a3b8]">Connect or disconnect third-party logins (Google, GitHub).</p>
+                  <div className="mt-3 flex gap-2">
+                    <button className="rounded-xl border border-[#1a2d4a] px-3 py-1 text-sm text-[#94a3b8]">Connect Google</button>
+                    <button className="rounded-xl border border-[#1a2d4a] px-3 py-1 text-sm text-[#94a3b8]">Connect GitHub</button>
+                  </div>
+                </div>
+
+                {/* Danger Zone */}
+                <div className="rounded-2xl border border-[#4b1f1f] bg-[#160808] p-4">
+                  <h3 className="font-semibold text-white">Danger zone</h3>
+                  <p className="mt-2 text-sm text-[#fca5a5]">Deleting your account is permanent. All data will be removed.</p>
+                  <div className="mt-3 flex gap-2">
+                    <button className="rounded-xl bg-[#7f1d1d] px-3 py-1 text-sm font-semibold text-white">Delete account</button>
+                    <button className="rounded-xl border border-[#4b1f1f] px-3 py-1 text-sm text-[#fca5a5]">Deactivate</button>
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="mt-6">
                   <h3 className="font-semibold text-white">Project feedback draft</h3>
                   <p className="mt-1 text-sm text-[#94a3b8]">This keeps the existing feedback submission flow available.</p>
                   <div className="mt-4 grid gap-3">
