@@ -5,8 +5,6 @@ import AdminPage from "./pages/AdminPage"
 import AuthPage from "./pages/AuthPage"
 import AuthCallback from "./pages/AuthCallback"
 import FeedbackPage from "./pages/FeedbackPage"
-import ForumPage from "./pages/ForumPage"
-import ForumDetailPage from "./pages/ForumDetailPage"
 import LandingPage from "./pages/LandingPage"
 import MyDashboardPage from "./pages/MyDashboardPage"
 import ProfilePage from "./pages/ProfilePage"
@@ -53,8 +51,6 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage feedbacks={feedbacks} />} />
           <Route path="/feedback" element={<FeedbackPage />} />
-          <Route path="/forum" element={<ForumPage />} />
-          <Route path="/forum/:slug" element={<ForumDetailPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/login" element={<AuthPage mode="login" onAuth={setUser} />} />
           <Route path="/signup" element={<AuthPage mode="signup" onAuth={setUser} />} />

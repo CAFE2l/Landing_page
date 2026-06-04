@@ -17,7 +17,7 @@ export default function AuthCallback() {
         if (role === "admin") {
           navigate("/admin/dashboard")
         } else {
-          navigate("/forum")
+          navigate("/")
         }
       } else {
         navigate("/login")
