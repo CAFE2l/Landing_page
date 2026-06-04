@@ -97,11 +97,11 @@ export default function Hero() {
   }, [])
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center pt-32 pb-24 overflow-hidden">
+    <section className="relative min-h-screen flex items-center justify-center pt-24 md:pt-32 pb-16 md:pb-24 overflow-hidden">
       <div className="absolute inset-0 bg-dot-grid" />
 
       <motion.div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[450px] sm:h-[450px] lg:w-[600px] lg:h-[600px] bg-[#2563eb] rounded-full pointer-events-none"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px] sm:w-[450px] sm:h-[450px] lg:w-[600px] lg:h-[600px] bg-[#2563eb] rounded-full pointer-events-none"
         style={{ filter: "blur(150px)" }}
         animate={
           !reduceMotion
@@ -115,12 +115,12 @@ export default function Hero() {
         }}
       />
 
-      <div className="container mx-auto px-6 relative z-10 text-center">
+      <div className="container mx-auto px-4 sm:px-6 relative z-10 text-center">
         <motion.div
           initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full glass mb-10"
+          className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full glass mb-6 md:mb-10"
         >
           <span className="relative flex h-2.5 w-2.5">
             <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 animate-ping opacity-75" />
@@ -164,7 +164,7 @@ export default function Hero() {
 
         <motion.p
           {...fadeUp(0.6)}
-          className="text-base sm:text-lg text-zinc-500 mb-12 max-w-2xl mx-auto leading-relaxed"
+           className="text-sm sm:text-lg text-zinc-500 mb-8 md:mb-12 max-w-2xl mx-auto leading-relaxed"
         >
           High-quality web development with clean code, pixel-perfect design, and
           clear communication. From landing pages to full-stack applications.
@@ -172,7 +172,7 @@ export default function Hero() {
 
         <motion.div
           {...fadeUp(0.75)}
-          className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
+          className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-10 md:mb-16"
         >
           <motion.a
             href="#contact"
@@ -194,7 +194,7 @@ export default function Hero() {
 
         <motion.div
           {...fadeUp(0.9)}
-          className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm text-zinc-600"
+          className="flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-8 gap-y-2 text-xs sm:text-sm text-zinc-600"
         >
           {statLabels.map((s, i) => (
             <span key={s.key} className="flex items-center gap-1.5">
@@ -211,7 +211,7 @@ export default function Hero() {
 
         <motion.div
           {...fadeUp(1.05)}
-          className="flex flex-col items-center gap-2 mt-20"
+          className="flex flex-col items-center gap-2 mt-12 md:mt-20"
         >
           <motion.svg
             width="20"

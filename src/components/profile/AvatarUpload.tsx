@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback } from "react"
 import { Camera, Loader2, AlertCircle } from "lucide-react"
-import { uploadToCloudinary } from "../../lib/cloudinary"
+import { uploadToCloudinary, isCloudinaryConfigured } from "../../lib/cloudinary"
 import { supabase } from "../../lib/supabase/client"
 import { useAuth } from "../../contexts/AuthContext"
+import { saveCurrentUser, loadCurrentUser } from "../../data/feedbackStore"
 
 interface AvatarUploadProps {
   currentAvatarUrl?: string
@@ -22,8 +23,8 @@ export function AvatarUpload({ currentAvatarUrl, onUploadComplete }: AvatarUploa
       setError("Only image files are allowed")
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image must be smaller than 5MB")
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Image must be smaller than 10MB")
       return
     }
 
@@ -34,6 +35,10 @@ export function AvatarUpload({ currentAvatarUrl, onUploadComplete }: AvatarUploa
     setProgress(30)
 
     try {
+      if (!isCloudinaryConfigured()) {
+        throw new Error("Cloudinary is not configured. Add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to .env")
+      }
+
       setProgress(50)
       const result = await uploadToCloudinary(file, "avatars")
       setProgress(80)
@@ -47,8 +52,17 @@ export function AvatarUpload({ currentAvatarUrl, onUploadComplete }: AvatarUploa
             avatar_public_id: result.public_id,
             updated_at: new Date().toISOString(),
           })
+          if (dbError) {
+            const msg = dbError.message || ""
+            if (!msg.includes("relation") && !msg.includes("does not exist")) {
+              throw dbError
+            }
+          }
+      }
 
-        if (dbError) throw dbError
+      const localUser = loadCurrentUser()
+      if (localUser) {
+        saveCurrentUser({ ...localUser, photoUrl: result.secure_url })
       }
 
       setProgress(100)
@@ -109,7 +123,7 @@ export function AvatarUpload({ currentAvatarUrl, onUploadComplete }: AvatarUploa
       )}
 
       <p className="text-[10px] text-[#6b6b80]">
-        Click or drag to upload · Max 5MB
+        Click or drag to upload · Max 10MB
       </p>
     </div>
   )

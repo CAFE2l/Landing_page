@@ -16,9 +16,9 @@ import { loadCurrentUser, type UserProfile } from "../data/feedbackStore"
 import toast from "react-hot-toast"
 
 export default function ForumPage() {
-  const { session } = useAuth()
+  const { user: supabaseUser } = useAuth()
   const localUser = loadCurrentUser()
-  const currentUser = session || localUser
+  const currentUser = supabaseUser || localUser
   const userProfile = currentUser ? (currentUser as unknown as UserProfile) : null
   const isAuthed = !!currentUser
 
@@ -35,7 +35,7 @@ export default function ForumPage() {
   const [showLoginPrompt, setShowLoginPrompt] = useState(false)
   const [upvotedPosts, setUpvotedPosts] = useState<Set<string>>(new Set())
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<string>>(new Set())
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>()
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const navigate = useNavigate()
 

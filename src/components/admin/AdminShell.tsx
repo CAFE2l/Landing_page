@@ -9,7 +9,7 @@ import { loadCurrentUser } from "../../data/feedbackStore"
 
 const pageTitles: Record<string, string> = {
   "/admin/dashboard": "Dashboard",
-  "/admin/feedback": "Feedback",
+  "/admin/feedback": "Feedback Management",
   "/admin/clients": "Clients",
   "/admin/forum": "Forum",
   "/admin/analytics": "Analytics",

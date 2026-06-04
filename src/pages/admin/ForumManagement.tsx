@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import toast from "react-hot-toast"
 import {
   Plus, Edit3, Trash2, Archive, Pin, Star,
   BadgeCheck, Search, Loader2, XCircle,
@@ -22,7 +23,7 @@ function EditPostModal({ post, categories, onClose, onSaved }: EditPostModalProp
   const [title, setTitle] = useState(post?.title || "")
   const [body, setBody] = useState(post?.body || "")
   const [categoryId, setCategoryId] = useState(post?.categoryId || "")
-  const [status, setStatus] = useState(post?.status || "published")
+  const [status, setStatus] = useState<"published" | "draft" | "archived">(post?.status as "published" | "draft" | "archived" || "published")
   const [featured, setFeatured] = useState(post?.featured || false)
   const [pinned, setPinned] = useState(post?.pinned || false)
   const [verifiedResult, setVerifiedResult] = useState(post?.verifiedResult || false)
@@ -75,7 +76,7 @@ function EditPostModal({ post, categories, onClose, onSaved }: EditPostModalProp
             <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="bg-[#0A0A0F] border border-[#1E1E2A] rounded-xl px-4 py-2.5 text-sm text-[#F0F0F5] focus:outline-none focus:border-[#4F6EF7]/50">
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className="bg-[#0A0A0F] border border-[#1E1E2A] rounded-xl px-4 py-2.5 text-sm text-[#F0F0F5] focus:outline-none focus:border-[#4F6EF7]/50">
+            <select value={status} onChange={(e) => setStatus(e.target.value as "published" | "draft" | "archived")} className="bg-[#0A0A0F] border border-[#1E1E2A] rounded-xl px-4 py-2.5 text-sm text-[#F0F0F5] focus:outline-none focus:border-[#4F6EF7]/50">
               <option value="published">Published</option>
               <option value="draft">Draft</option>
               <option value="archived">Archived</option>

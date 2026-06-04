@@ -15,7 +15,7 @@ export default function SectionHeading({ label, title, subtitle }: SectionHeadin
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 0.5, ease: "easeOut" as const }}
-      className="text-center mb-16"
+      className="text-center mb-10 md:mb-16"
     >
       {label && (
         <span className="inline-block px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[#0ea5e9] text-xs font-semibold tracking-wider uppercase mb-5">

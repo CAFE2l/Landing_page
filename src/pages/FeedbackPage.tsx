@@ -1,136 +1,266 @@
+import { useState, useEffect, useRef, useCallback } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Star, PenLine } from "lucide-react"
 import { Link } from "react-router-dom"
-import { ArrowUp, Image, MessageCircle, PenLine, Search, Share2, Video } from "lucide-react"
+import { getInitials } from "../lib/utils"
 import PageShell from "./PageShell"
-import type { FeedbackEntry } from "../data/feedbackStore"
+import FeedbackFeed from "../components/feedback/FeedbackFeed"
+import FeedbackSidebar from "../components/feedback/FeedbackSidebar"
+import FeedbackDetail from "../components/feedback/FeedbackDetail"
+import FeedbackForm, { type FeedbackFormData } from "../components/feedback/FeedbackForm"
+import type { FeedbackPost, ServiceCategory } from "../data/feedbackStore"
+import { searchFeedbackPosts, createFeedbackPost, toggleHelpfulVote, getUserHelpfulVote } from "../data/feedbackService"
+import { useAuth } from "../contexts/AuthContext"
+import { loadCurrentUser } from "../data/feedbackStore"
+import { uploadToCloudinary, isCloudinaryConfigured } from "../lib/cloudinary"
+import toast from "react-hot-toast"
 
-interface FeedbackPageProps {
-  feedbacks: FeedbackEntry[]
-}
+export default function FeedbackPage() {
+  const { user: supabaseUser } = useAuth()
+  const localUser = loadCurrentUser()
+  const currentUser = supabaseUser || localUser
+  const userProfile = currentUser ? (currentUser as unknown as { uid?: string; id: string; name?: string; email?: string; photoUrl?: string }) : null
+  const uid = userProfile?.uid || userProfile?.id
 
-export default function FeedbackPage({ feedbacks }: FeedbackPageProps) {
-  const approved = feedbacks.filter((item) => item.approved)
+  const [posts, setPosts] = useState<FeedbackPost[]>([])
+  const [loading, setLoading] = useState(true)
+  const [sort, setSort] = useState<"recent" | "rating" | "helpful" | "media" | "verified">("recent")
+  const [category, setCategory] = useState<ServiceCategory | "">("")
+  const [rating, setRating] = useState(0)
+  const [search, setSearch] = useState("")
+  const [searchInput, setSearchInput] = useState("")
+  const [helpfulPosts, setHelpfulPosts] = useState<Set<string>>(new Set())
+  const [selectedPost, setSelectedPost] = useState<FeedbackPost | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const loadPosts = useCallback(async () => {
+    setLoading(true)
+    const result = await searchFeedbackPosts(search, category, rating, sort)
+    setPosts(result.posts)
+    setLoading(false)
+  }, [search, category, rating, sort])
+
+  useEffect(() => {
+    loadPosts()
+  }, [loadPosts])
+
+  useEffect(() => {
+    if (uid) {
+      const fetchVotes = async () => {
+        const helpful = new Set<string>()
+        for (const p of posts) {
+          const voted = await getUserHelpfulVote(p.id, uid)
+          if (voted) helpful.add(p.id)
+        }
+        setHelpfulPosts(helpful)
+      }
+      fetchVotes()
+    }
+  }, [posts, uid])
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => setSearch(searchInput), 300)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [searchInput])
+
+  const handleHelpful = async (postId: string) => {
+    const uid = userProfile?.uid || userProfile?.id
+    if (!uid) { toast.error("Login to vote"); return }
+    const result = await toggleHelpfulVote(postId, uid)
+    setHelpfulPosts((prev) => {
+      const next = new Set(prev)
+      if (result) next.add(postId)
+      else next.delete(postId)
+      return next
+    })
+    setPosts((prev) =>
+      prev.map((p) => p.id === postId ? { ...p, helpfulCount: p.helpfulCount + (result ? 1 : -1) } : p)
+    )
+  }
+
+  const handleSubmitFeedback = async (data: FeedbackFormData) => {
+    const uid = userProfile?.uid || userProfile?.id
+    if (!uid) { toast.error("You must be logged in"); return }
+    setSubmitting(true)
+
+    const cloudinaryAvailable = isCloudinaryConfigured()
+    const uploadedMedia: FeedbackPost["media"] = []
+
+    for (const m of data.media) {
+      if (!m.url.startsWith("blob:")) {
+        uploadedMedia.push(m)
+        continue
+      }
+      if (!cloudinaryAvailable) {
+        toast.error("Cloudinary not configured — upload preset missing")
+        continue
+      }
+      try {
+        toast.loading(`Uploading ${m.altText || "file"}...`, { id: `upload-${m.url}` })
+        const response = await fetch(m.url)
+        const blob = await response.blob()
+        const file = new File([blob], m.altText || "upload", { type: blob.type })
+        const result = await uploadToCloudinary(file, "feedback")
+        uploadedMedia.push({ url: result.secure_url, type: m.type, altText: m.altText })
+        toast.success(`Uploaded ${m.altText || "file"}`, { id: `upload-${m.url}` })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Upload failed"
+        toast.error(`${msg} — file skipped`, { id: `upload-${m.url}` })
+      }
+    }
+
+    try {
+      const id = await createFeedbackPost({
+        userId: uid,
+        userName: userProfile?.name || userProfile?.email?.split("@")[0] || "User",
+        userAvatar: userProfile?.photoUrl || "",
+        serviceCategory: data.serviceCategory,
+        projectTitle: data.projectTitle,
+        projectUrl: data.projectUrl,
+        rating: data.rating,
+        title: data.title,
+        content: data.content,
+        media: uploadedMedia,
+        serviceDate: data.serviceDate,
+        status: "pending",
+        isVerifiedClient: false,
+        isVerifiedProject: false,
+        isHighlighted: false,
+      })
+
+      if (id) {
+        toast.success("Feedback submitted! It will appear after admin approval.")
+        setShowForm(false)
+      } else {
+        toast.error("Failed to submit feedback")
+      }
+    } catch {
+      toast.error("Failed to submit feedback")
+    }
+    setSubmitting(false)
+  }
+
+  const categoryCounts: Record<string, number> = {}
+  for (const p of posts) {
+    categoryCounts[p.serviceCategory] = (categoryCounts[p.serviceCategory] || 0) + 1
+  }
 
   return (
     <PageShell
-      eyebrow="Community feedback"
+      eyebrow="Client Reviews"
       title="Feedback Forum"
-      subtitle="A forum-style space for clients to publish project stories, screenshots, videos, outcomes, and longer discussions after delivery."
+      subtitle="Real feedback from real clients. Share your experience with CAFÉ Services — your review helps us improve."
     >
-      <div className="grid gap-6 lg:grid-cols-[260px_1fr_280px]">
-        <aside className="hidden lg:block">
-          <div className="sticky top-28 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-600">Channels</p>
-            {["All feedbacks", "Web apps", "Landing pages", "SaaS", "Results"].map((channel, index) => (
-              <button key={channel} className={`mb-1 flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-colors ${index === 0 ? "bg-[#2563eb]/10 text-white" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"}`}>
-                <span>{channel}</span>
-                <span className="text-xs text-zinc-700">0</span>
-              </button>
-            ))}
-          </div>
-        </aside>
-
-        <div className="min-w-0">
-          <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#3b82f6]/30 bg-[#2563eb]/10 text-sm font-bold text-white">
-              CS
-            </div>
-            <Link to="/signup" className="flex-1 rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-left text-sm text-zinc-600 transition-colors hover:border-[#3b82f6]/30 hover:text-zinc-300">
-              Share your project feedback...
-            </Link>
-            <Link to="/signup" className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-[#3b82f6]/40 bg-[#2563eb] px-4 py-3 text-sm font-semibold text-white hover:bg-[#1d4ed8]">
-              <PenLine size={16} />
-              Post
-            </Link>
-          </div>
-
-          {approved.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-white/[0.1] bg-white/[0.02] p-10 text-center">
-              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#3b82f6]/25 bg-[#2563eb]/10 text-[#60a5fa]">
-                <MessageCircle size={24} />
-              </div>
-              <h2 className="mb-3 text-2xl font-bold text-white">No feedback posts yet</h2>
-              <p className="mx-auto mb-7 max-w-md text-sm leading-relaxed text-zinc-500">
-                Once clients publish feedback and the admin approves it from the backend, posts will appear here like a community feed.
-              </p>
-              <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Link to="/signup" className="inline-flex items-center justify-center rounded-xl border border-[#3b82f6]/40 bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] hover:bg-[#1d4ed8]">
-                  Create feedback post
-                </Link>
-                <Link to="/login" className="inline-flex items-center justify-center rounded-xl border border-white/[0.08] px-5 py-3 text-sm font-semibold text-zinc-300 hover:bg-white/[0.04]">
-                  Client login
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {approved.map((item) => (
-                <article key={item.id} className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03]">
-                  <div className="flex gap-4 p-5">
-                    <div className="hidden sm:flex w-12 shrink-0 flex-col items-center gap-2 text-zinc-600">
-                      <ArrowUp size={18} />
-                      <span className="text-xs font-bold">0</span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-zinc-600">
-                        <span className="font-medium text-zinc-400">{item.name}</span>
-                        <span>in</span>
-                        <span className="rounded-full border border-[#3b82f6]/20 bg-[#2563eb]/10 px-2 py-0.5 text-[#93c5fd]">{item.project || "Project feedback"}</span>
-                        <span>{new Date(item.createdAt).toLocaleDateString("en-US")}</span>
-                      </div>
-                      <h2 className="mb-3 text-xl font-bold text-white">{item.project}</h2>
-                      <blockquote className="mb-4 text-sm leading-relaxed text-zinc-400">&ldquo;{item.quote}&rdquo;</blockquote>
-                      {item.mediaUrl && (
-                        <div className="relative mb-4 h-72 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a1628]">
-                          <img src={item.mediaUrl} alt={item.project || item.company} className="h-full w-full object-cover opacity-75" />
-                          <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/[0.1] bg-black/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-300 backdrop-blur">
-                            {item.mediaType === "video" ? <Video size={14} /> : <Image size={14} />}
-                            {item.mediaType || "image"}
-                          </div>
-                        </div>
-                      )}
-                      {item.result && (
-                        <p className="mb-4 rounded-xl border border-[#3b82f6]/15 bg-[#2563eb]/10 px-4 py-3 text-sm text-[#93c5fd]">{item.result}</p>
-                      )}
-                      <div className="flex flex-wrap gap-3 text-xs font-semibold text-zinc-500">
-                        <button className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-white/[0.04] hover:text-zinc-300">
-                          <MessageCircle size={14} />
-                          Reply
-                        </button>
-                        <button className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-white/[0.04] hover:text-zinc-300">
-                          <Share2 size={14} />
-                          Share
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
+      {/* CTA Bar */}
+      <div className="mb-6 flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 sm:p-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#4F6EF7]/10 text-sm font-bold text-[#4F6EF7]">
+          {userProfile?.name ? getInitials(userProfile.name) : "CS"}
         </div>
-
-        <aside className="hidden lg:block">
-          <div className="sticky top-28 space-y-4">
-            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
-              <div className="mb-3 flex items-center gap-2 rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2 text-zinc-600">
-                <Search size={15} />
-                <span className="text-sm">Search feedbacks</span>
-              </div>
-              <p className="text-xs leading-relaxed text-zinc-600">
-                Posts are empty until the backend returns approved client feedback.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-600">Posting rules</p>
-              <div className="space-y-2 text-sm text-zinc-500">
-                <p>Share real project context.</p>
-                <p>Add images, videos, or measurable results.</p>
-                <p>Admin approval is required before publishing.</p>
-              </div>
-            </div>
-          </div>
-        </aside>
+        {userProfile?.photoUrl && (
+          <img src={userProfile.photoUrl} alt="" className="h-10 w-10 rounded-full object-cover hidden sm:block" />
+        )}
+        <button
+          onClick={() => uid ? setShowForm(true) : setShowLoginPrompt(true)}
+          className="flex-1 rounded-xl border border-white/[0.08] bg-black/20 px-4 py-2.5 text-left text-sm text-[#6B6B80] transition-colors hover:border-[#4F6EF7]/30 hover:text-[#F0F0F5]"
+        >
+          Share your feedback...
+        </button>
+        <button
+          onClick={() => uid ? setShowForm(true) : setShowLoginPrompt(true)}
+          className="inline-flex items-center gap-2 rounded-xl bg-[#4F6EF7] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#6B85FF] shadow-[0_0_20px_rgba(79,110,247,0.15)] transition-all"
+        >
+          <PenLine size={16} />
+          <span className="hidden sm:inline">Share Your Feedback</span>
+        </button>
       </div>
+
+      <div className="flex gap-6">
+        <FeedbackSidebar
+          category={category}
+          onCategoryChange={setCategory}
+          rating={rating}
+          onRatingChange={setRating}
+          search={searchInput}
+          onSearch={setSearchInput}
+          categoryCounts={categoryCounts}
+        />
+
+        <FeedbackFeed
+          posts={posts}
+          loading={loading}
+          sort={sort}
+          onSortChange={setSort}
+          onPostClick={setSelectedPost}
+          onHelpful={handleHelpful}
+          helpfulPosts={helpfulPosts}
+          onCommentClick={setSelectedPost}
+          category={category}
+          rating={rating}
+          search={search}
+        />
+      </div>
+
+      {/* Detail Modal */}
+      <FeedbackDetail
+        post={selectedPost}
+        open={!!selectedPost}
+        onClose={() => setSelectedPost(null)}
+        onHelpful={handleHelpful}
+        helpful={selectedPost ? helpfulPosts.has(selectedPost.id) : false}
+      />
+
+      {/* Feedback Form */}
+      <FeedbackForm
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        onSubmit={handleSubmitFeedback}
+        isSubmitting={submitting}
+      />
+
+      {/* Login Prompt */}
+      <AnimatePresence>
+        {showLoginPrompt && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowLoginPrompt(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm rounded-3xl border border-white/[0.08] bg-[#0A0A0F] p-6 text-center shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Star size={32} className="mx-auto mb-4 text-[#F59E0B]" />
+              <h2 className="text-lg font-bold text-[#F0F0F5] mb-2">Share Your Experience</h2>
+              <p className="text-sm text-[#6B6B80] mb-6">Login to submit your feedback and help us improve.</p>
+              <div className="flex flex-col gap-3">
+                <Link
+                  to="/login"
+                  onClick={() => setShowLoginPrompt(false)}
+                  className="w-full py-2.5 rounded-xl bg-[#4F6EF7] text-white text-sm font-semibold hover:bg-[#6B85FF] transition-all text-center block"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  onClick={() => setShowLoginPrompt(false)}
+                  className="w-full py-2.5 rounded-xl border border-white/[0.08] text-[#F0F0F5] text-sm font-medium hover:bg-white/[0.04] transition-all text-center block"
+                >
+                  Sign Up
+                </Link>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </PageShell>
   )
 }

@@ -23,8 +23,6 @@ export async function uploadToCloudinary(
   formData.append("file", file)
   formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET)
   formData.append("folder", folder)
-  formData.append("eager", "c_fill,g_face,h_200,w_200,q_auto,f_auto")
-  formData.append("eager_async", "false")
 
   const response = await fetch(
     `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,

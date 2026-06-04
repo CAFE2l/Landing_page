@@ -8,7 +8,8 @@ import {
 import type { ForumMedia, ForumMetric, ForumPost, ForumAuthor } from "../../data/forumStore"
 import { createForumPost } from "../../data/forumService"
 import { useAuth } from "../../contexts/AuthContext"
-import { loadCurrentUser, type UserProfile } from "../../data/feedbackStore"
+import { loadCurrentUser } from "../../data/feedbackStore"
+import type { UserProfile } from "../../data/feedbackStore"
 import toast from "react-hot-toast"
 
 interface CreatePostModalProps {
@@ -56,8 +57,6 @@ export default function CreatePostModal({ open, onClose, onPostCreated }: Create
     setMetrics([])
     setShowMetrics(false)
     setIsTestimonial(false)
-    setRating(5)
-    setCompany("")
     setIsVerified(false)
     setUploadedMedia([])
     setEmbedUrl("")
@@ -85,11 +84,11 @@ export default function CreatePostModal({ open, onClose, onPostCreated }: Create
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "")
 
-    const profile = currentUser as unknown as UserProfile
-    const uid = profile.uid || currentUser.id || ""
+    const profile = currentUser as unknown as UserProfile & { id: string }
+    const uid = profile.uid || profile.id || ""
     const author: ForumAuthor = {
       uid,
-      name: profile.name || currentUser.email?.split("@")[0] || "User",
+      name: profile.name || (currentUser as unknown as { email?: string }).email?.split("@")[0] || "User",
       avatar: (profile.name?.[0] || "U").toUpperCase(),
       role: profile.role === "admin" ? "admin" : "member",
       verified: profile.role === "admin",

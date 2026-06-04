@@ -51,14 +51,14 @@ export default function Differentials() {
 
   return (
     <section className="py-20 md:py-32 relative">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-4 sm:px-6">
         <SectionHeading
           label="Why hire me"
           title="What Sets Me Apart"
           subtitle="Beyond technical skills — these are the qualities that make working with me a great experience."
         />
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
           {items.map((item, i) => (
             <motion.div
               key={item.title}

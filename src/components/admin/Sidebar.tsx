@@ -7,7 +7,7 @@ import {
 import { cn } from "../../lib/utils"
 import { useAdminStore } from "../../lib/store/adminStore"
 import { useAuth } from "../../contexts/AuthContext"
-import { getPendingCount } from "../../lib/supabase/admin"
+import { getPendingFeedbackCount } from "../../data/feedbackService"
 
 const navItems = [
   { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -26,10 +26,10 @@ export default function Sidebar() {
   const [pendingCount, setPendingCount] = useState(0)
 
   useEffect(() => {
-    getPendingCount().then(setPendingCount)
+    getPendingFeedbackCount().then(setPendingCount)
 
     const interval = setInterval(() => {
-      getPendingCount().then(setPendingCount)
+      getPendingFeedbackCount().then(setPendingCount)
     }, 30000)
 
     return () => clearInterval(interval)

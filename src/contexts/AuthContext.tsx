@@ -22,7 +22,6 @@ const AuthContext = createContext<AuthContextType>({
 
 function syncSessionToStorage(session: Session | null) {
   if (!session?.user) {
-    clearCurrentUser()
     return
   }
 

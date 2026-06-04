@@ -12,11 +12,11 @@ import ProfilePage from "./pages/ProfilePage"
 import AdminShell from "./components/admin/AdminShell"
 import AdminLogin from "./pages/admin/Login"
 import AdminDashboard from "./pages/admin/Dashboard"
-import AdminFeedback from "./pages/admin/FeedbackPage"
 import AdminClients from "./pages/admin/Clients"
 import AdminAnalytics from "./pages/admin/Analytics"
 import AdminSettings from "./pages/admin/Settings"
 import AdminForum from "./pages/admin/ForumManagement"
+import AdminFeedbackManagement from "./pages/admin/AdminFeedbackManagement"
 import { ProtectedRoute } from "./components/auth/ProtectedRoute"
 import { AdminRoute } from "./components/auth/AdminRoute"
 import {
@@ -51,7 +51,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage feedbacks={feedbacks} />} />
-          <Route path="/feedback" element={<FeedbackPage feedbacks={feedbacks} />} />
+          <Route path="/feedback" element={<FeedbackPage />} />
           <Route path="/forum" element={<ForumPage />} />
           <Route path="/forum/:slug" element={<ForumDetailPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
@@ -65,7 +65,7 @@ function App() {
             <Route index element={<AdminDashboard />} />
           </Route>
           <Route path="/admin/feedback" element={<AdminRoute><AdminShell /></AdminRoute>}>
-            <Route index element={<AdminFeedback />} />
+            <Route index element={<AdminFeedbackManagement />} />
           </Route>
           <Route path="/admin/clients" element={<AdminRoute><AdminShell /></AdminRoute>}>
             <Route index element={<AdminClients />} />

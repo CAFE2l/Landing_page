@@ -45,7 +45,7 @@ export default function Services() {
 
   return (
     <section id="services" className="py-20 md:py-28 relative">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-4 sm:px-6">
         <SectionHeading
           label="Services"
           title="What I Build"

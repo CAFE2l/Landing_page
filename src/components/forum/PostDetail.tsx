@@ -16,7 +16,7 @@ export default function PostDetail() {
   const { user: supabaseUser } = useAuth()
   const localUser = loadCurrentUser()
   const currentUser = supabaseUser || localUser
-  const userProfile = currentUser ? (currentUser as unknown as UserProfile) : null
+  const userProfile = currentUser ? (currentUser as unknown as UserProfile & { id: string }) : null
 
   const [post, setPost] = useState<ForumPost | null>(null)
   const [loading, setLoading] = useState(true)
@@ -40,9 +40,10 @@ export default function PostDetail() {
     ]).then(([postData, comments]) => {
       if (postData) {
         setPost(postData)
-        if (currentUser) {
-          getUserVote(postData.id, currentUser.uid || currentUser.id).then((v) => setUpvoted(v === 1))
-          getBookmarkStatus(postData.id, currentUser.uid || currentUser.id).then(setBookmarked)
+        const uid = userProfile?.uid || userProfile?.id
+        if (uid) {
+          getUserVote(postData.id, uid).then((v) => setUpvoted(v === 1))
+          getBookmarkStatus(postData.id, uid).then(setBookmarked)
         }
       }
       setLocalComments(comments)
@@ -72,16 +73,16 @@ export default function PostDetail() {
   }
 
   const handleUpvote = async () => {
-    if (!currentUser) { toast.error("Login to vote"); return }
-    const uid = currentUser.uid || currentUser.id
+    const uid = userProfile?.uid || userProfile?.id
+    if (!uid) { toast.error("Login to vote"); return }
     await votePost(post.id, uid, upvoted ? -1 : 1)
     setUpvoted(!upvoted)
     setPost((prev) => prev ? { ...prev, upvotes: prev.upvotes + (upvoted ? -1 : 1) } : prev)
   }
 
   const handleBookmark = async () => {
-    if (!currentUser) { toast.error("Login to bookmark"); return }
-    const uid = currentUser.uid || currentUser.id
+    const uid = userProfile?.uid || userProfile?.id
+    if (!uid) { toast.error("Login to bookmark"); return }
     const newState = await toggleBookmark(post.id, uid)
     setBookmarked(newState)
   }
@@ -89,14 +90,14 @@ export default function PostDetail() {
   const handleComment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!commentText.trim()) return
-    if (!currentUser) { toast.error("Login to comment"); return }
+    const uid = userProfile?.uid || userProfile?.id
+    if (!uid) { toast.error("Login to comment"); return }
     if (!slug) return
     setPostingComment(true)
 
-    const uid = userProfile?.uid || currentUser.id || ""
     const author: ForumAuthor = {
       uid,
-      name: userProfile?.name || currentUser.email?.split("@")[0] || "User",
+      name: userProfile?.name || userProfile?.email?.split("@")[0] || "User",
       avatar: (userProfile?.name?.[0] || "U").toUpperCase(),
       role: userProfile?.role === "admin" ? "admin" : "member",
       verified: userProfile?.role === "admin",
@@ -123,13 +124,13 @@ export default function PostDetail() {
   const handleReply = async (e: React.FormEvent, parentId: string) => {
     e.preventDefault()
     if (!replyText.trim()) return
-    if (!currentUser) { toast.error("Login to reply"); return }
+    const uid = userProfile?.uid || userProfile?.id
+    if (!uid) { toast.error("Login to reply"); return }
     if (!slug) return
 
-    const uid = userProfile?.uid || currentUser.id || ""
     const author: ForumAuthor = {
       uid,
-      name: userProfile?.name || currentUser.email?.split("@")[0] || "User",
+      name: userProfile?.name || userProfile?.email?.split("@")[0] || "User",
       avatar: (userProfile?.name?.[0] || "U").toUpperCase(),
       role: userProfile?.role === "admin" ? "admin" : "member",
       verified: userProfile?.role === "admin",
@@ -164,7 +165,7 @@ export default function PostDetail() {
     setPost((prev) => prev ? { ...prev, commentCount: Math.max(0, prev.commentCount - 1) } : prev)
   }
 
-  const currentUserId = currentUser?.uid || currentUser?.id || ""
+  const currentUserId = userProfile?.uid || userProfile?.id || ""
 
   return (
     <div className="min-h-screen bg-[#0A0A0F]">
@@ -294,19 +295,6 @@ export default function PostDetail() {
           )}
 
           {/* Share */}
-          {post.testimonial && (
-            <div className="mb-6 p-5 rounded-2xl bg-[#F59E0B]/5 border border-[#F59E0B]/10">
-              <div className="flex gap-1 mb-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} size={16} className={i < 5 ? "text-[#F59E0B] fill-[#F59E0B]" : "text-[#6B6B80]"} />
-                ))}
-              </div>
-              <p className="text-sm text-[#F0F0F5] font-medium italic">
-                &ldquo;{post.body.split("\n")[0]}&rdquo;
-              </p>
-              <p className="text-xs text-[#6B6B80] mt-2">— {post.author.company || "Client"}</p>
-            </div>
-          )}
 
           {/* Actions */}
           <div className="flex items-center gap-4 pt-4 border-t border-[#1E1E2A]">

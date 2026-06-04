@@ -37,6 +37,69 @@ export interface FeedbackEntry {
   updatedAt?: string
 }
 
+export type FeedbackStatus = "pending" | "approved" | "rejected" | "highlighted"
+
+export type ServiceCategory = "Landing Page" | "Website Profissional" | "Web App" | "SaaS/Dashboard" | "UI/UX" | "Manutenção" | "Outro"
+
+export const SERVICE_CATEGORIES: ServiceCategory[] = [
+  "Landing Page",
+  "Website Profissional",
+  "Web App",
+  "SaaS/Dashboard",
+  "UI/UX",
+  "Manutenção",
+  "Outro",
+]
+
+export interface FeedbackMedia {
+  url: string
+  type: "image" | "video"
+  altText?: string
+}
+
+export interface FeedbackAdminReply {
+  content: string
+  adminId: string
+  adminName: string
+  createdAt: string
+}
+
+export interface FeedbackPost {
+  id: string
+  userId: string
+  userName: string
+  userAvatar: string
+  serviceCategory: ServiceCategory
+  projectTitle: string
+  projectUrl?: string
+  rating: number
+  title: string
+  content: string
+  media: FeedbackMedia[]
+  serviceDate?: string
+  status: FeedbackStatus
+  isVerifiedClient: boolean
+  isVerifiedProject: boolean
+  isHighlighted: boolean
+  helpfulCount: number
+  commentCount: number
+  createdAt: string
+  updatedAt: string
+  adminReply?: FeedbackAdminReply
+  improvementSuggestion?: string
+}
+
+export interface FeedbackComment {
+  id: string
+  postId: string
+  userId: string
+  userName: string
+  userAvatar: string
+  content: string
+  status: "visible" | "hidden"
+  createdAt: string
+}
+
 export const getInitials = (name: string) =>
   name
     .split(" ")
@@ -51,15 +114,12 @@ export const loadFeedbacks = (): FeedbackEntry[] => {
 
 export const saveFeedbacks = (feedbacks: FeedbackEntry[]) => {
   void feedbacks
-  // Feedback persistence belongs to the backend. This no-op keeps the UI ready
-  // until the API/database layer is connected.
 }
 
 export const loadCurrentUser = (): UserProfile | null => {
   if (typeof window === "undefined") return null
   const saved = window.localStorage.getItem(SESSION_KEY)
   if (!saved) return null
-
   try {
     return JSON.parse(saved) as UserProfile
   } catch {

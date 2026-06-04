@@ -11,7 +11,7 @@ export default function Contact() {
     <section id="contact" className="py-20 md:py-32 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-[#2563eb]/[0.03] via-transparent to-transparent pointer-events-none" />
       
-      <div className="container mx-auto px-6 relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 relative z-10">
         <div className="text-center max-w-4xl mx-auto mb-20">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-6 tracking-tight">
             Support and community beyond delivery
@@ -27,7 +27,7 @@ export default function Contact() {
             initial={{ opacity: 0, x: -20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            className="group relative p-8 rounded-3xl bg-white/[0.02] border border-white/[0.08] hover:bg-white/[0.04] hover:border-white/[0.12] transition-all duration-300"
+            className="group relative p-6 md:p-8 rounded-3xl bg-white/[0.02] border border-white/[0.08] hover:bg-white/[0.04] hover:border-white/[0.12] transition-all duration-300"
           >
             <div className="w-12 h-12 rounded-xl bg-[#5865F2]/10 flex items-center justify-center mb-6">
               <img src="/imgs/icons/Discord.png" alt="Discord" className="w-6 h-6 object-contain" />
@@ -53,9 +53,9 @@ export default function Contact() {
             initial={{ opacity: 0, x: 20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            className="group relative p-8 rounded-3xl bg-white/[0.02] border border-white/[0.08] hover:bg-white/[0.04] hover:border-white/[0.12] transition-all duration-300"
+            className="group relative p-6 md:p-8 rounded-3xl bg-white/[0.02] border border-white/[0.08] hover:bg-white/[0.04] hover:border-white/[0.12] transition-all duration-300"
           >
-            <div className="absolute top-8 right-8 px-2 py-1 rounded-md bg-[#2563eb]/10 border border-[#2563eb]/20">
+            <div className="absolute top-6 md:top-8 right-6 md:right-8 px-2 py-1 rounded-md bg-[#2563eb]/10 border border-[#2563eb]/20">
               <span className="text-[9px] text-[#2563eb] font-bold uppercase tracking-wider">Exclusive for clients</span>
             </div>
             <div className="w-12 h-12 rounded-xl bg-[#0088cc]/10 flex items-center justify-center mb-6">

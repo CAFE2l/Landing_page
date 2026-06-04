@@ -80,7 +80,7 @@ export default function Process() {
 
   return (
     <section id="process" className="py-20 md:py-32 relative">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-4 sm:px-6">
         <SectionHeading
           label="Process"
           title="How I Work"
@@ -101,7 +101,7 @@ export default function Process() {
               <div className="w-12" />
             </div>
 
-            <div className="p-6 font-mono text-sm leading-relaxed space-y-8">
+            <div className="p-4 sm:p-6 font-mono text-sm leading-relaxed space-y-6 md:space-y-8">
               {steps.map((step, i) => (
                 <motion.div
                   key={step.id}

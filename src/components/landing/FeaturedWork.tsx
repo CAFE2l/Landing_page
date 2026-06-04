@@ -90,7 +90,7 @@ const plans = [
 function PlanPreview({ type }: { type: PlanPreviewType }) {
   if (type === "landing") {
     return (
-      <div className="absolute inset-x-5 top-12 h-36 overflow-hidden rounded-xl border border-white/[0.08] bg-[#06111b]/90 shadow-2xl shadow-black/40">
+      <div className="absolute inset-x-4 sm:inset-x-5 top-10 sm:top-12 h-28 sm:h-36 overflow-hidden rounded-xl border border-white/[0.08] bg-[#06111b]/90 shadow-2xl shadow-black/40">
         <img
           src="/imgs/Plans/Produtos.png"
           alt="Landing page example preview"
@@ -104,7 +104,7 @@ function PlanPreview({ type }: { type: PlanPreviewType }) {
 
   if (type === "website") {
     return (
-      <div className="absolute inset-x-5 top-12 h-36 overflow-hidden rounded-xl border border-white/[0.08] bg-[#07111d]/85 shadow-2xl shadow-black/40">
+      <div className="absolute inset-x-4 sm:inset-x-5 top-10 sm:top-12 h-28 sm:h-36 overflow-hidden rounded-xl border border-white/[0.08] bg-[#07111d]/85 shadow-2xl shadow-black/40">
         <img
           src="/imgs/Plans/portfolio.png"
           alt="Professional website example preview"
@@ -118,7 +118,7 @@ function PlanPreview({ type }: { type: PlanPreviewType }) {
 
   if (type === "saas") {
     return (
-      <div className="absolute inset-x-5 top-12 h-36 overflow-hidden rounded-xl border border-[#3b82f6]/20 bg-[#06101f]/90 shadow-2xl shadow-black/40">
+      <div className="absolute inset-x-4 sm:inset-x-5 top-10 sm:top-12 h-28 sm:h-36 overflow-hidden rounded-xl border border-[#3b82f6]/20 bg-[#06101f]/90 shadow-2xl shadow-black/40">
         <img
           src="/imgs/Plans/banner.png"
           alt="Web app and SaaS example preview"
@@ -147,7 +147,7 @@ export default function FeaturedWork() {
 
   return (
     <section id="work" className="py-20 md:py-32 relative">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-4 sm:px-6">
         <SectionHeading
           label="Pricing"
           title="Service Plans"
@@ -186,13 +186,13 @@ export default function FeaturedWork() {
                   Most requested
                 </div>
               )}
-              <div className={`relative h-48 sm:h-56 bg-gradient-to-br ${plan.gradient} overflow-hidden`}>
+              <div className={`relative h-40 sm:h-56 bg-gradient-to-br ${plan.gradient} overflow-hidden`}>
                 <div className="absolute inset-0 bg-dot-grid opacity-50" />
                 <PlanPreview type={plan.preview} />
-                <div className="absolute left-6 top-6 text-[10px] uppercase tracking-[0.32em] text-zinc-600 font-semibold">
+                <div className="absolute left-4 sm:left-6 top-4 sm:top-6 text-[10px] uppercase tracking-[0.32em] text-zinc-600 font-semibold">
                   {plan.number}
                 </div>
-                <div className="absolute bottom-5 left-6 flex h-12 w-12 items-center justify-center rounded-xl border border-[#3b82f6]/25 bg-[#020408]/70 text-[#60a5fa] backdrop-blur-md">
+                <div className="absolute bottom-4 sm:bottom-5 left-4 sm:left-6 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl border border-[#3b82f6]/25 bg-[#020408]/70 text-[#60a5fa] backdrop-blur-md">
                   <Icon size={22} />
                 </div>
                 <div className="absolute bottom-5 right-6 text-6xl font-bold text-white/[0.07] select-none">

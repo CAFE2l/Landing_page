@@ -16,7 +16,7 @@ export default function Testimonials({ feedbacks }: TestimonialsProps) {
 
   return (
     <section className="py-20 md:py-32 relative">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-4 sm:px-6">
         <SectionHeading
           label="Testimonials"
           title="What Clients Say"
@@ -26,7 +26,7 @@ export default function Testimonials({ feedbacks }: TestimonialsProps) {
         {approved.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-6xl mx-auto">
             {approved.map((item) => (
-              <article key={item.id} className="rounded-2xl border border-white/[0.08] bg-[#0a1628] p-7">
+              <article key={item.id} className="rounded-2xl border border-white/[0.08] bg-[#0a1628] p-5 md:p-7">
                 <p className="text-sm text-zinc-400 leading-relaxed mb-5">&ldquo;{item.quote}&rdquo;</p>
                 <p className="text-sm font-medium text-white">{item.name}</p>
                 <p className="text-xs text-zinc-600">{item.role}, {item.company}</p>
@@ -38,7 +38,7 @@ export default function Testimonials({ feedbacks }: TestimonialsProps) {
             initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.3 }}
-            className="mx-auto max-w-2xl rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8 text-center"
+            className="mx-auto max-w-2xl rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 md:p-8 text-center"
           >
             <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-[#3b82f6]/25 bg-[#2563eb]/10 text-[#60a5fa]">
               <MessageSquareText size={22} />

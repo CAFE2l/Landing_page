@@ -132,8 +132,8 @@ export default function ForumFeed({
                     <PostCard
                       post={post}
                       index={i}
-                      onUpvote={(e) => { e.stopPropagation?.(); onUpvote(post.id) }}
-                      onBookmark={(e) => { e.stopPropagation?.(); onBookmark(post.id) }}
+                      onUpvote={() => onUpvote(post.id)}
+                      onBookmark={() => onBookmark(post.id)}
                       onReadMore={() => onPostClick(post.slug)}
                       upvoted={upvotedPosts.has(post.id)}
                       bookmarked={bookmarkedPosts.has(post.id)}

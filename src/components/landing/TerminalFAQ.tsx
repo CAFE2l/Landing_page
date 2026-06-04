@@ -121,7 +121,7 @@ export default function TerminalFAQ() {
 
   return (
     <section id="faq" className="py-20 md:py-32 relative">
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-4 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -159,7 +159,7 @@ export default function TerminalFAQ() {
 
             <div
               ref={terminalRef}
-              className="p-5 sm:p-6 font-mono text-sm leading-relaxed max-h-[560px] overflow-y-auto"
+              className="p-4 sm:p-6 font-mono text-sm leading-relaxed max-h-[400px] sm:max-h-[560px] overflow-y-auto"
               style={{
                 scrollbarWidth: "thin",
                 scrollbarColor: "rgba(37,99,235,0.15) transparent",
@@ -177,7 +177,7 @@ export default function TerminalFAQ() {
                 question below:
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-2 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
                 {questions.map((q, i) => {
                   const isSelected = selectedId === q.id
                   return (
