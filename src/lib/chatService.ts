@@ -380,9 +380,10 @@ export function subscribeToConversationUpdates(
 ) {
   if (!supabase || !supabaseConfigured) return () => {}
   const client = supabase
+  const channelName = `conversations:${userId}:${Date.now()}`
 
   const channel = client
-    .channel(`conversations:${userId}`)
+    .channel(channelName)
     .on(
       "postgres_changes",
       {

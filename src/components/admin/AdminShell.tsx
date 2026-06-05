@@ -16,6 +16,7 @@ const pageTitles: Record<string, string> = {
   "/admin/forum": "Forum",
   "/admin/analytics": "Analytics",
   "/admin/settings": "Settings",
+  "/admin/service-orders": "Service Orders",
 }
 
 export default function AdminShell() {

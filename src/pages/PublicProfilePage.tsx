@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Edit3, MessageCircle, UserPlus, Users } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Edit3, MessageCircle, UserPlus, Users, Trash2, Loader2, Shield } from "lucide-react";
 import toast from "react-hot-toast";
 import PageShell from "./PageShell";
 import FeedbackCard from "../components/feedback/FeedbackCard";
@@ -13,14 +13,18 @@ import {
   toggleFollowProfile,
   type PublicProfileData,
 } from "../data/feedbackServiceSupabase";
+import { deleteClient } from "../lib/adminClientService";
 
 export default function PublicProfilePage() {
   const { userId } = useParams();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<PublicProfileData | null>(null);
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const isOwnProfile = !!user?.id && user.id === userId;
 
@@ -36,6 +40,20 @@ export default function PublicProfilePage() {
     if (!user?.id || !userId || user.id === userId) return;
     isFollowingProfile(user.id, userId).then(setFollowing);
   }, [user?.id, userId]);
+
+  const handleDeleteUser = async () => {
+    if (!userId || !profile) return
+    setDeleting(true)
+    const ok = await deleteClient(userId)
+    setDeleting(false)
+    if (ok) {
+      toast.success(`${profile.name} deleted`)
+      setShowDeleteModal(false)
+      navigate("/")
+    } else {
+      toast.error("Failed to delete user")
+    }
+  }
 
   const handleFollow = async () => {
     if (!user?.id || !userId) {
@@ -143,6 +161,34 @@ export default function PublicProfilePage() {
             </div>
           </motion.section>
 
+          {/* Admin Actions — only visible to admins */}
+          {isAdmin && !isOwnProfile && (
+            <motion.section
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-3xl border border-red-500/15 bg-red-500/[0.03] p-5 shadow-[0_0_30px_rgba(239,68,68,0.06)] backdrop-blur-xl"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Shield size={16} className="text-red-400" />
+                <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wider">Admin Actions</h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleMessage}
+                  className="flex items-center gap-2 rounded-xl border border-white/[0.1] px-3.5 py-2 text-xs font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+                >
+                  <MessageCircle size={14} /> Send Message
+                </button>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+                >
+                  <Trash2 size={14} /> Delete User
+                </button>
+              </div>
+            </motion.section>
+          )}
+
           <div className="flex items-center gap-2 text-sm font-semibold text-[#F0F0F5]">
             <Users size={16} /> Public feedback
           </div>
@@ -160,6 +206,74 @@ export default function PublicProfilePage() {
           </div>
         </div>
       )}
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => { setShowDeleteModal(false); setDeleteConfirm("") }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-2xl border border-red-500/20 bg-[#0a0a0f] p-6 shadow-2xl"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/15">
+                  <Trash2 size={18} className="text-red-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Delete User</h2>
+                  <p className="text-sm text-white/40">This action can be irreversible</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 mb-4 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-white/40">Name</span>
+                  <span className="text-white font-medium">{profile?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/40">Email</span>
+                  <span className="text-white/70">{profile ? profile.posts[0]?.userName || userId : userId}</span>
+                </div>
+              </div>
+
+              <p className="text-sm text-red-400/80 mb-3">
+                Type <strong className="text-red-300">DELETE</strong> to confirm:
+              </p>
+              <input
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder="Type DELETE"
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-red-500/40 transition-colors mb-5"
+              />
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => { setShowDeleteModal(false); setDeleteConfirm("") }}
+                  className="rounded-xl border border-white/[0.08] px-4 py-2.5 text-sm text-white/60 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteUser}
+                  disabled={deleteConfirm !== "DELETE" || deleting}
+                  className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40 hover:bg-red-500 transition-all"
+                >
+                  {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                  {deleting ? "Deleting..." : "Delete User"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </PageShell>
   );
 }

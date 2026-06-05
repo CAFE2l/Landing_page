@@ -239,6 +239,16 @@ export interface ServiceHistoryItem {
   date: string
 }
 
+export async function deleteClient(clientId: string): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+  const { error } = await supabase.from("profiles").delete().eq("id", clientId)
+  if (error) {
+    console.error("deleteClient failed", error)
+    return false
+  }
+  return true
+}
+
 export async function fetchClientServiceHistory(
   _clientId: string,
 ): Promise<ServiceHistoryItem[]> {

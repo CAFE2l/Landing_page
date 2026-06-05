@@ -1,6 +1,7 @@
 "use client"
 
 import { motion, useReducedMotion } from "framer-motion"
+import { Link } from "react-router-dom"
 import { ArrowRight, Check, Code2, LayoutDashboard, MonitorSmartphone } from "lucide-react"
 import SectionHeading from "./SectionHeading"
 import WhatsAppIcon from "./WhatsAppIcon"
@@ -250,20 +251,35 @@ export default function FeaturedWork() {
                   ))}
                 </ul>
                 <Magnetic strength={0.12}>
-                  <a
-                    href={wa(plan.waMessage)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-300 ${
-                      plan.featured
-                        ? "bg-[#2563eb] text-white border border-[#3b82f6]/50 shadow-[0_0_20px_rgba(37,99,235,0.35)] hover:bg-[#1d4ed8]"
-                        : "border border-white/[0.1] text-white hover:border-[#3b82f6]/40 hover:bg-[#2563eb]/10"
-                    } relative z-20`}
-                  >
-                    <WhatsAppIcon />
-                    {plan.cta}
-                    <ArrowRight size={15} />
-                  </a>
+                  {plan.preview === "saas" ? (
+                    <a
+                      href={wa(plan.waMessage)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-300 ${
+                        plan.featured
+                          ? "bg-[#2563eb] text-white border border-[#3b82f6]/50 shadow-[0_0_20px_rgba(37,99,235,0.35)] hover:bg-[#1d4ed8]"
+                          : "border border-white/[0.1] text-white hover:border-[#3b82f6]/40 hover:bg-[#2563eb]/10"
+                      } relative z-20`}
+                    >
+                      <WhatsAppIcon />
+                      {plan.cta}
+                      <ArrowRight size={15} />
+                    </a>
+                  ) : (
+                    <Link
+                      to={`/hire/${plan.preview === "landing" ? "landing-page" : "website"}`}
+                      className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-300 ${
+                        plan.featured
+                          ? "bg-[#2563eb] text-white border border-[#3b82f6]/50 shadow-[0_0_20px_rgba(37,99,235,0.35)] hover:bg-[#1d4ed8]"
+                          : "border border-white/[0.1] text-white hover:border-[#3b82f6]/40 hover:bg-[#2563eb]/10"
+                      } relative z-20`}
+                    >
+                      <WhatsAppIcon />
+                      {plan.cta}
+                      <ArrowRight size={15} />
+                    </Link>
+                  )}
                 </Magnetic>
               </div>
             </motion.div>

@@ -14,6 +14,9 @@ import {
   Search,
   Shield,
   User,
+  UserPlus,
+  CalendarDays,
+  X,
 } from "lucide-react";
 import AuthBackground from "../components/auth/AuthBackground";
 import Navbar from "../components/landing/Navbar";
@@ -29,6 +32,7 @@ import {
   updateProfileMetadata,
 } from "../lib/supabaseProfile";
 import { supabase } from "../lib/supabase/client";
+import { fetchFollowCounts, fetchFollowersList, fetchFollowingList, fetchFollowingIds, toggleFollow } from "../lib/socialService";
 
 interface ProfilePageProps {
   user: UserProfile | null;
@@ -726,6 +730,55 @@ export default function ProfilePage({
   });
   const [savedForm, setSavedForm] = useState(form);
 
+  // ========== Social (Following / Followers) ==========
+  const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 })
+  const [socialDrawer, setSocialDrawer] = useState<"followers" | "following" | null>(null)
+  const [socialList, setSocialList] = useState<Array<{ id: string; name: string; username: string | null; avatarUrl: string | null; bio: string | null }>>([])
+  const [socialSearch, setSocialSearch] = useState("")
+  const [socialLoading, setSocialLoading] = useState(false)
+  const [followingMap, setFollowingMap] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (profileUser?.uid) {
+      fetchFollowCounts(profileUser.uid).then(setFollowCounts)
+    }
+  }, [profileUser?.uid])
+
+  const openSocialDrawer = async (type: "followers" | "following") => {
+    if (!profileUser?.uid) return
+    setSocialDrawer(type)
+    setSocialSearch("")
+    setSocialLoading(true)
+    const list = type === "followers"
+      ? await fetchFollowersList(profileUser.uid)
+      : await fetchFollowingList(profileUser.uid)
+    setSocialList(list)
+    setSocialLoading(false)
+
+    if (profileUser?.uid) {
+      const ids = await fetchFollowingIds(profileUser.uid)
+      setFollowingMap(ids)
+    }
+  }
+
+  const handleToggleFollow = async (targetId: string) => {
+    if (!profileUser?.uid) return
+    const wasFollowing = followingMap.has(targetId)
+    const ok = await toggleFollow(profileUser.uid, targetId)
+    if (ok !== undefined) {
+      setFollowingMap((prev) => {
+        const next = new Set(prev)
+        if (wasFollowing) next.delete(targetId)
+        else next.add(targetId)
+        return next
+      })
+      setFollowCounts((prev) => ({
+        ...prev,
+        following: wasFollowing ? prev.following - 1 : prev.following + 1,
+      }))
+    }
+  }
+
   const displayName = savedForm.fullName || profileUser?.name || "Client";
   const passwordStrength = useMemo(
     () => getPasswordStrength(newPassword),
@@ -857,12 +910,14 @@ export default function ProfilePage({
     { value: 0, label: "Feedbacks" },
   ];
 
+  const showBadge = profileUser.role || "client";
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#0a0a0f] px-4 pb-8 pt-28 text-white sm:px-6">
       <AuthBackground />
       <Navbar />
 
-      <div className="relative z-10 mx-auto grid min-h-[calc(100vh-8rem)] w-full max-w-6xl gap-6 py-8 md:grid-cols-[minmax(280px,0.34fr)_1fr]">
+      <div className="relative z-10 mx-auto grid min-h-[calc(100vh-8rem)] w-full max-w-6xl gap-6 py-8 md:grid-cols-[minmax(360px,0.38fr)_1fr]">
         <motion.aside
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -870,16 +925,14 @@ export default function ProfilePage({
           className={`${cardClass} p-6`}
         >
           <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:url('data:image/svg+xml,%3Csvg_viewBox=%220_0_200_200%22_xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter_id=%22n%22%3E%3CfeTurbulence_type=%22fractalNoise%22_baseFrequency=%220.85%22_numOctaves=%223%22_stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect_width=%22200%22_height=%22200%22_filter=%22url(%23n)%22_opacity=%220.45%22/%3E%3C/svg%3E')]" />
+
+          {/* Avatar */}
           <div className="pb-2 pt-4 text-center">
             <div className="relative mx-auto flex flex-col items-center">
               <motion.div
                 className="absolute inset-0 -z-10 scale-125 rounded-full bg-[#2563eb]/20 blur-xl"
                 animate={{ opacity: [0.4, 0.8, 0.4], scale: [1.2, 1.4, 1.2] }}
-                transition={{
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               />
               <AvatarUpload
                 currentAvatarUrl={avatarUrl}
@@ -887,8 +940,7 @@ export default function ProfilePage({
                   setAvatarUrl(url);
                   const updated: UserProfile = {
                     ...profileUser,
-                    uid: profileUser.uid,
-                  photoUrl: url,
+                    uid: profileUser.uid, photoUrl: url,
                     location: savedForm.location,
                     locationCountryCode: savedForm.locationCountryCode,
                     bio: savedForm.bio,
@@ -901,49 +953,70 @@ export default function ProfilePage({
               />
             </div>
 
-            <h1
-              className="mt-5 w-full break-words text-center font-['Clash_Display',Inter,sans-serif] text-2xl font-semibold text-white"
-              style={
-                {
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                } as React.CSSProperties
-              }
-            >
+            <h1 className="mt-5 font-['Clash_Display',Inter,sans-serif] text-2xl font-semibold text-white">
               {displayName}
             </h1>
-            <p className="mt-1 truncate text-center text-sm text-white/45">
-              {profileUser.email}
-            </p>
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-sm font-semibold text-[#b7c2ff] shadow-[0_6px_22px_rgba(59,130,246,0.12)]">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              Client Account
+            {profileUser.username && (
+              <p className="mt-0.5 text-sm text-[#60a5fa]/70">@{profileUser.username}</p>
+            )}
+            <p className="mt-1 text-sm text-white/45">{profileUser.email}</p>
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs font-semibold text-[#b7c2ff] shadow-[0_6px_22px_rgba(59,130,246,0.12)]">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              {showBadge === "admin" ? "Admin" : "Client Account"}
             </div>
           </div>
 
           <div className="my-6 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
 
-          <div className="grid grid-cols-3 gap-3">
+          {/* Stats grid: 3 + 2 rows */}
+          <div className="grid grid-cols-3 gap-2.5">
             {statItems.map((item) => (
-              <div
+              <motion.div
                 key={item.label}
-                className="flex min-w-0 flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-4"
+                whileHover={{ y: -2 }}
+                className="flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-3.5 transition-all hover:border-blue-500/20 hover:shadow-[0_0_20px_rgba(37,99,235,0.08)]"
               >
-                <span className="bg-gradient-to-r from-[#60a5fa] to-[#a78bfa] bg-clip-text text-2xl font-bold text-transparent">
+                <span className="bg-gradient-to-r from-[#60a5fa] to-[#a78bfa] bg-clip-text text-xl font-bold text-transparent">
                   <CountUp value={item.value} />
                 </span>
-                <span className="text-[10px] uppercase tracking-wider text-white/30">
-                  {item.label}
-                </span>
-              </div>
+                <span className="text-[10px] uppercase tracking-wider text-white/30">{item.label}</span>
+              </motion.div>
             ))}
+            <motion.button
+              whileHover={{ y: -2 }}
+              onClick={() => openSocialDrawer("following")}
+              className="flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-3.5 transition-all hover:border-blue-500/20 hover:shadow-[0_0_20px_rgba(37,99,235,0.08)] cursor-pointer"
+            >
+              <span className="bg-gradient-to-r from-[#60a5fa] to-[#a78bfa] bg-clip-text text-xl font-bold text-transparent">
+                <CountUp value={followCounts.following} />
+              </span>
+              <span className="text-[10px] uppercase tracking-wider text-white/30">Following</span>
+            </motion.button>
+            <motion.button
+              whileHover={{ y: -2 }}
+              onClick={() => openSocialDrawer("followers")}
+              className="flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-3.5 transition-all hover:border-blue-500/20 hover:shadow-[0_0_20px_rgba(37,99,235,0.08)] cursor-pointer"
+            >
+              <span className="bg-gradient-to-r from-[#60a5fa] to-[#a78bfa] bg-clip-text text-xl font-bold text-transparent">
+                <CountUp value={followCounts.followers} />
+              </span>
+              <span className="text-[10px] uppercase tracking-wider text-white/30">Followers</span>
+            </motion.button>
+          </div>
+
+          {/* Info row */}
+          <div className="mt-4 flex items-center justify-center gap-4 text-xs text-white/30">
+            {profileUser.createdAt && (
+              <span className="flex items-center gap-1.5">
+                <CalendarDays size={12} className="text-white/20" />
+                Member since {new Date(profileUser.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+              </span>
+            )}
           </div>
 
           <div className="my-6 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
 
-          <nav className="space-y-2">
+          <nav className="space-y-1.5">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
@@ -959,16 +1032,10 @@ export default function ProfilePage({
                       : "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-white/45 transition-all duration-200 hover:bg-white/[0.04] hover:text-white"
                   }
                 >
-                  <Icon
-                    className={active ? "text-[#3b82f6]" : "text-[#475569]"}
-                    size={18}
-                  />
+                  <Icon className={active ? "text-[#3b82f6]" : "text-[#475569]"} size={18} />
                   {tab.label}
                   {active && (
-                    <motion.div
-                      layoutId="activeTab"
-                      className="ml-auto h-1.5 w-1.5 rounded-full bg-[#3b82f6]"
-                    />
+                    <motion.div layoutId="activeTab" className="ml-auto h-1.5 w-1.5 rounded-full bg-[#3b82f6]" />
                   )}
                 </motion.button>
               );
@@ -977,21 +1044,11 @@ export default function ProfilePage({
             {links.map((item) => {
               const Icon = item.icon;
               return (
-                <motion.div
-                  key={item.href}
-                  whileHover={{ x: 4 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  <Link
-                    to={item.href}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-white/45 transition-all duration-200 hover:bg-white/[0.04] hover:text-white"
-                  >
+                <motion.div key={item.href} whileHover={{ x: 4 }} transition={{ duration: 0.15 }}>
+                  <Link to={item.href} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-white/45 transition-all duration-200 hover:bg-white/[0.04] hover:text-white">
                     <Icon className="text-[#475569]" size={18} />
                     {item.label}
-                    <ChevronRight
-                      className="ml-auto text-[#475569]"
-                      size={16}
-                    />
+                    <ChevronRight className="ml-auto text-[#475569]" size={16} />
                   </Link>
                 </motion.div>
               );
@@ -1502,6 +1559,123 @@ export default function ProfilePage({
           </AnimatePresence>
         </motion.section>
       </div>
+
+      {/* Social Drawer (Following / Followers) */}
+      <AnimatePresence>
+        {socialDrawer && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSocialDrawer(null)}
+            className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-12 pb-8 backdrop-blur-sm sm:items-center sm:pt-0 sm:pb-0"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="mx-4 flex h-full w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0a0f]/95 shadow-2xl backdrop-blur-xl sm:h-auto sm:max-h-[600px]"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
+                <h2 className="text-base font-semibold text-white">
+                  {socialDrawer === "following" ? "Following" : "Followers"}
+                </h2>
+                <button
+                  onClick={() => setSocialDrawer(null)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Search */}
+              <div className="px-5 pt-3 pb-2">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                  <input
+                    value={socialSearch}
+                    onChange={(e) => setSocialSearch(e.target.value)}
+                    placeholder="Search users..."
+                    className="w-full rounded-xl border border-white/[0.06] bg-white/[0.03] py-2 pl-9 pr-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-blue-500/40 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* List */}
+              <div className="flex-1 overflow-y-auto px-5 pb-4 scrollbar-thin scrollbar-thumb-white/[0.06]">
+                {socialLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 size={20} className="animate-spin text-white/40" />
+                  </div>
+                ) : socialList.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <UserPlus size={28} className="mb-3 text-white/15" />
+                    <p className="text-sm text-white/30">
+                      {socialDrawer === "following" ? "Not following anyone yet" : "No followers yet"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {socialList
+                      .filter(
+                        (u) =>
+                          u.name.toLowerCase().includes(socialSearch.toLowerCase()) ||
+                          (u.username || "").toLowerCase().includes(socialSearch.toLowerCase()),
+                      )
+                      .map((user) => (
+                        <motion.div
+                          key={user.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/[0.04]"
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-500/30 to-cyan-500/30 text-sm font-bold text-blue-400">
+                            {user.avatarUrl ? (
+                              <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              user.name.charAt(0).toUpperCase()
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-white">{user.name}</p>
+                            {user.username && <p className="truncate text-xs text-white/40">@{user.username}</p>}
+                            {user.bio && <p className="truncate text-xs text-white/30 mt-0.5">{user.bio}</p>}
+                          </div>
+                          {socialDrawer === "following" && (
+                            <button
+                              onClick={() => handleToggleFollow(user.id)}
+                              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                                followingMap.has(user.id)
+                                  ? "border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30"
+                                  : "border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                              }`}
+                            >
+                              {followingMap.has(user.id) ? "Following" : "Follow Back"}
+                            </button>
+                          )}
+                          {socialDrawer === "followers" && profileUser?.uid !== user.id && (
+                            <button
+                              onClick={() => handleToggleFollow(user.id)}
+                              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                                followingMap.has(user.id)
+                                  ? "border border-green-500/30 bg-green-500/10 text-green-400"
+                                  : "border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                              }`}
+                            >
+                              {followingMap.has(user.id) ? "Following" : "Follow"}
+                            </button>
+                          )}
+                        </motion.div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showToast && (

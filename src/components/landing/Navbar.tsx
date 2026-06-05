@@ -8,7 +8,7 @@ import WhatsAppIcon from "./WhatsAppIcon"
 import UserMenu from "../auth/UserMenu"
 import { useAuth } from "../../contexts/AuthContext"
 import { wa, WA_MESSAGES } from "../../lib/utils"
-import { getUnreadMessageCount } from "../../data/feedbackServiceSupabase"
+import { getGlobalUnreadCount } from "../../lib/chatService"
 import { supabase } from "../../lib/supabase/client"
 
 const links = [
@@ -35,13 +35,13 @@ export default function Navbar() {
       queueMicrotask(() => setUnreadMessages(0))
       return
     }
-    const refresh = () => getUnreadMessageCount(user.id).then(setUnreadMessages).catch(() => setUnreadMessages(0))
+    const refresh = () => getGlobalUnreadCount().then(setUnreadMessages).catch(() => setUnreadMessages(0))
     refresh()
     const client = supabase
     if (!client) return
     const channel = client
       .channel(`navbar-messages:${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `receiver_id=eq.${user.id}` }, refresh)
       .subscribe()
     return () => {
       client.removeChannel(channel)

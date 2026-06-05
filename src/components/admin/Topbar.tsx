@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, Bell, ChevronDown, User, Settings, ExternalLink, LogOut, Clock, MessageSquare, Users as UsersIcon, Star } from "lucide-react"
+import { Search, Bell, ChevronDown, User, Settings, ExternalLink, LogOut, Clock, MessageSquare, Users as UsersIcon, Star, ClipboardList } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn, getInitials, timeAgo } from "../../lib/utils"
 import { supabase } from "../../lib/supabase/client"
 import { useAuth } from "../../contexts/AuthContext"
 import { useAdminStore } from "../../lib/store/adminStore"
+import { subscribeToNotifications } from "../../lib/serviceOrdersService"
 import type { UserProfile } from "../../data/feedbackStore"
+import toast from "react-hot-toast"
 
 interface TopbarProps {
   title: string
@@ -57,7 +59,7 @@ export default function Topbar({ title, user }: TopbarProps) {
     type: string
     title: string
     message?: string
-    read: boolean
+    is_read: boolean
     created_at: string
   }
 
@@ -66,21 +68,41 @@ export default function Topbar({ title, user }: TopbarProps) {
     const { data } = await supabase
       .from("notifications")
       .select("*")
-      .eq("read", false)
+      .eq("is_read", false)
       .order("created_at", { ascending: false })
       .limit(10)
-    setNotifications((data as NotificationItem[]) ?? [])
+    const items = (data as NotificationItem[]) ?? []
+    setNotifications(items)
     setNotifLoading(false)
   }, [])
 
   useEffect(() => {
-    if (!notifOpen) return
     fetchNotifications()
-  }, [notifOpen, fetchNotifications])
+  }, [fetchNotifications])
+
+  // Realtime subscription for new notifications
+  useEffect(() => {
+    const sub = subscribeToNotifications(() => {
+      fetchNotifications()
+      playNotificationSound()
+      toast.custom(() => (
+        <div className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-[#0a0a0f] px-4 py-3 shadow-2xl">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/15 text-blue-400">
+            <Bell size={14} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-white">New notification</p>
+            <p className="text-xs text-zinc-500">A new service order or update arrived</p>
+          </div>
+        </div>
+      ), { duration: 4000 })
+    })
+    return () => { sub.then((fn) => fn()) }
+  }, [fetchNotifications])
 
   const markAllNotificationsRead = async () => {
     if (!supabase) return
-    await supabase.from("notifications").update({ read: true }).eq("read", false)
+    await supabase.from("notifications").update({ is_read: true }).eq("is_read", false)
     setNotifications([])
   }
 
@@ -89,6 +111,8 @@ export default function Topbar({ title, user }: TopbarProps) {
     client: UsersIcon,
     info: MessageSquare,
     warning: Clock,
+    new_service_order: ClipboardList,
+    order_status: ClipboardList,
   }
 
   // ========== Global search with debounce ==========
@@ -135,6 +159,22 @@ export default function Topbar({ title, user }: TopbarProps) {
   const avatarUrl = user?.photoUrl
   const initials = getInitials(user?.name || "Admin")
   const hasAnyResult = results.clients.length > 0 || results.feedbacks.length > 0
+
+  function playNotificationSound() {
+    try {
+      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+      const oscillator = ctx.createOscillator()
+      const gain = ctx.createGain()
+      oscillator.connect(gain)
+      gain.connect(ctx.destination)
+      oscillator.frequency.value = 800
+      oscillator.type = "sine"
+      gain.gain.setValueAtTime(0.3, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
+      oscillator.start(ctx.currentTime)
+      oscillator.stop(ctx.currentTime + 0.5)
+    } catch {}
+  }
 
   return (
     <header

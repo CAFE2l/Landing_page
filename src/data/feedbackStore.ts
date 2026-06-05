@@ -191,3 +191,29 @@ export interface UserSticker {
   name: string | null
   createdAt: string
 }
+
+// ========== Social Post Types ==========
+
+export interface SocialPost {
+  id: string
+  userId: string
+  content: string
+  mediaUrl: string | null
+  mediaType: "image" | "video" | "audio" | null
+  likesCount: number
+  commentsCount: number
+  createdAt: string
+  updatedAt: string
+  user: { id: string; name: string; avatarUrl: string | null; username: string | null } | null
+  liked: boolean
+  comments: SocialComment[]
+}
+
+export interface SocialComment {
+  id: string
+  postId: string
+  userId: string
+  content: string
+  createdAt: string
+  user: { id: string; name: string; avatarUrl: string | null; username: string | null } | null
+}

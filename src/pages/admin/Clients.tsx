@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react"
+import { useNavigate } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
 import {
-  Users, UserPlus, MessageCircle, MoreHorizontal, Search,
+  Users, UserPlus, MessageCircle, Search,
   X, Plus, Calendar, Clock,
   Mail, Phone, MapPin, Briefcase, FileText,
   Loader2, Send, Trash2, Check, Copy,
@@ -13,11 +14,12 @@ import { useAuth } from "../../contexts/AuthContext"
 import { getSupabaseClient } from "../../data/adminServiceSupabase"
 import {
   fetchEnhancedClients, fetchClientSummary,
-  fetchClientNotes, createClientNote, deleteClientNote,
+  fetchClientNotes, createClientNote, deleteClientNote, deleteClient,
   type ClientSummary,
 } from "../../lib/adminClientService"
 import { createOrGetConversation } from "../../lib/chatService"
 import { useChatStore } from "../../lib/store/chatStore"
+import { fetchFollowCounts, isFollowing, toggleFollow } from "../../lib/socialService"
 
 type SortField = "name" | "createdAt" | "projectsCount" | "feedbackCount" | "lastActivity"
 type SortDir = "asc" | "desc"
@@ -68,6 +70,18 @@ export default function Clients() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch { toast.error("Failed to copy link") }
+  }
+
+  const handleDelete = async (client: Client) => {
+    const confirmed = window.confirm(`Are you sure you want to delete ${client.name}? This cannot be undone.`)
+    if (!confirmed) return
+    const ok = await deleteClient(client.id)
+    if (ok) {
+      toast.success(`${client.name} deleted`)
+      loadAll()
+    } else {
+      toast.error("Failed to delete client")
+    }
   }
 
   const handleMessageClient = async (client: Client) => {
@@ -237,25 +251,27 @@ export default function Clients() {
             {/* Desktop rows */}
             <div className="hidden lg:block">
               {filtered.map((client, i) => (
-                <ClientRow
-                  key={client.id}
-                  client={client}
-                  index={i}
-                  onView={() => setSelectedClient(client)}
-                  onMessage={() => handleMessageClient(client)}
-                />
+                  <ClientRow
+                    key={client.id}
+                    client={client}
+                    index={i}
+                    onView={() => setSelectedClient(client)}
+                    onMessage={() => handleMessageClient(client)}
+                    onDelete={() => handleDelete(client)}
+                  />
               ))}
             </div>
             {/* Mobile cards */}
             <div className="space-y-2 p-3 lg:hidden">
               {filtered.map((client, i) => (
                 <ClientCard
-                  key={client.id}
-                  client={client}
-                  index={i}
-                  onView={() => setSelectedClient(client)}
-                  onMessage={() => handleMessageClient(client)}
-                />
+                    key={client.id}
+                    client={client}
+                    index={i}
+                    onView={() => setSelectedClient(client)}
+                    onMessage={() => handleMessageClient(client)}
+                    onDelete={() => handleDelete(client)}
+                  />
               ))}
             </div>
           </div>
@@ -344,9 +360,9 @@ function StatusBadge({ status }: { status?: ClientStatus }) {
 }
 
 function ClientRow({
-  client, index, onView, onMessage,
+  client, index, onView, onMessage, onDelete,
 }: {
-  client: Client; index: number; onView: () => void; onMessage: () => void
+  client: Client; index: number; onView: () => void; onMessage: () => void; onDelete: () => void
 }) {
   return (
     <motion.div
@@ -396,8 +412,12 @@ function ClientRow({
         >
           <MessageCircle size={13} />
         </button>
-        <button className="flex h-7 w-7 items-center justify-center rounded-lg text-[#6b6b80] transition-colors hover:bg-white/[0.06] hover:text-[#f0f0f5]">
-          <MoreHorizontal size={13} />
+        <button
+          onClick={onDelete}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-[#6b6b80] transition-colors hover:bg-red-500/10 hover:text-red-400"
+          title="Delete client"
+        >
+          <Trash2 size={13} />
         </button>
       </div>
     </motion.div>
@@ -405,9 +425,9 @@ function ClientRow({
 }
 
 function ClientCard({
-  client, index, onView, onMessage,
+  client, index, onView, onMessage, onDelete,
 }: {
-  client: Client; index: number; onView: () => void; onMessage: () => void
+  client: Client; index: number; onView: () => void; onMessage: () => void; onDelete: () => void
 }) {
   return (
     <motion.div
@@ -435,6 +455,9 @@ function ClientCard({
           </button>
           <button onClick={onMessage} className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] text-[#6b6b80] hover:text-[#4f6ef7]">
             <MessageCircle size={13} />
+          </button>
+          <button onClick={onDelete} className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] text-[#6b6b80] hover:border-red-500/20 hover:text-red-400">
+            <Trash2 size={13} />
           </button>
         </div>
       </div>
@@ -512,11 +535,21 @@ function ClientDrawer({
 }: {
   client: Client; adminId?: string; onClose: () => void; onMessage: () => void; onClientUpdate: () => void
 }) {
+  const navigate = useNavigate()
   const [notes, setNotes] = useState<ClientNote[]>([])
   const [noteInput, setNoteInput] = useState("")
   const [savingNote, setSavingNote] = useState(false)
   const [deletingNote, setDeletingNote] = useState<string | null>(null)
   const [notesLoading, setNotesLoading] = useState(true)
+  const [following, setFollowing] = useState(false)
+  const [followLoading, setFollowLoading] = useState(false)
+  const [socialCounts, setSocialCounts] = useState({ followers: 0, following: 0 })
+
+  useEffect(() => {
+    if (!adminId || !client.id) return
+    isFollowing(adminId, client.id).then(setFollowing)
+    fetchFollowCounts(client.id).then(setSocialCounts)
+  }, [adminId, client.id])
 
   const loadNotes = useCallback(async () => {
     setNotesLoading(true)
@@ -553,6 +586,26 @@ function ClientDrawer({
     }
   }
 
+  const handleFollowToggle = async () => {
+    if (!adminId || !client.id) return
+    setFollowLoading(true)
+    const next = await toggleFollow(adminId, client.id)
+    if (next !== undefined) {
+      setFollowing(next)
+      setSocialCounts((prev) => ({
+        ...prev,
+        followers: next ? prev.followers + 1 : Math.max(0, prev.followers - 1),
+      }))
+      toast.success(next ? `Following ${client.name}` : `Unfollowed ${client.name}`)
+    }
+    setFollowLoading(false)
+  }
+
+  const handleViewProfile = () => {
+    onClose()
+    navigate(`/profile/${client.id}`)
+  }
+
   const infoSections = [
     { icon: Mail, label: "Email", value: client.email },
     { icon: Phone, label: "Phone", value: client.phone || "—" },
@@ -587,7 +640,7 @@ function ClientDrawer({
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/[0.08]">
-          {/* Profile header */}
+          {/* Profile header with clickable avatar */}
           <div className="relative px-6 pt-12 pb-6 text-center">
             <motion.div
               className="absolute inset-0 -z-10 scale-150 rounded-full bg-[#2563eb]/10 blur-3xl"
@@ -595,13 +648,22 @@ function ClientDrawer({
               transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
             />
             <div className="relative mx-auto flex flex-col items-center">
-              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-white/[0.12] bg-gradient-to-br from-[#4f6ef7] to-[#8b5cf6] text-2xl font-bold text-white shadow-[0_0_30px_rgba(79,110,247,0.3)]">
-                {client.avatarUrl ? (
-                  <img src={client.avatarUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  getInitials(client.name)
-                )}
-              </div>
+              <button
+                onClick={handleViewProfile}
+                title="View profile"
+                className="group relative"
+              >
+                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-white/[0.12] bg-gradient-to-br from-[#4f6ef7] to-[#8b5cf6] text-2xl font-bold text-white shadow-[0_0_30px_rgba(79,110,247,0.3)] transition-all duration-300 group-hover:border-blue-400/50 group-hover:shadow-[0_0_40px_rgba(79,110,247,0.5)] cursor-pointer">
+                  {client.avatarUrl ? (
+                    <img src={client.avatarUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    getInitials(client.name)
+                  )}
+                </div>
+                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-full bg-blue-500/20 backdrop-blur-md px-2 py-0.5 text-[9px] text-blue-300 whitespace-nowrap">
+                  View profile
+                </span>
+              </button>
               <h2 className="mt-4 text-xl font-bold text-[#f0f0f5]">{client.name}</h2>
               <p className="text-sm text-[#6b6b80]">{client.email}</p>
               <div className="mt-3 flex items-center gap-2">
@@ -615,7 +677,7 @@ function ClientDrawer({
 
           <div className="px-6 pb-6 space-y-5">
             {/* Action buttons */}
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <button
                 onClick={onMessage}
                 className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.25)] hover:shadow-[0_0_32px_rgba(37,99,235,0.4)] transition-all"
@@ -623,18 +685,39 @@ function ClientDrawer({
                 <MessageCircle size={16} />
                 Send Message
               </button>
+              <motion.button
+                onClick={handleFollowToggle}
+                disabled={followLoading || !adminId}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                  following
+                    ? "border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30"
+                    : "border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 shadow-[0_0_16px_rgba(37,99,235,0.12)]"
+                }`}
+              >
+                {followLoading ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : following ? (
+                  "Following"
+                ) : (
+                  "Follow"
+                )}
+              </motion.button>
             </div>
 
-            {/* Stats cards */}
-            <div className="grid grid-cols-4 gap-2">
+            {/* Stats cards — extended with social */}
+            <div className="grid grid-cols-3 gap-2">
               {[
                 { label: "Orders", value: client.projectsCount },
                 { label: "Services", value: client.servicesCount || 0 },
                 { label: "Feedback", value: client.feedbackCount },
                 { label: "Messages", value: client.unreadMessagesCount || 0 },
+                { label: "Followers", value: socialCounts.followers },
+                { label: "Following", value: socialCounts.following },
               ].map((stat) => (
-                <div key={stat.label} className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-center">
-                  <p className="bg-gradient-to-r from-[#60a5fa] to-[#a78bfa] bg-clip-text text-lg font-bold text-transparent">{stat.value}</p>
+                <div key={stat.label} className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-center">
+                  <p className="bg-gradient-to-r from-[#60a5fa] to-[#a78bfa] bg-clip-text text-base font-bold text-transparent">{stat.value}</p>
                   <p className="text-[9px] uppercase tracking-wider text-white/30">{stat.label}</p>
                 </div>
               ))}

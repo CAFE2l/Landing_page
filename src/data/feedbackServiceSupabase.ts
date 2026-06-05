@@ -903,7 +903,7 @@ export interface DirectMessage {
   conversationId: string;
   senderId: string;
   content: string;
-  read: boolean;
+  readAt: string | null;
   createdAt: string;
 }
 
@@ -1040,7 +1040,7 @@ export async function fetchConversations(userId: string): Promise<ConversationSu
     supabase.from(PROFILES_TABLE).select("id, full_name, username, avatar_url").in("id", otherIds),
     supabase
       .from(MESSAGES_TABLE)
-      .select("conversation_id, sender_id, content, read, created_at")
+      .select("id, conversation_id, sender_id, receiver_id, content, message_type, media_url, caption, delivered_at, read_at, created_at")
       .in("conversation_id", rows.map((row) => row.id as string))
       .order("created_at", { ascending: false }),
   ]);
@@ -1065,7 +1065,7 @@ export async function fetchConversations(userId: string): Promise<ConversationSu
       otherAvatar: (profile?.avatar_url as string) || undefined,
       lastMessage: (last?.content as string) || "",
       lastMessageAt: ((last?.created_at as string) || row.last_message_at) as string,
-      unreadCount: conversationMessages.filter((m) => m.sender_id !== userId && !m.read).length,
+      unreadCount: conversationMessages.filter((m) => m.sender_id !== userId && !m.read_at).length,
     };
   });
 }
@@ -1083,7 +1083,7 @@ export async function fetchConversationMessages(conversationId: string): Promise
     conversationId: row.conversation_id as string,
     senderId: row.sender_id as string,
     content: row.content as string,
-    read: row.read as boolean,
+    readAt: (row.read_at as string) || null,
     createdAt: row.created_at as string,
   }));
 }
@@ -1105,7 +1105,7 @@ export async function markConversationRead(conversationId: string, currentUserId
   if (!supabase || !supabaseConfigured) return;
   await supabase
     .from(MESSAGES_TABLE)
-    .update({ read: true })
+    .update({ read_at: new Date().toISOString() })
     .eq("conversation_id", conversationId)
     .neq("sender_id", currentUserId);
 }

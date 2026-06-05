@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { MessageCircle, X, Minus, Maximize2, Loader2, Search } from "lucide-react"
+import { MessageCircle, X, Minus, Maximize2, Loader2, Search, AlertCircle, RefreshCw } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
 import { fetchConversations, markMessagesAsRead, subscribeToConversationUpdates } from "../../lib/chatService"
 import { useChatStore } from "../../lib/store/chatStore"
@@ -17,6 +17,7 @@ export default function ChatWidget() {
   const [view, setView] = useState<ViewState>("closed")
   const [conversations, setConversations] = useState<ChatConv[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [activeConv, setActiveConv] = useState<ChatConv | null>(null)
   const [search, setSearch] = useState("")
   const [totalUnread, setTotalUnread] = useState(0)
@@ -24,14 +25,20 @@ export default function ChatWidget() {
 
   const uid = user?.id
   const loadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const isMessagesPage = location.pathname.startsWith("/dashboard/messages")
+  const isMessagesPage = location.pathname.startsWith("/dashboard/messages") || location.pathname === "/messages"
 
   const load = useCallback(async () => {
     if (!uid) return
     setLoading(true)
-    const convs = await fetchConversations(uid)
-    setConversations(convs)
-    setTotalUnread(convs.reduce((s, c) => s + c.unreadCount, 0))
+    setLoadError(null)
+    try {
+      const convs = await fetchConversations(uid)
+      setConversations(convs)
+      setTotalUnread(convs.reduce((s, c) => s + c.unreadCount, 0))
+    } catch (e) {
+      console.error("[ChatWidget] load failed", e)
+      setLoadError("Could not load messages")
+    }
     setLoading(false)
   }, [uid])
 
@@ -61,7 +68,7 @@ export default function ChatWidget() {
 
     if (isMessagesPage) {
       useChatStore.getState().clearOpenWithTarget()
-      navigate(`/messages?conversationId=${openWithTarget.conversationId}`, { replace: true })
+      navigate(`/dashboard/messages?conversationId=${openWithTarget.conversationId}`, { replace: true })
     } else {
       setView("compact")
       const virtualConv: ChatConv = {
@@ -91,7 +98,7 @@ export default function ChatWidget() {
 
   const handleSelectConversation = async (conv: ChatConv) => {
     if (isMessagesPage) {
-      navigate(`/messages?conversationId=${conv.id}`, { replace: true })
+      navigate(`/dashboard/messages?conversationId=${conv.id}`, { replace: true })
       setView("closed")
       setActiveConv(null)
     } else {
@@ -109,33 +116,35 @@ export default function ChatWidget() {
 
   return (
     <>
-      <button
-        onClick={() => setView(view === "closed" ? "compact" : "closed")}
-        className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white shadow-[0_4px_24px_rgba(37,99,235,0.35)] hover:shadow-[0_4px_32px_rgba(37,99,235,0.5)] transition-all duration-300 hover:scale-105"
-      >
-        {view === "closed" ? (
-          <>
-            <MessageCircle size={24} />
-            {totalUnread > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white shadow-lg">
-                {totalUnread > 9 ? "9+" : totalUnread}
-              </span>
-            )}
-          </>
-        ) : (
-          <X size={20} />
-        )}
-      </button>
-
-      <AnimatePresence>
-        {view === "compact" && !isMessagesPage && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="fixed bottom-24 right-5 z-40 w-[380px] h-[560px] max-h-[calc(100vh-140px)] rounded-2xl border border-white/[0.08] bg-[#0A0A0F] shadow-2xl shadow-black/60 overflow-hidden flex flex-col"
+      {!isMessagesPage && (
+        <>
+          <button
+            onClick={() => setView(view === "closed" ? "compact" : "closed")}
+            className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white shadow-[0_4px_24px_rgba(37,99,235,0.35)] hover:shadow-[0_4px_32px_rgba(37,99,235,0.5)] transition-all duration-300 hover:scale-105"
           >
+            {view === "closed" ? (
+              <>
+                <MessageCircle size={24} />
+                {totalUnread > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white shadow-lg">
+                    {totalUnread > 9 ? "9+" : totalUnread}
+                  </span>
+                )}
+              </>
+            ) : (
+              <X size={20} />
+            )}
+          </button>
+
+          <AnimatePresence>
+            {view === "compact" && (
+              <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="fixed bottom-24 right-5 z-40 w-[380px] h-[560px] max-h-[calc(100vh-140px)] rounded-2xl border border-white/[0.08] bg-[#0A0A0F] shadow-2xl shadow-black/60 overflow-hidden flex flex-col"
+              >
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-[#0A0A0F]/80 backdrop-blur-md shrink-0">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#4F6EF7]/10 text-[#4F6EF7]">
@@ -190,6 +199,18 @@ export default function ChatWidget() {
                     <div className="flex items-center justify-center py-16">
                       <Loader2 size={24} className="animate-spin text-[#4F6EF7]" />
                     </div>
+                  ) : loadError ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+                      <AlertCircle size={28} className="text-red-400 mb-3" />
+                      <p className="text-sm text-[#6B6B80] mb-3">{loadError}</p>
+                      <button
+                        onClick={load}
+                        className="flex items-center gap-2 rounded-xl bg-[#4F6EF7] px-4 py-2 text-xs font-medium text-white hover:bg-[#4F6EF7]/90 transition-all"
+                      >
+                        <RefreshCw size={13} />
+                        Retry
+                      </button>
+                    </div>
                   ) : filtered.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center px-4">
                       <MessageCircle size={32} className="text-[#4A4A5A] mb-3" />
@@ -239,7 +260,7 @@ export default function ChatWidget() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {view === "expanded" && !isMessagesPage && (
+        {view === "expanded" && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -296,6 +317,18 @@ export default function ChatWidget() {
                     {loading ? (
                       <div className="flex items-center justify-center py-16">
                         <Loader2 size={20} className="animate-spin text-[#4F6EF7]" />
+                      </div>
+                    ) : loadError ? (
+                      <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+                        <AlertCircle size={24} className="text-red-400 mb-2" />
+                        <p className="text-xs text-[#6B6B80] mb-3">{loadError}</p>
+                        <button
+                          onClick={load}
+                          className="flex items-center gap-2 rounded-xl bg-[#4F6EF7] px-3 py-1.5 text-[10px] font-medium text-white hover:bg-[#4F6EF7]/90 transition-all"
+                        >
+                          <RefreshCw size={11} />
+                          Retry
+                        </button>
                       </div>
                     ) : filtered.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-16 text-center px-4">
@@ -358,6 +391,8 @@ export default function ChatWidget() {
           </motion.div>
         )}
       </AnimatePresence>
+        </>
+      )}
     </>
   )
 }
