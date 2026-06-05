@@ -16,15 +16,19 @@ export async function fetchClientSummary(): Promise<ClientSummary> {
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-  const [{ count: total }, { count: newThisMonth }, { data: unreadData }] = await Promise.all([
+  const [{ count: total }, { count: newThisMonth }] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "client"),
     supabase
       .from("profiles")
       .select("*", { count: "exact", head: true })
       .eq("role", "client")
       .gte("created_at", monthStart),
-    supabase.rpc("get_total_unread_messages_for_admin" as never).catch(() => ({ data: null })),
   ])
+  let unreadData: unknown = null
+  try {
+    const result = await supabase.rpc("get_total_unread_messages_for_admin" as never)
+    unreadData = (result as { data: unknown })?.data
+  } catch { /* ignore */ }
 
   const pendingMessages = unreadData ? Number(unreadData) : 0
 
@@ -163,7 +167,7 @@ export async function fetchClientNotes(clientId: string): Promise<ClientNote[]> 
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
       adminName: adminInfo?.name || "Admin",
-      adminAvatar: adminInfo?.avatar || null,
+      adminAvatar: adminInfo?.avatar || undefined,
     }
   })
 }

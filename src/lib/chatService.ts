@@ -52,7 +52,7 @@ export async function fetchConversations(userId: string): Promise<ChatConversati
 
   const { data: allMessages } = await supabase
     .from("messages")
-    .select("conversation_id, sender_id, read_at, created_at")
+    .select("conversation_id, sender_id, read_at, created_at, content, message_type, caption")
     .in("conversation_id", conversationIds)
     .order("created_at", { ascending: false })
 
@@ -72,12 +72,38 @@ export async function fetchConversations(userId: string): Promise<ChatConversati
       row.participant_1 === userId ? (row.participant_2 as string) : (row.participant_1 as string)
     const profile = profileMap.get(otherId)
     const latest = latestByConv.get(row.id as string)
+    const lastMsgFromRow = (row.last_message as string) || null
+    const lastContent = latest?.content as string | undefined
+    const lastMsgType = latest?.message_type as string | undefined
+    const lastCaption = latest?.caption as string | undefined
+
+    let displayLastMessage = lastMsgFromRow
+    if (!displayLastMessage && lastContent && lastMsgType === "text") {
+      displayLastMessage = lastContent
+    }
+
+    const typeLabel = (type?: string) => {
+      if (type === "image") return "📷 Image"
+      if (type === "video") return "🎥 Video"
+      if (type === "audio") return "🎙️ Audio"
+      if (type === "sticker") return "Sticker"
+      if (type === "emoji") return "😊 Emoji"
+      return null
+    }
+
+    if (!displayLastMessage) {
+      displayLastMessage = typeLabel(lastMsgType)
+    }
+
+    if (displayLastMessage && lastCaption && (lastMsgType === "image" || lastMsgType === "video")) {
+      displayLastMessage = `${displayLastMessage} — ${lastCaption.slice(0, 40)}`
+    }
 
     return {
       id: row.id as string,
       participantA: row.participant_1 as string,
       participantB: row.participant_2 as string,
-      lastMessage: (row.last_message as string) || (latest?.content as string) || null,
+      lastMessage: displayLastMessage,
       lastMessageAt: (row.last_message_at as string) || (latest?.created_at as string) || row.created_at as string,
       updatedAt: (row.updated_at as string) || row.created_at as string,
       createdAt: row.created_at as string,
@@ -115,8 +141,14 @@ export async function sendMessage(
   content: string,
   messageType: MessageType = "text",
   mediaUrl?: string,
+  caption?: string,
+  mediaMimeType?: string,
+  mediaSize?: number,
+  mediaDuration?: number,
 ): Promise<ChatMessage | null> {
   if (!supabase || !supabaseConfigured) return null
+
+  const now = new Date().toISOString()
 
   const payload: Record<string, unknown> = {
     conversation_id: conversationId,
@@ -124,9 +156,14 @@ export async function sendMessage(
     receiver_id: receiverId,
     content,
     message_type: messageType,
+    delivered_at: now,
   }
 
   if (mediaUrl) payload.media_url = mediaUrl
+  if (caption) payload.caption = caption
+  if (mediaMimeType) payload.media_mime_type = mediaMimeType
+  if (mediaSize !== undefined) payload.media_size = mediaSize
+  if (mediaDuration !== undefined) payload.media_duration = mediaDuration
 
   const { data, error } = await supabase
     .from("messages")
@@ -140,12 +177,20 @@ export async function sendMessage(
     return null
   }
 
+  const lastMsgType = messageType
+  let lastMessageStr = content
+  if (lastMsgType === "image") lastMessageStr = caption ? `📷 Image — ${caption.slice(0, 40)}` : "📷 Image"
+  else if (lastMsgType === "video") lastMessageStr = caption ? `🎥 Video — ${caption.slice(0, 40)}` : "🎥 Video"
+  else if (lastMsgType === "audio") lastMessageStr = "🎙️ Audio"
+  else if (lastMsgType === "sticker") lastMessageStr = "Sticker"
+  else if (lastMsgType === "emoji") lastMessageStr = content || "😊 Emoji"
+
   await supabase
     .from("conversations")
     .update({
-      last_message: messageType === "text" ? content : messageType === "image" ? "📷 Image" : messageType === "sticker" ? "🎨 Sticker" : "😊 Emoji",
-      last_message_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      last_message: lastMessageStr,
+      last_message_at: now,
+      updated_at: now,
     })
     .eq("id", conversationId)
 
@@ -154,21 +199,134 @@ export async function sendMessage(
 
 export async function markMessagesAsRead(
   conversationId: string,
-  currentUserId: string,
+  _currentUserId?: string,
 ): Promise<void> {
   if (!supabase || !supabaseConfigured) return
 
-  await supabase
-    .from("messages")
-    .update({ read_at: new Date().toISOString() })
-    .eq("conversation_id", conversationId)
-    .eq("receiver_id", currentUserId)
-    .is("read_at", null)
+  await supabase.rpc("mark_conversation_as_read", {
+    p_conversation_id: conversationId,
+  })
 }
 
-export async function getUnreadCount(userId: string): Promise<number> {
-  const conversations = await fetchConversations(userId)
-  return conversations.reduce((sum, c) => sum + c.unreadCount, 0)
+export async function getGlobalUnreadCount(): Promise<number> {
+  if (!supabase || !supabaseConfigured) return 0
+
+  const { data, error } = await supabase.rpc("get_global_unread_count")
+  if (error) {
+    console.error("getGlobalUnreadCount failed", error)
+    return 0
+  }
+  return (data as number) || 0
+}
+
+export async function getConversationUnreadCounts(): Promise<Record<string, number>> {
+  if (!supabase || !supabaseConfigured) return {}
+
+  const { data, error } = await supabase.rpc("get_conversation_unread_counts")
+  if (error) {
+    console.error("getConversationUnreadCounts failed", error)
+    return {}
+  }
+  return (data as Record<string, number>) || {}
+}
+
+// ========== Media Upload ==========
+
+const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"]
+const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"]
+const ALLOWED_AUDIO_TYPES = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"]
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024
+const MAX_AUDIO_SIZE = 25 * 1024 * 1024
+
+export function validateMediaFile(file: File): { valid: boolean; error?: string } {
+  if (ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    if (file.size > MAX_IMAGE_SIZE) return { valid: false, error: "Image must be under 10MB" }
+    return { valid: true }
+  }
+  if (ALLOWED_VIDEO_TYPES.includes(file.type)) {
+    if (file.size > MAX_VIDEO_SIZE) return { valid: false, error: "Video must be under 100MB" }
+    return { valid: true }
+  }
+  if (ALLOWED_AUDIO_TYPES.includes(file.type)) {
+    if (file.size > MAX_AUDIO_SIZE) return { valid: false, error: "Audio must be under 25MB" }
+    return { valid: true }
+  }
+  return { valid: false, error: "File type not supported. Allowed: PNG, JPG, WEBP, GIF, MP4, WebM, audio." }
+}
+
+export function getMediaType(file: File): "image" | "video" | "audio" | null {
+  if (ALLOWED_IMAGE_TYPES.includes(file.type)) return "image"
+  if (ALLOWED_VIDEO_TYPES.includes(file.type)) return "video"
+  if (ALLOWED_AUDIO_TYPES.includes(file.type)) return "audio"
+  return null
+}
+
+export async function uploadChatMedia(
+  file: File,
+  userId: string,
+): Promise<{ url: string; mimeType: string; size: number } | null> {
+  if (!supabase || !supabaseConfigured) return null
+
+  const ext = file.name.split(".").pop() || "bin"
+  const path = `${userId}/${Date.now()}.${ext}`
+
+  const { error } = await supabase.storage
+    .from("chat-media")
+    .upload(path, file, {
+      cacheControl: "3600",
+      upsert: false,
+    })
+
+  if (error) {
+    console.error("uploadChatMedia failed", error)
+    toast.error("Failed to upload media")
+    return null
+  }
+
+  const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(path)
+  if (!urlData?.publicUrl) return null
+
+  return {
+    url: urlData.publicUrl,
+    mimeType: file.type,
+    size: file.size,
+  }
+}
+
+// ========== Audio Upload ==========
+
+export async function uploadAudio(
+  blob: Blob,
+  userId: string,
+  _conversationId: string,
+): Promise<{ url: string; mimeType: string; size: number } | null> {
+  if (!supabase || !supabaseConfigured) return null
+
+  const path = `${userId}/audio_${Date.now()}.webm`
+
+  const { error } = await supabase.storage
+    .from("chat-media")
+    .upload(path, blob, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: blob.type,
+    })
+
+  if (error) {
+    console.error("uploadAudio failed", error)
+    toast.error("Failed to upload audio")
+    return null
+  }
+
+  const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(path)
+  if (!urlData?.publicUrl) return null
+
+  return {
+    url: urlData.publicUrl,
+    mimeType: blob.type,
+    size: blob.size,
+  }
 }
 
 // ========== Realtime ==========
@@ -231,6 +389,17 @@ export function subscribeToConversationUpdates(
         event: "*",
         schema: "public",
         table: "messages",
+        filter: `receiver_id=eq.${userId}`,
+      },
+      onUpdate,
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `sender_id=eq.${userId}`,
       },
       onUpdate,
     )
@@ -239,34 +408,6 @@ export function subscribeToConversationUpdates(
   return () => {
     client.removeChannel(channel)
   }
-}
-
-// ========== Image Upload ==========
-
-export async function uploadChatImage(
-  file: File,
-  userId: string,
-): Promise<string | null> {
-  if (!supabase || !supabaseConfigured) return null
-
-  const ext = file.name.split(".").pop() || "jpg"
-  const path = `${userId}/${Date.now()}.${ext}`
-
-  const { error } = await supabase.storage
-    .from("chat-media")
-    .upload(path, file, {
-      cacheControl: "3600",
-      upsert: false,
-    })
-
-  if (error) {
-    console.error("uploadChatImage failed", error)
-    toast.error("Failed to upload image")
-    return null
-  }
-
-  const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(path)
-  return urlData?.publicUrl || null
 }
 
 // ========== Stickers ==========
@@ -362,8 +503,13 @@ function mapMessage(row: Record<string, unknown>): ChatMessage {
     senderId: row.sender_id as string,
     receiverId: (row.receiver_id as string) || null,
     content: row.content as string,
+    caption: (row.caption as string) || null,
     messageType: (row.message_type as MessageType) || "text",
     mediaUrl: (row.media_url as string) || null,
+    mediaMimeType: (row.media_mime_type as string) || null,
+    mediaSize: (row.media_size as number) || null,
+    mediaDuration: (row.media_duration as number) || null,
+    deliveredAt: (row.delivered_at as string) || null,
     readAt: (row.read_at as string) || null,
     createdAt: row.created_at as string,
   }

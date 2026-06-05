@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { MessageCircle, X, Minus, Maximize2, Loader2, Search } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
-import { fetchConversations, subscribeToConversationUpdates } from "../../lib/chatService"
+import { fetchConversations, markMessagesAsRead, subscribeToConversationUpdates } from "../../lib/chatService"
 import { useChatStore } from "../../lib/store/chatStore"
 import ChatConversation from "./ChatConversation"
 import type { ChatConversation as ChatConv } from "../../data/feedbackStore"
@@ -11,6 +12,8 @@ type ViewState = "closed" | "compact" | "expanded"
 
 export default function ChatWidget() {
   const { user } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [view, setView] = useState<ViewState>("closed")
   const [conversations, setConversations] = useState<ChatConv[]>([])
   const [loading, setLoading] = useState(false)
@@ -20,6 +23,8 @@ export default function ChatWidget() {
   const openWithTarget = useChatStore((s) => s.openWithTarget)
 
   const uid = user?.id
+  const loadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isMessagesPage = location.pathname.startsWith("/dashboard/messages")
 
   const load = useCallback(async () => {
     if (!uid) return
@@ -30,50 +35,74 @@ export default function ChatWidget() {
     setLoading(false)
   }, [uid])
 
+  const debouncedLoad = useCallback(() => {
+    if (loadTimer.current) clearTimeout(loadTimer.current)
+    loadTimer.current = setTimeout(load, 300)
+  }, [load])
+
   useEffect(() => {
     if (view !== "closed") load()
   }, [view, load])
 
   useEffect(() => {
+    return () => {
+      if (loadTimer.current) clearTimeout(loadTimer.current)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!uid) return
-    const cleanup = subscribeToConversationUpdates(uid, load)
+    const cleanup = subscribeToConversationUpdates(uid, debouncedLoad)
     return cleanup
-  }, [uid, load])
+  }, [uid, debouncedLoad])
 
   useEffect(() => {
     if (!uid || !openWithTarget) return
-    setView("compact")
-    const virtualConv: ChatConv = {
-      id: openWithTarget.conversationId,
-      participantA: uid,
-      participantB: openWithTarget.otherUserId,
-      lastMessage: null,
-      lastMessageAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      otherUser: {
-        id: openWithTarget.otherUserId,
-        name: openWithTarget.otherUserName,
-        avatarUrl: openWithTarget.otherUserAvatar,
-        username: null,
-      },
-      unreadCount: 0,
+
+    if (isMessagesPage) {
+      useChatStore.getState().clearOpenWithTarget()
+      navigate(`/messages?conversationId=${openWithTarget.conversationId}`, { replace: true })
+    } else {
+      setView("compact")
+      const virtualConv: ChatConv = {
+        id: openWithTarget.conversationId,
+        participantA: uid,
+        participantB: openWithTarget.otherUserId,
+        lastMessage: null,
+        lastMessageAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        otherUser: {
+          id: openWithTarget.otherUserId,
+          name: openWithTarget.otherUserName,
+          avatarUrl: openWithTarget.otherUserAvatar,
+          username: null,
+        },
+        unreadCount: 0,
+      }
+      setActiveConv(virtualConv)
+      useChatStore.getState().clearOpenWithTarget()
     }
-    setActiveConv(virtualConv)
-    useChatStore.getState().clearOpenWithTarget()
-  }, [openWithTarget, uid])
+  }, [openWithTarget, uid, isMessagesPage, navigate])
 
   const filtered = conversations.filter((c) =>
     c.otherUser.name.toLowerCase().includes(search.toLowerCase()),
   )
 
-  const handleSelectConversation = (conv: ChatConv) => {
-    setActiveConv(conv)
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === conv.id ? { ...c, unreadCount: 0 } : c,
-      ),
-    )
+  const handleSelectConversation = async (conv: ChatConv) => {
+    if (isMessagesPage) {
+      navigate(`/messages?conversationId=${conv.id}`, { replace: true })
+      setView("closed")
+      setActiveConv(null)
+    } else {
+      setActiveConv(conv)
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conv.id ? { ...c, unreadCount: 0 } : c,
+        ),
+      )
+      await markMessagesAsRead(conv.id)
+    }
   }
 
   if (!uid) return null
@@ -99,7 +128,7 @@ export default function ChatWidget() {
       </button>
 
       <AnimatePresence>
-        {view === "compact" && (
+        {view === "compact" && !isMessagesPage && (
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -136,15 +165,13 @@ export default function ChatWidget() {
             </div>
 
             {activeConv ? (
-              <>
-                <div className="flex-1 overflow-hidden">
-                  <ChatConversation
-                    conversation={activeConv}
-                    currentUserId={uid}
-                    onBack={() => setActiveConv(null)}
-                  />
-                </div>
-              </>
+              <div className="flex-1 overflow-hidden">
+                <ChatConversation
+                  conversation={activeConv}
+                  currentUserId={uid}
+                  onBack={() => setActiveConv(null)}
+                />
+              </div>
             ) : (
               <>
                 <div className="px-4 py-2">
@@ -212,13 +239,14 @@ export default function ChatWidget() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {view === "expanded" && (
+        {view === "expanded" && !isMessagesPage && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => { setView("closed"); setActiveConv(null) }}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -226,6 +254,7 @@ export default function ChatWidget() {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
               className="w-full max-w-5xl h-[85vh] rounded-2xl border border-white/[0.08] bg-[#0A0A0F] shadow-2xl shadow-black/60 overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06] bg-[#0A0A0F]/80 backdrop-blur-md shrink-0">
                 <div className="flex items-center gap-3">
@@ -332,4 +361,3 @@ export default function ChatWidget() {
     </>
   )
 }
-

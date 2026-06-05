@@ -2,9 +2,9 @@ import { useEffect, useState, useCallback } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import {
   Users, UserPlus, MessageCircle, MoreHorizontal, Search,
-  X, Plus, ChevronRight, Calendar, Star, Clock,
-  Mail, Phone, MapPin, Briefcase, FileText, AlertCircle,
-  Loader2, Send, Trash2, Edit3, Check, Copy,
+  X, Plus, Calendar, Clock,
+  Mail, Phone, MapPin, Briefcase, FileText,
+  Loader2, Send, Trash2, Check, Copy,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import type { Client, ClientNote, ClientStatus } from "../../lib/types/client"
@@ -508,7 +508,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 // ========== Client Detail Drawer ==========
 
 function ClientDrawer({
-  client, adminId, onClose, onMessage, onClientUpdate,
+  client, adminId, onClose, onMessage, onClientUpdate: _onClientUpdate,
 }: {
   client: Client; adminId?: string; onClose: () => void; onMessage: () => void; onClientUpdate: () => void
 }) {

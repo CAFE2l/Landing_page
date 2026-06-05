@@ -148,7 +148,7 @@ export const clearCurrentUser = () => {
 
 // ========== Chat Types ==========
 
-export type MessageType = "text" | "image" | "sticker" | "emoji"
+export type MessageType = "text" | "image" | "video" | "audio" | "sticker" | "emoji"
 
 export interface ChatMessage {
   id: string
@@ -156,8 +156,13 @@ export interface ChatMessage {
   senderId: string
   receiverId: string | null
   content: string
+  caption: string | null
   messageType: MessageType
   mediaUrl: string | null
+  mediaMimeType: string | null
+  mediaSize: number | null
+  mediaDuration: number | null
+  deliveredAt: string | null
   readAt: string | null
   createdAt: string
 }
