@@ -1,31 +1,59 @@
-import { useState } from "react"
-import { motion } from "framer-motion"
-import { Star, ThumbsDown, ThumbsUp, MessageCircle, BadgeCheck, Link as LinkIcon, Play, Bookmark } from "lucide-react"
-import { Link } from "react-router-dom"
-import type { FeedbackPost, ReactionType } from "../../data/feedbackStore"
-import MediaModal from "./MediaModal"
+import { useState } from "react";
+import { motion } from "framer-motion";
+import {
+  Star,
+  ThumbsDown,
+  ThumbsUp,
+  MessageCircle,
+  BadgeCheck,
+  Link as LinkIcon,
+  Play,
+  Bookmark,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import type { FeedbackPost, ReactionType } from "../../data/feedbackStore";
+import MediaModal from "./MediaModal";
+import { useUserProfile } from "../../hooks/useUserProfile";
 
 interface FeedbackCardProps {
-  post: FeedbackPost
-  index: number
-  onReaction: (reactionType: ReactionType) => void
-  onComment: () => void
-  onClick: () => void
-  onSave?: () => void
-  userReaction?: ReactionType | null
-  saved?: boolean
+  post: FeedbackPost;
+  index: number;
+  onReaction: (reactionType: ReactionType) => void;
+  onComment: () => void;
+  onClick: () => void;
+  onSave?: () => void;
+  userReaction?: ReactionType | null;
+  saved?: boolean;
 }
 
-export default function FeedbackCard({ post, index, onReaction, onComment, onClick, onSave, userReaction, saved }: FeedbackCardProps) {
-  const displayRating = Math.round(post.rating)
-  const [mediaIndex, setMediaIndex] = useState<number | null>(null)
+export default function FeedbackCard({
+  post,
+  index,
+  onReaction,
+  onComment,
+  onClick,
+  onSave,
+  userReaction,
+  saved,
+}: FeedbackCardProps) {
+  const { profile } = useUserProfile(post.userId);
+  const displayRating = Math.round(post.rating);
+  const [mediaIndex, setMediaIndex] = useState<number | null>(null);
+
+  const userName = profile?.full_name || post.userName;
+  const userAvatar = profile?.avatar_url || post.userAvatar;
+  const initials = profile?.initials || post.userName[0]?.toUpperCase() || "U";
 
   return (
     <>
       <motion.article
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ delay: index * 0.05, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        transition={{
+          delay: index * 0.05,
+          duration: 0.5,
+          ease: [0.16, 1, 0.3, 1],
+        }}
         className={`group relative overflow-hidden rounded-2xl border transition-all duration-500 ${
           post.isHighlighted
             ? "border-[#4F6EF7]/25 bg-gradient-to-br from-[#4F6EF7]/[0.06] via-[#4F6EF7]/[0.02] to-transparent shadow-[0_0_40px_rgba(79,110,247,0.08)]"
@@ -45,10 +73,14 @@ export default function FeedbackCard({ post, index, onReaction, onComment, onCli
                 onClick={(e) => e.stopPropagation()}
                 className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4F6EF7]/10 text-sm font-bold text-[#4F6EF7] ring-1 ring-white/[0.06] transition-all duration-300 hover:ring-2 hover:ring-[#4F6EF7]/45 hover:shadow-[0_0_20px_rgba(79,110,247,0.2)]"
               >
-                {post.userAvatar ? (
-                  <img src={post.userAvatar} alt="" className="h-full w-full object-cover" />
+                {userAvatar ? (
+                  <img
+                    src={userAvatar}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
-                  post.userName[0]?.toUpperCase() || "U"
+                  initials
                 )}
               </Link>
               <div>
@@ -58,17 +90,20 @@ export default function FeedbackCard({ post, index, onReaction, onComment, onCli
                     onClick={(e) => e.stopPropagation()}
                     className="text-sm font-semibold text-[#F0F0F5] transition-colors hover:text-[#8EA0FF] hover:underline"
                   >
-                    {post.userName}
+                    {userName}
                   </Link>
                   {post.isVerifiedClient && (
                     <BadgeCheck size={14} className="text-[#4F6EF7]" />
                   )}
                 </div>
+
                 <div className="flex items-center gap-2 text-[10px] text-[#6B6B80]">
                   <span className="inline-flex items-center gap-1 rounded-full bg-[#4F6EF7]/8 px-2 py-0.5 text-[10px] font-medium text-[#4F6EF7] border border-[#4F6EF7]/15">
                     {post.serviceCategory}
                   </span>
-                  <span>{new Date(post.createdAt).toLocaleDateString("en-US")}</span>
+                  <span>
+                    {new Date(post.createdAt).toLocaleDateString("en-US")}
+                  </span>
                 </div>
               </div>
             </div>
@@ -78,13 +113,20 @@ export default function FeedbackCard({ post, index, onReaction, onComment, onCli
                   <Star
                     key={n}
                     size={14}
-                    className={n <= displayRating ? "text-[#F59E0B] fill-[#F59E0B]" : "text-[#3A3A4A]"}
+                    className={
+                      n <= displayRating
+                        ? "text-[#F59E0B] fill-[#F59E0B]"
+                        : "text-[#3A3A4A]"
+                    }
                   />
                 ))}
               </div>
               {onSave && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); onSave() }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSave();
+                  }}
                   aria-label={saved ? "Remove saved post" : "Save post"}
                   className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-300 ${
                     saved
@@ -140,11 +182,18 @@ export default function FeedbackCard({ post, index, onReaction, onComment, onCli
                 <button
                   key={i}
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); setMediaIndex(i) }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMediaIndex(i);
+                  }}
                   className="group/media relative aspect-video overflow-hidden rounded-xl border border-[#1E1E2A] bg-[#050508] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all hover:border-[#4F6EF7]/30"
                 >
                   {m.type === "image" ? (
-                    <img src={m.url} alt={m.altText || ""} className="h-full w-full object-cover transition-transform duration-500 group-hover/media:scale-105" />
+                    <img
+                      src={m.url}
+                      alt={m.altText || ""}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover/media:scale-105"
+                    />
                   ) : (
                     <>
                       <video
@@ -163,7 +212,9 @@ export default function FeedbackCard({ post, index, onReaction, onComment, onCli
                   )}
                   {i === 3 && post.media.length > 4 && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                      <span className="text-lg font-bold text-white">+{post.media.length - 4}</span>
+                      <span className="text-lg font-bold text-white">
+                        +{post.media.length - 4}
+                      </span>
                     </div>
                   )}
                 </button>
@@ -187,7 +238,10 @@ export default function FeedbackCard({ post, index, onReaction, onComment, onCli
           <div className="flex items-center gap-3 border-t border-white/[0.06] pt-3">
             <div className="inline-flex items-center gap-1 rounded-xl border border-white/[0.06] bg-white/[0.025] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
               <button
-                onClick={(e) => { e.stopPropagation(); onReaction("like") }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReaction("like");
+                }}
                 aria-label="Like"
                 className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-300 ${
                   userReaction === "like"
@@ -202,7 +256,10 @@ export default function FeedbackCard({ post, index, onReaction, onComment, onCli
               </span>
               <div className="h-5 w-px bg-white/[0.06]" />
               <button
-                onClick={(e) => { e.stopPropagation(); onReaction("dislike") }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReaction("dislike");
+                }}
                 aria-label="Dislike"
                 className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-300 ${
                   userReaction === "dislike"
@@ -217,7 +274,10 @@ export default function FeedbackCard({ post, index, onReaction, onComment, onCli
               </span>
             </div>
             <button
-              onClick={(e) => { e.stopPropagation(); onComment() }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onComment();
+              }}
               className="inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-1.5 text-xs font-medium text-[#6B6B80] transition-all hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-[#F0F0F5]"
             >
               <MessageCircle size={14} />
@@ -234,5 +294,5 @@ export default function FeedbackCard({ post, index, onReaction, onComment, onCli
         onClose={() => setMediaIndex(null)}
       />
     </>
-  )
+  );
 }

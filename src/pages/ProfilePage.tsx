@@ -23,7 +23,6 @@ import Navbar from "../components/landing/Navbar";
 import { AvatarUpload } from "../components/profile/AvatarUpload";
 import PhoneInput, { formatPhoneDisplay } from "../components/ui/PhoneInput";
 import FollowButton from "../components/ui/FollowButton";
-import { saveCurrentUser, type FeedbackEntry } from "../data/feedbackStore";
 import {
   updatePublicProfile,
   updateProfileMetadata,
@@ -35,7 +34,6 @@ import {
   fetchFollowingIds,
   toggleFollow,
 } from "../lib/socialService";
-import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { useUserProfile } from "../hooks/useUserProfile";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -737,23 +735,9 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Info row */}
-          <div className="mt-4 flex items-center justify-center gap-4 text-xs text-white/30">
-            {profileUser.createdAt && (
-              <span className="flex items-center gap-1.5">
-                <CalendarDays size={12} className="text-white/20" />
-                Member since{" "}
-                {new Date(profileUser.createdAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  year: "numeric",
-                })}
-              </span>
-            )}
-          </div>
-
           <div className="my-6 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
 
-          <nav className="space-y-1.5">
+          <nav className="space-y-1.5 flex-1">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
@@ -807,6 +791,20 @@ export default function ProfilePage() {
               );
             })}
           </nav>
+
+          {/* Info row */}
+          <div className="mt-auto flex items-center justify-center gap-4 text-xs text-white/30 pt-6">
+            <span className="flex items-center gap-1.5">
+              <CalendarDays size={12} className="text-white/20" />
+              Member since{" "}
+              {profile
+                ? new Date().toLocaleDateString("en-US", {
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "..."}
+            </span>
+          </div>
         </motion.aside>
 
         <motion.section
@@ -1027,7 +1025,7 @@ export default function ProfilePage() {
                 <div className="mb-6 border-b border-[#1a2d4a] pb-6">
                   <h2 className="text-xl font-bold text-white">Security</h2>
                   <p className="mt-1 text-sm text-[#94a3b8]">
-                    Manage passwords, sessions and connected accounts.
+                    Manage passwords, sessions and security settings.
                   </p>
                 </div>
 
@@ -1244,24 +1242,6 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Connected Accounts */}
-                  <div className="rounded-2xl border border-[#1a2d4a] bg-[#060d14] p-4">
-                    <h3 className="font-semibold text-white">
-                      Connected accounts
-                    </h3>
-                    <p className="mt-2 text-sm text-[#94a3b8]">
-                      Connect or disconnect third-party logins (Google, GitHub).
-                    </p>
-                    <div className="mt-3 flex gap-2">
-                      <button className="rounded-xl border border-[#1a2d4a] px-3 py-1 text-sm text-[#94a3b8]">
-                        Connect Google
-                      </button>
-                      <button className="rounded-xl border border-[#1a2d4a] px-3 py-1 text-sm text-[#94a3b8]">
-                        Connect GitHub
-                      </button>
-                    </div>
-                  </div>
-
                   {/* Danger Zone */}
                   <div className="rounded-2xl border border-[#4b1f1f] bg-[#160808] p-4">
                     <h3 className="font-semibold text-white">Danger zone</h3>
@@ -1393,25 +1373,12 @@ export default function ProfilePage() {
                               </p>
                             )}
                           </div>
-                          {profileUser?.uid && profileUser.uid !== user.id && (
+                          {profile?.id && profile.id !== user.id && (
                             <FollowButton
-                              currentUserId={profileUser.uid}
+                              currentUserId={profile.id}
                               targetUserId={user.id}
                               initialFollowing={followingMap.has(user.id)}
-                              onStateChange={(nowFollowing) => {
-                                setFollowingMap((prev) => {
-                                  const next = new Set(prev);
-                                  if (nowFollowing) next.add(user.id);
-                                  else next.delete(user.id);
-                                  return next;
-                                });
-                                setFollowCounts((prev) => ({
-                                  ...prev,
-                                  following: nowFollowing
-                                    ? prev.following + 1
-                                    : prev.following - 1,
-                                }));
-                              }}
+                              onStateChange={() => handleToggleFollow(user.id)}
                               variant="compact"
                             />
                           )}

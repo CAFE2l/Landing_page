@@ -1,143 +1,178 @@
-import { useEffect, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
-import { ArrowRight, Building2, CheckCircle, Globe, Loader2, LockKeyhole, Mail, ShieldCheck, Sparkles, User, XCircle } from "lucide-react"
-import { motion } from "framer-motion"
-import AuthBackground from "../components/auth/AuthBackground"
-import Navbar from "../components/landing/Navbar"
-import { saveCurrentUser, type UserProfile } from "../data/feedbackStore"
-import { checkUsernameAvailability, normalizeUsername } from "../data/firestoreStore"
-import { supabase, supabaseConfigured } from "../lib/supabase/client"
-import { ensureProfileFromAuthUser, updatePublicProfile, upsertPublicUser } from "../lib/supabaseProfile"
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  ArrowRight,
+  Building2,
+  CheckCircle,
+  Globe,
+  Loader2,
+  LockKeyhole,
+  Mail,
+  ShieldCheck,
+  Sparkles,
+  User,
+  XCircle,
+} from "lucide-react";
+import { motion } from "framer-motion";
+import AuthBackground from "../components/auth/AuthBackground";
+import Navbar from "../components/landing/Navbar";
+import { saveCurrentUser, type UserProfile } from "../data/feedbackStore";
+import {
+  checkUsernameAvailability,
+  normalizeUsername,
+} from "../data/firestoreStore";
+import { supabase, supabaseConfigured } from "../lib/supabase/client";
+import {
+  ensureProfileFromAuthUser,
+  updatePublicProfile,
+  upsertPublicUser,
+} from "../lib/supabaseProfile";
 
 interface AuthPageProps {
-  mode: "login" | "signup"
-  onAuth: (user: UserProfile) => void
+  mode: "login" | "signup";
+  onAuth?: (user: UserProfile) => void;
 }
 
 const getSupabaseErrorMessage = (error: unknown) => {
-  if (!(error instanceof Error)) return "Could not authenticate. Try again."
+  if (!(error instanceof Error)) return "Could not authenticate. Try again.";
 
-  const msg = error.message
-  if (msg.includes("User already registered")) return "This email is already registered."
-  if (msg.includes("Invalid login credentials")) return "Invalid email or password."
-  if (msg.includes("popup_closed_by_user")) return "Google login was cancelled."
-  if (msg.includes("Password should be at least 6 characters")) return "Password must have at least 6 characters."
-  if (msg.includes("Email not confirmed")) return "Please confirm your email before logging in."
-  if (msg.includes("rate_limit")) return "Too many attempts. Try again later."
+  const msg = error.message;
+  if (msg.includes("User already registered"))
+    return "This email is already registered.";
+  if (msg.includes("Invalid login credentials"))
+    return "Invalid email or password.";
+  if (msg.includes("popup_closed_by_user"))
+    return "Google login was cancelled.";
+  if (msg.includes("Password should be at least 6 characters"))
+    return "Password must have at least 6 characters.";
+  if (msg.includes("Email not confirmed"))
+    return "Please confirm your email before logging in.";
+  if (msg.includes("rate_limit")) return "Too many attempts. Try again later.";
 
-  return msg
-}
+  return msg;
+};
 
 export default function AuthPage({ mode, onAuth }: AuthPageProps) {
-  const navigate = useNavigate()
-  const [name, setName] = useState("")
-  const [username, setUsername] = useState("")
-  const [company, setCompany] = useState("")
-  const [country, setCountry] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [authError, setAuthError] = useState("")
-  const [usernameError, setUsernameError] = useState("")
-  const [googleLoading, setGoogleLoading] = useState(false)
-  const [emailLoading, setEmailLoading] = useState(false)
-  const [usernameState, setUsernameState] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle")
-  const isSignup = mode === "signup"
+  const navigate = useNavigate();
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [company, setCompany] = useState("");
+  const [country, setCountry] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [usernameError, setUsernameError] = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [usernameState, setUsernameState] = useState<
+    "idle" | "checking" | "available" | "taken" | "invalid"
+  >("idle");
+  const isSignup = mode === "signup";
 
   useEffect(() => {
-    if (!isSignup) return
+    if (!isSignup) return;
 
-    const normalized = normalizeUsername(username)
-    if (usernameState !== "checking") return
+    const normalized = normalizeUsername(username);
+    if (usernameState !== "checking") return;
 
     const timeout = window.setTimeout(async () => {
       try {
-        const result = await checkUsernameAvailability(normalized)
-        setUsernameState(result.available ? "available" : result.message === "Invalid format" ? "invalid" : "taken")
-        setUsernameError(result.message)
+        const result = await checkUsernameAvailability(normalized);
+        setUsernameState(
+          result.available
+            ? "available"
+            : result.message === "Invalid format"
+              ? "invalid"
+              : "taken",
+        );
+        setUsernameError(result.message);
       } catch {
-        setUsernameState("idle")
-        setUsernameError("")
+        setUsernameState("idle");
+        setUsernameError("");
       }
-    }, 600)
+    }, 600);
 
-    return () => window.clearTimeout(timeout)
-  }, [isSignup, username, usernameState])
+    return () => window.clearTimeout(timeout);
+  }, [isSignup, username, usernameState]);
 
   const handleUsernameChange = (value: string) => {
-    const normalized = normalizeUsername(value)
-    setUsername(normalized)
+    const normalized = normalizeUsername(value);
+    setUsername(normalized);
 
     if (!normalized) {
-      setUsernameState("idle")
-      setUsernameError("")
-      return
+      setUsernameState("idle");
+      setUsernameError("");
+      return;
     }
 
     if (normalized.length < 3) {
-      setUsernameState("invalid")
-      setUsernameError("Invalid format")
-      return
+      setUsernameState("invalid");
+      setUsernameError("Invalid format");
+      return;
     }
 
-    setUsernameState("checking")
-    setUsernameError("")
-  }
+    setUsernameState("checking");
+    setUsernameError("");
+  };
 
   const finishAuth = async (user: UserProfile, forceProfileUpdate = false) => {
-    saveCurrentUser(user)
-    onAuth(user)
-    if (forceProfileUpdate) await updatePublicProfile(user)
-    else upsertPublicUser(user)
+    saveCurrentUser(user);
+    if (onAuth) onAuth(user);
+    if (forceProfileUpdate) await updatePublicProfile(user);
+    else upsertPublicUser(user);
     // Always redirect to site root after login
-    navigate("/")
-  }
+    navigate("/");
+  };
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setAuthError("")
-    setEmailLoading(true)
+    event.preventDefault();
+    setAuthError("");
+    setEmailLoading(true);
 
     try {
       if (!supabase || !supabaseConfigured) {
-        setAuthError("Authentication is not configured.")
-        return
+        setAuthError("Authentication is not configured.");
+        return;
       }
 
-      const normalizedEmail = email.trim().toLowerCase()
+      const normalizedEmail = email.trim().toLowerCase();
 
       if (!normalizedEmail || !password) {
-        setAuthError("Enter your email and password.")
-        return
+        setAuthError("Enter your email and password.");
+        return;
       }
 
       if (isSignup && password.length < 6) {
-        setAuthError("Password must have at least 6 characters.")
-        return
+        setAuthError("Password must have at least 6 characters.");
+        return;
       }
 
       if (isSignup) {
-        const normalizedUsername = normalizeUsername(username)
+        const normalizedUsername = normalizeUsername(username);
         if (!normalizedUsername) {
-          setUsernameError("Please choose a username")
-          setUsernameState("invalid")
-          return
+          setUsernameError("Please choose a username");
+          setUsernameState("invalid");
+          return;
         }
 
         if (usernameState === "checking") {
-          setUsernameError("Wait until username checking finishes.")
-          return
+          setUsernameError("Wait until username checking finishes.");
+          return;
         }
 
         if (!country.trim()) {
-          setAuthError("Country is required.")
-          return
+          setAuthError("Country is required.");
+          return;
         }
 
-        const usernameCheck = await checkUsernameAvailability(normalizedUsername)
+        const usernameCheck =
+          await checkUsernameAvailability(normalizedUsername);
         if (!usernameCheck.available) {
-          setUsernameError(usernameCheck.message)
-          setUsernameState(usernameCheck.message === "Invalid format" ? "invalid" : "taken")
-          return
+          setUsernameError(usernameCheck.message);
+          setUsernameState(
+            usernameCheck.message === "Invalid format" ? "invalid" : "taken",
+          );
+          return;
         }
 
         const meta = {
@@ -146,16 +181,16 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
           company: company.trim() || undefined,
           country: country.trim(),
           role: "client",
-        }
+        };
 
         const { data, error } = await supabase.auth.signUp({
           email: normalizedEmail,
           password,
           options: { data: meta },
-        })
+        });
 
-        if (error) throw error
-        if (!data.user) throw new Error("Could not create account.")
+        if (error) throw error;
+        if (!data.user) throw new Error("Could not create account.");
 
         const profile: UserProfile = {
           uid: data.user.id,
@@ -165,36 +200,36 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
           username: meta.username,
           company: meta.company,
           country: meta.country,
-        }
-        await finishAuth(profile, true)
-        return
+        };
+        await finishAuth(profile, true);
+        return;
       }
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password,
-      })
+      });
 
-      if (error) throw error
-      if (!data.user) throw new Error("Could not sign in.")
+      if (error) throw error;
+      if (!data.user) throw new Error("Could not sign in.");
 
-      const profile = await ensureProfileFromAuthUser(data.user)
-      await finishAuth(profile)
+      const profile = await ensureProfileFromAuthUser(data.user);
+      await finishAuth(profile);
     } catch (error) {
-      setAuthError(getSupabaseErrorMessage(error))
+      setAuthError(getSupabaseErrorMessage(error));
     } finally {
-      setEmailLoading(false)
+      setEmailLoading(false);
     }
-  }
+  };
 
   const handleGoogleAuth = async () => {
-    setAuthError("")
-    setGoogleLoading(true)
+    setAuthError("");
+    setGoogleLoading(true);
 
     try {
       if (!supabase || !supabaseConfigured) {
-        setAuthError("Authentication is not configured.")
-        return
+        setAuthError("Authentication is not configured.");
+        return;
       }
 
       const { error } = await supabase.auth.signInWithOAuth({
@@ -203,14 +238,14 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
           redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: { access_type: "offline", prompt: "consent" },
         },
-      })
+      });
 
-      if (error) throw error
+      if (error) throw error;
     } catch (error) {
-      setAuthError(getSupabaseErrorMessage(error))
-      setGoogleLoading(false)
+      setAuthError(getSupabaseErrorMessage(error));
+      setGoogleLoading(false);
     }
-  }
+  };
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#020408] px-6 pb-8 pt-28 text-white">
@@ -230,14 +265,24 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
               Secure client portal
             </div>
             <h1 className="mb-6 text-5xl font-bold leading-tight tracking-tight text-white">
-              {isSignup ? "Create access to your project feedback hub." : "Enter your private project workspace."}
+              {isSignup
+                ? "Create access to your project feedback hub."
+                : "Enter your private project workspace."}
             </h1>
             <p className="mb-8 text-base leading-relaxed text-zinc-500">
-              Manage feedback, project stories, media references, and approved client posts from a focused digital workspace.
+              Manage feedback, project stories, media references, and approved
+              client posts from a focused digital workspace.
             </p>
             <div className="grid gap-3">
-              {["Encrypted session handoff", "Admin roles are managed from the dashboard", "Feedback workflow ready for backend data"].map((item) => (
-                <div key={item} className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-3 text-sm text-zinc-400 backdrop-blur">
+              {[
+                "Encrypted session handoff",
+                "Admin roles are managed from the dashboard",
+                "Feedback workflow ready for backend data",
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-3 text-sm text-zinc-400 backdrop-blur"
+                >
                   <ShieldCheck size={17} className="text-[#60a5fa]" />
                   {item}
                 </div>
@@ -280,8 +325,17 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
                   disabled={googleLoading}
                   className="inline-flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.04] px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:border-[#3b82f6]/35 hover:bg-white/[0.07]"
                 >
-                  <img src="/imgs/icons/Google.png" alt="" aria-hidden="true" className="h-5 w-5 object-contain" />
-                  {googleLoading ? "Connecting..." : isSignup ? "Sign up with Google" : "Login with Google"}
+                  <img
+                    src="/imgs/icons/Google.png"
+                    alt=""
+                    aria-hidden="true"
+                    className="h-5 w-5 object-contain"
+                  />
+                  {googleLoading
+                    ? "Connecting..."
+                    : isSignup
+                      ? "Sign up with Google"
+                      : "Login with Google"}
                 </button>
 
                 {authError && (
@@ -292,25 +346,37 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
 
                 <div className="flex items-center gap-3 py-1">
                   <span className="h-px flex-1 bg-white/[0.08]" />
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-700">or continue with email</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-700">
+                    or continue with email
+                  </span>
                   <span className="h-px flex-1 bg-white/[0.08]" />
                 </div>
 
                 {isSignup && (
                   <>
                     <label className="block">
-                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Full name</span>
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                        Full name
+                      </span>
                       <span className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/25 px-4 py-3.5 transition-colors focus-within:border-[#3b82f6]/50 focus-within:bg-[#020408]/70">
                         <User size={18} className="text-zinc-500" />
-                        <input value={name} onChange={(event) => setName(event.target.value)} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700" placeholder="Client name" />
+                        <input
+                          value={name}
+                          onChange={(event) => setName(event.target.value)}
+                          className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700"
+                          placeholder="Client name"
+                        />
                       </span>
                     </label>
 
                     <label className="block">
-                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Username</span>
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                        Username
+                      </span>
                       <span
                         className={`relative flex items-center gap-3 rounded-xl border bg-black/25 px-4 py-3.5 transition-colors focus-within:bg-[#020408]/70 ${
-                          usernameState === "taken" || usernameState === "invalid"
+                          usernameState === "taken" ||
+                          usernameState === "invalid"
                             ? "border-red-500/50 focus-within:border-red-500"
                             : usernameState === "available"
                               ? "border-green-500/50 focus-within:border-green-500"
@@ -320,11 +386,18 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
                         <User size={18} className="text-zinc-500" />
                         <input
                           value={username}
-                          onChange={(event) => handleUsernameChange(event.target.value)}
+                          onChange={(event) =>
+                            handleUsernameChange(event.target.value)
+                          }
                           className="w-full bg-transparent pr-8 text-sm text-white outline-none placeholder:text-zinc-700"
                           placeholder="cafe_dev"
                         />
-                        {usernameState === "checking" && <Loader2 size={16} className="absolute right-4 animate-spin text-[#475569]" />}
+                        {usernameState === "checking" && (
+                          <Loader2
+                            size={16}
+                            className="absolute right-4 animate-spin text-[#475569]"
+                          />
+                        )}
                       </span>
                       {usernameState === "taken" && (
                         <span className="mt-2 flex items-center gap-1 text-xs text-red-400">
@@ -335,7 +408,9 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
                       {usernameState === "invalid" && usernameError && (
                         <span className="mt-2 flex items-center gap-1 text-xs text-red-400">
                           <XCircle size={12} />
-                          {usernameError === "Please choose a username" ? usernameError : "Invalid format"}
+                          {usernameError === "Please choose a username"
+                            ? usernameError
+                            : "Invalid format"}
                         </span>
                       )}
                       {usernameState === "available" && (
@@ -352,32 +427,63 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
                 )}
 
                 <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Email</span>
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    Email
+                  </span>
                   <span className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/25 px-4 py-3.5 transition-colors focus-within:border-[#3b82f6]/50 focus-within:bg-[#020408]/70">
                     <Mail size={18} className="text-zinc-500" />
-                    <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700" placeholder="client@company.com" />
+                    <input
+                      required
+                      type="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700"
+                      placeholder="client@company.com"
+                    />
                   </span>
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Password</span>
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    Password
+                  </span>
                   <span className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/25 px-4 py-3.5 transition-colors focus-within:border-[#3b82f6]/50 focus-within:bg-[#020408]/70">
                     <LockKeyhole size={18} className="text-zinc-500" />
-                    <input required minLength={6} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700" placeholder="Minimum 6 characters" />
+                    <input
+                      required
+                      minLength={6}
+                      type="password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700"
+                      placeholder="Minimum 6 characters"
+                    />
                   </span>
                 </label>
 
                 {isSignup && (
                   <>
                     <label className="block">
-                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Company <span className="font-medium tracking-normal text-zinc-700">(optional)</span></span>
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                        Company{" "}
+                        <span className="font-medium tracking-normal text-zinc-700">
+                          (optional)
+                        </span>
+                      </span>
                       <span className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/25 px-4 py-3.5 transition-colors focus-within:border-[#3b82f6]/50 focus-within:bg-[#020408]/70">
                         <Building2 size={18} className="text-zinc-500" />
-                        <input value={company} onChange={(event) => setCompany(event.target.value)} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700" placeholder="Company name, if you have one" />
+                        <input
+                          value={company}
+                          onChange={(event) => setCompany(event.target.value)}
+                          className="w-full bg-transparent text-sm text-white outline-none placeholder:text-zinc-700"
+                          placeholder="Company name, if you have one"
+                        />
                       </span>
                     </label>
                     <label className="block">
-                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">Country <span className="text-red-400">*</span></span>
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                        Country <span className="text-red-400">*</span>
+                      </span>
                       <span className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/25 px-4 py-3.5 transition-colors focus-within:border-[#3b82f6]/50 focus-within:bg-[#020408]/70">
                         <Globe size={18} className="text-zinc-500" />
                         <input
@@ -415,15 +521,28 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
                   </>
                 )}
 
-                <button disabled={emailLoading} className="group mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#3b82f6]/50 bg-[#2563eb] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_0_28px_rgba(37,99,235,0.38)] transition-all hover:bg-[#1d4ed8] hover:shadow-[0_0_42px_rgba(37,99,235,0.48)] disabled:cursor-not-allowed disabled:opacity-70">
-                  {emailLoading ? "Connecting..." : isSignup ? "Create account" : "Login"}
-                  <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
+                <button
+                  disabled={emailLoading}
+                  className="group mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#3b82f6]/50 bg-[#2563eb] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_0_28px_rgba(37,99,235,0.38)] transition-all hover:bg-[#1d4ed8] hover:shadow-[0_0_42px_rgba(37,99,235,0.48)] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {emailLoading
+                    ? "Connecting..."
+                    : isSignup
+                      ? "Create account"
+                      : "Login"}
+                  <ArrowRight
+                    size={16}
+                    className="transition-transform group-hover:translate-x-0.5"
+                  />
                 </button>
               </form>
 
               <p className="mt-6 text-center text-sm text-zinc-600">
                 {isSignup ? "Already have access?" : "Need an account?"}{" "}
-                <Link to={isSignup ? "/login" : "/signup"} className="font-semibold text-[#60a5fa] transition-colors hover:text-white">
+                <Link
+                  to={isSignup ? "/login" : "/signup"}
+                  className="font-semibold text-[#60a5fa] transition-colors hover:text-white"
+                >
                   {isSignup ? "Login" : "Create one"}
                 </Link>
               </p>
@@ -432,5 +551,5 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
         </section>
       </div>
     </main>
-  )
+  );
 }

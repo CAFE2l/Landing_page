@@ -124,7 +124,7 @@ export function useUserProfile(userId?: string) {
     window.addEventListener("cafe-profile-updated", handleUpdate);
 
     return () => {
-      supabase.removeChannel(channel);
+      if (supabase) supabase.removeChannel(channel);
       window.removeEventListener("cafe-profile-updated", handleUpdate);
     };
   }, [targetUserId, fetchProfile]);

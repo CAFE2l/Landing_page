@@ -1,110 +1,150 @@
-import { useState, useEffect, useRef, useCallback } from "react"
-import { useNavigate } from "react-router-dom"
-import { Search, Bell, ChevronDown, User, Settings, ExternalLink, LogOut, Clock, MessageSquare, Users as UsersIcon, Star, ClipboardList } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
-import { cn, getInitials, timeAgo } from "../../lib/utils"
-import { supabase } from "../../lib/supabase/client"
-import { useAuth } from "../../contexts/AuthContext"
-import { useAdminStore } from "../../lib/store/adminStore"
-import { subscribeToNotifications } from "../../lib/serviceOrdersService"
-import type { UserProfile } from "../../data/feedbackStore"
-import toast from "react-hot-toast"
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Search,
+  Bell,
+  ChevronDown,
+  User,
+  Settings,
+  ExternalLink,
+  LogOut,
+  Clock,
+  MessageSquare,
+  Users as UsersIcon,
+  Star,
+  ClipboardList,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn, getInitials, timeAgo } from "../../lib/utils";
+import { supabase } from "../../lib/supabase/client";
+import { useAuth } from "../../contexts/AuthContext";
+import { useAdminStore } from "../../lib/store/adminStore";
+import { subscribeToNotifications } from "../../lib/serviceOrdersService";
+import { useUserProfile } from "../../hooks/useUserProfile";
+import toast from "react-hot-toast";
 
 interface TopbarProps {
-  title: string
-  user?: UserProfile | null
+  title: string;
+  userId?: string;
 }
 
 interface SearchResult {
-  clients: { id: string; full_name?: string; email?: string; avatar_url?: string }[]
-  feedbacks: { id: string; title: string; service_category?: string; created_at: string }[]
+  clients: {
+    id: string;
+    full_name?: string;
+    email?: string;
+    avatar_url?: string;
+  }[];
+  feedbacks: {
+    id: string;
+    title: string;
+    service_category?: string;
+    created_at: string;
+  }[];
 }
 
-export default function Topbar({ title, user }: TopbarProps) {
-  const navigate = useNavigate()
-  const { signOut } = useAuth()
-  const collapsed = useAdminStore((s) => s.ui.sidebarCollapsed)
+export default function Topbar({ title, userId }: TopbarProps) {
+  const navigate = useNavigate();
+  const { user: authUser, signOut } = useAuth();
+  const { profile } = useUserProfile(userId || authUser?.id);
+  const collapsed = useAdminStore((s) => s.ui.sidebarCollapsed);
 
   // — Profile dropdown state —
-  const [profileOpen, setProfileOpen] = useState(false)
-  const profileRef = useRef<HTMLDivElement>(null)
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   // — Notifications state —
-  const [notifOpen, setNotifOpen] = useState(false)
-  const [notifications, setNotifications] = useState<NotificationItem[]>([])
-  const [notifLoading, setNotifLoading] = useState(true)
-  const notifRef = useRef<HTMLDivElement>(null)
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notifLoading, setNotifLoading] = useState(true);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   // — Search state —
-  const [query, setQuery] = useState("")
-  const [results, setResults] = useState<SearchResult>({ clients: [], feedbacks: [] })
-  const [searching, setSearching] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
-  const searchRef = useRef<HTMLDivElement>(null)
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult>({
+    clients: [],
+    feedbacks: [],
+  });
+  const [searching, setSearching] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   // ========== Close on outside click ==========
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false)
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false)
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false)
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [])
+      if (profileRef.current && !profileRef.current.contains(e.target as Node))
+        setProfileOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target as Node))
+        setNotifOpen(false);
+      if (searchRef.current && !searchRef.current.contains(e.target as Node))
+        setSearchOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   // ========== Notifications ==========
   interface NotificationItem {
-    id: string
-    type: string
-    title: string
-    message?: string
-    is_read: boolean
-    created_at: string
+    id: string;
+    type: string;
+    title: string;
+    message?: string;
+    is_read: boolean;
+    created_at: string;
   }
 
   const fetchNotifications = useCallback(async () => {
-    if (!supabase) return
+    if (!supabase) return;
     const { data } = await supabase
       .from("notifications")
       .select("*")
       .eq("is_read", false)
       .order("created_at", { ascending: false })
-      .limit(10)
-    const items = (data as NotificationItem[]) ?? []
-    setNotifications(items)
-    setNotifLoading(false)
-  }, [])
+      .limit(10);
+    const items = (data as NotificationItem[]) ?? [];
+    setNotifications(items);
+    setNotifLoading(false);
+  }, []);
 
   useEffect(() => {
-    fetchNotifications()
-  }, [fetchNotifications])
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   // Realtime subscription for new notifications
   useEffect(() => {
     const sub = subscribeToNotifications(() => {
-      fetchNotifications()
-      playNotificationSound()
-      toast.custom(() => (
-        <div className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-[#0a0a0f] px-4 py-3 shadow-2xl">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/15 text-blue-400">
-            <Bell size={14} />
+      fetchNotifications();
+      playNotificationSound();
+      toast.custom(
+        () => (
+          <div className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-[#0a0a0f] px-4 py-3 shadow-2xl">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/15 text-blue-400">
+              <Bell size={14} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-white">New notification</p>
+              <p className="text-xs text-zinc-500">
+                A new service order or update arrived
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-medium text-white">New notification</p>
-            <p className="text-xs text-zinc-500">A new service order or update arrived</p>
-          </div>
-        </div>
-      ), { duration: 4000 })
-    })
-    return () => { sub.then((fn) => fn()) }
-  }, [fetchNotifications])
+        ),
+        { duration: 4000 },
+      );
+    });
+    return () => {
+      sub.then((fn) => fn());
+    };
+  }, [fetchNotifications]);
 
   const markAllNotificationsRead = async () => {
-    if (!supabase) return
-    await supabase.from("notifications").update({ is_read: true }).eq("is_read", false)
-    setNotifications([])
-  }
+    if (!supabase) return;
+    await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("is_read", false);
+    setNotifications([]);
+  };
 
   const notifIcons: Record<string, typeof Bell> = {
     feedback: Star,
@@ -113,19 +153,19 @@ export default function Topbar({ title, user }: TopbarProps) {
     warning: Clock,
     new_service_order: ClipboardList,
     order_status: ClipboardList,
-  }
+  };
 
   // ========== Global search with debounce ==========
   useEffect(() => {
     if (query.length < 2) {
-      setResults({ clients: [], feedbacks: [] })
-      setSearchOpen(false)
-      return
+      setResults({ clients: [], feedbacks: [] });
+      setSearchOpen(false);
+      return;
     }
 
     const timeout = setTimeout(async () => {
-      setSearching(true)
-      setSearchOpen(true)
+      setSearching(true);
+      setSearchOpen(true);
       const [clientsRes, feedbacksRes] = await Promise.all([
         supabase!
           .from("profiles")
@@ -139,40 +179,46 @@ export default function Topbar({ title, user }: TopbarProps) {
           .ilike("title", `%${query}%`)
           .in("status", ["approved", "highlighted"])
           .limit(5),
-      ])
+      ]);
       setResults({
         clients: (clientsRes?.data as SearchResult["clients"]) ?? [],
         feedbacks: (feedbacksRes?.data as SearchResult["feedbacks"]) ?? [],
-      })
-      setSearching(false)
-    }, 300)
+      });
+      setSearching(false);
+    }, 300);
 
-    return () => clearTimeout(timeout)
-  }, [query])
+    return () => clearTimeout(timeout);
+  }, [query]);
 
   const handleLogout = async () => {
-    setProfileOpen(false)
-    await signOut()
-    navigate("/")
-  }
+    setProfileOpen(false);
+    await signOut();
+    navigate("/");
+  };
 
-  const avatarUrl = user?.photoUrl
-  const initials = getInitials(user?.name || "Admin")
-  const hasAnyResult = results.clients.length > 0 || results.feedbacks.length > 0
+  const name = profile?.full_name || "Admin";
+  const avatarUrl = profile?.avatar_url;
+  const initials = profile?.initials || "A";
+  const hasAnyResult =
+    results.clients.length > 0 || results.feedbacks.length > 0;
 
   function playNotificationSound() {
     try {
-      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
-      const oscillator = ctx.createOscillator()
-      const gain = ctx.createGain()
-      oscillator.connect(gain)
-      gain.connect(ctx.destination)
-      oscillator.frequency.value = 800
-      oscillator.type = "sine"
-      gain.gain.setValueAtTime(0.3, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
-      oscillator.start(ctx.currentTime)
-      oscillator.stop(ctx.currentTime + 0.5)
+      const ctx = new (
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext
+      )();
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.frequency.value = 800;
+      oscillator.type = "sine";
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+      oscillator.start(ctx.currentTime);
+      oscillator.stop(ctx.currentTime + 0.5);
     } catch {}
   }
 
@@ -196,12 +242,19 @@ export default function Topbar({ title, user }: TopbarProps) {
 
       {/* — Global Search — */}
       <div ref={searchRef} className="relative hidden sm:block">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+        />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => { if (query.length >= 2) setSearchOpen(true) }}
-          onKeyDown={(e) => { if (e.key === "Escape") setSearchOpen(false) }}
+          onFocus={() => {
+            if (query.length >= 2) setSearchOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setSearchOpen(false);
+          }}
           placeholder="Search..."
           className="h-9 w-64 rounded-lg border border-white/8 bg-white/5 pl-9 pr-3 text-sm text-[#f0f0f5] placeholder:text-white/30 outline-none focus:border-[#4f6ef7]/50 transition-all"
         />
@@ -222,25 +275,48 @@ export default function Topbar({ title, user }: TopbarProps) {
                 </div>
               ) : !hasAnyResult ? (
                 <div className="px-4 py-8 text-center text-sm text-white/30">
-                  No results for '<span className="text-white/50">{query}</span>'
+                  No results for '<span className="text-white/50">{query}</span>
+                  '
                 </div>
               ) : (
                 <div className="max-h-80 overflow-y-auto">
                   {results.clients.length > 0 && (
                     <div>
-                      <div className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/30">Clients</div>
+                      <div className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                        Clients
+                      </div>
                       {results.clients.map((client) => (
                         <button
                           key={client.id}
-                          onClick={() => { setSearchOpen(false); setQuery(""); navigate("/admin/clients") }}
+                          onClick={() => {
+                            setSearchOpen(false);
+                            setQuery("");
+                            navigate("/admin/clients");
+                          }}
                           className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-white/70 transition-colors hover:bg-white/5"
                         >
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4f6ef7]/20 text-[9px] font-bold text-[#9BA7FF]">
-                            {client.avatar_url ? <img src={client.avatar_url} alt="" className="h-full w-full object-cover" /> : getInitials(client.full_name || client.email || "C")}
+                            {client.avatar_url ? (
+                              <img
+                                src={client.avatar_url}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              getInitials(
+                                client.full_name || client.email || "C",
+                              )
+                            )}
                           </div>
                           <div className="min-w-0 flex-1 text-left">
-                            <div className="truncate text-white">{client.full_name || client.email}</div>
-                            {client.full_name && client.email && <div className="truncate text-[11px] text-white/40">{client.email}</div>}
+                            <div className="truncate text-white">
+                              {client.full_name || client.email}
+                            </div>
+                            {client.full_name && client.email && (
+                              <div className="truncate text-[11px] text-white/40">
+                                {client.email}
+                              </div>
+                            )}
                           </div>
                         </button>
                       ))}
@@ -248,19 +324,29 @@ export default function Topbar({ title, user }: TopbarProps) {
                   )}
                   {results.feedbacks.length > 0 && (
                     <div className="border-t border-white/[0.06]">
-                      <div className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/30">Feedbacks</div>
+                      <div className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                        Feedbacks
+                      </div>
                       {results.feedbacks.map((fb) => (
                         <button
                           key={fb.id}
-                          onClick={() => { setSearchOpen(false); setQuery(""); navigate("/admin/feedback") }}
+                          onClick={() => {
+                            setSearchOpen(false);
+                            setQuery("");
+                            navigate("/admin/feedback");
+                          }}
                           className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-white/70 transition-colors hover:bg-white/5"
                         >
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#4f6ef7]/20 text-[9px] font-bold text-[#9BA7FF]">
                             <Star size={12} />
                           </div>
                           <div className="min-w-0 flex-1 text-left">
-                            <div className="truncate text-white">{fb.title}</div>
-                            <div className="truncate text-[11px] text-white/40">{fb.service_category}</div>
+                            <div className="truncate text-white">
+                              {fb.title}
+                            </div>
+                            <div className="truncate text-[11px] text-white/40">
+                              {fb.service_category}
+                            </div>
                           </div>
                         </button>
                       ))}
@@ -297,9 +383,14 @@ export default function Topbar({ title, user }: TopbarProps) {
               className="absolute right-0 top-full mt-2 w-80 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl"
             >
               <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
-                <span className="text-sm font-semibold text-white">Notifications</span>
+                <span className="text-sm font-semibold text-white">
+                  Notifications
+                </span>
                 {notifications.length > 0 && (
-                  <button onClick={markAllNotificationsRead} className="text-[11px] text-[#4f6ef7] hover:text-[#6b85ff] transition-colors">
+                  <button
+                    onClick={markAllNotificationsRead}
+                    className="text-[11px] text-[#4f6ef7] hover:text-[#6b85ff] transition-colors"
+                  >
                     Mark all as read
                   </button>
                 )}
@@ -317,19 +408,30 @@ export default function Topbar({ title, user }: TopbarProps) {
               ) : (
                 <div className="max-h-72 overflow-y-auto">
                   {notifications.map((notif) => {
-                    const Icon = notifIcons[notif.type] || Bell
+                    const Icon = notifIcons[notif.type] || Bell;
                     return (
-                      <div key={notif.id} className="flex gap-3 border-b border-white/[0.04] px-4 py-3 transition-colors hover:bg-white/[0.02]">
+                      <div
+                        key={notif.id}
+                        className="flex gap-3 border-b border-white/[0.04] px-4 py-3 transition-colors hover:bg-white/[0.02]"
+                      >
                         <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#4f6ef7]/15 text-[#9BA7FF]">
                           <Icon size={13} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-white">{notif.title}</p>
-                          {notif.message && <p className="mt-0.5 text-xs text-white/50">{notif.message}</p>}
-                          <p className="mt-1 text-[10px] text-white/30">{timeAgo(notif.created_at)}</p>
+                          <p className="text-sm font-medium text-white">
+                            {notif.title}
+                          </p>
+                          {notif.message && (
+                            <p className="mt-0.5 text-xs text-white/50">
+                              {notif.message}
+                            </p>
+                          )}
+                          <p className="mt-1 text-[10px] text-white/30">
+                            {timeAgo(notif.created_at)}
+                          </p>
                         </div>
                       </div>
-                    )
+                    );
                   })}
                 </div>
               )}
@@ -345,14 +447,21 @@ export default function Topbar({ title, user }: TopbarProps) {
           className="flex items-center gap-2 rounded-lg border border-white/8 bg-white/5 px-3 py-1.5 text-sm text-[#f0f0f5] transition-colors hover:bg-white/[0.08]"
         >
           {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
+            <img
+              src={avatarUrl}
+              alt=""
+              className="h-6 w-6 rounded-full object-cover"
+            />
           ) : (
             <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#4f6ef7] to-[#6b85ff] text-[10px] font-bold text-white">
               {initials}
             </div>
           )}
-          <span className="hidden md:inline">{user?.name || "Admin"}</span>
-          <ChevronDown size={14} className={`text-white/50 transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`} />
+          <span className="hidden md:inline">{name}</span>
+          <ChevronDown
+            size={14}
+            className={`text-white/50 transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`}
+          />
         </button>
 
         <AnimatePresence>
@@ -367,29 +476,43 @@ export default function Topbar({ title, user }: TopbarProps) {
               <div className="border-b border-white/[0.06] px-4 py-3">
                 <div className="flex items-center gap-3">
                   {avatarUrl ? (
-                    <img src={avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
+                    <img
+                      src={avatarUrl}
+                      alt=""
+                      className="h-9 w-9 rounded-full object-cover"
+                    />
                   ) : (
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#4f6ef7] to-[#6b85ff] text-xs font-bold text-white">
                       {initials}
                     </div>
                   )}
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-white">{user?.name || "Admin"}</p>
-                    <p className="truncate text-xs text-white/40">{user?.email || ""}</p>
+                    <p className="truncate text-sm font-semibold text-white">
+                      {name}
+                    </p>
+                    <p className="truncate text-xs text-white/40">
+                      {profile?.email || ""}
+                    </p>
                   </div>
                 </div>
               </div>
 
               <div className="p-1">
                 <button
-                  onClick={() => { setProfileOpen(false); navigate("/admin/settings?tab=profile") }}
+                  onClick={() => {
+                    setProfileOpen(false);
+                    navigate("/admin/settings?tab=profile");
+                  }}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/5 hover:text-white"
                 >
                   <User size={16} />
                   My Profile
                 </button>
                 <button
-                  onClick={() => { setProfileOpen(false); navigate("/admin/settings") }}
+                  onClick={() => {
+                    setProfileOpen(false);
+                    navigate("/admin/settings");
+                  }}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/5 hover:text-white"
                 >
                   <Settings size={16} />
@@ -420,5 +543,5 @@ export default function Topbar({ title, user }: TopbarProps) {
         </AnimatePresence>
       </div>
     </header>
-  )
+  );
 }
