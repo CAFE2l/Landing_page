@@ -200,10 +200,9 @@ export default function FeedbackPage() {
       });
 
       if (id) {
-        toast.success(
-          "Feedback submitted! It will appear after admin approval.",
-        );
+        toast.success("Feedback publicado com sucesso!");
         setShowForm(false);
+        loadPosts();
       } else {
         toast.error("Failed to submit feedback — check console for details");
       }

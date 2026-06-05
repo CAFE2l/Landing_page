@@ -28,7 +28,7 @@ export default function AdminShell() {
   const [profile, setProfile] = useState<{ avatar_url?: string; full_name?: string; email?: string } | null>(null)
 
   useEffect(() => {
-    if (!supabaseUser?.id) return
+    if (!supabaseUser?.id || !supabase) return
     supabase
       .from("profiles")
       .select("avatar_url, full_name, email")

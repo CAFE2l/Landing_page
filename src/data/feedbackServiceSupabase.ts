@@ -12,8 +12,8 @@ import type {
 const POSTS_TABLE = "feedback_posts";
 const MEDIA_TABLE = "feedback_media";
 const COMMENTS_TABLE = "feedback_comments";
-const VOTES_TABLE = "feedback_helpful_votes";
-const SAVED_TABLE = "feedback_saved_posts";
+const VOTES_TABLE = "feedback_votes";
+const SAVED_TABLE = "saved_feedbacks";
 const PROFILES_TABLE = "profiles";
 const FOLLOWS_TABLE = "follows";
 const CONVERSATIONS_TABLE = "conversations";
@@ -470,16 +470,14 @@ export async function toggleFeedbackVote(
 
   const { error: insertError } = await supabase
     .from(VOTES_TABLE)
-    .upsert(
+    .insert(
       { post_id: postId, user_id: userId, vote_type: voteType },
-      { onConflict: "post_id,user_id" },
     );
 
   if (insertError) {
     if (insertError.message?.includes("vote_type")) {
       return toggleLegacyHelpfulVote(postId, userId, voteType);
     }
-    console.error("toggleFeedbackVote insert failed", insertError);
     return null;
   }
 
@@ -511,10 +509,9 @@ async function toggleLegacyHelpfulVote(
 
   const { error } = await supabase
     .from(VOTES_TABLE)
-    .upsert({ post_id: postId, user_id: userId }, { onConflict: "post_id,user_id" });
+    .insert({ post_id: postId, user_id: userId });
 
   if (error) {
-    console.error("toggleLegacyHelpfulVote failed", error);
     return null;
   }
 

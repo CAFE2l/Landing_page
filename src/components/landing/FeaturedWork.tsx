@@ -173,34 +173,49 @@ export default function FeaturedWork() {
                   : "border-white/[0.08] hover:border-blue-500/25 hover:shadow-[0_0_30px_rgba(37,99,235,0.08)]"
               }`}
             >
-              {plan.previewUrl && (
-                <a
-                  href={plan.previewUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`View ${plan.name} example site`}
-                  className="absolute inset-0 z-10"
-                />
-              )}
               {plan.featured && (
                 <div className="absolute right-5 top-5 z-20 rounded-full border border-[#3b82f6]/30 bg-[#2563eb]/15 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#93c5fd]">
                   Most requested
                 </div>
               )}
-              <div className={`relative h-40 sm:h-56 bg-gradient-to-br ${plan.gradient} overflow-hidden`}>
-                <div className="absolute inset-0 bg-dot-grid opacity-50" />
-                <PlanPreview type={plan.preview} />
-                <div className="absolute left-4 sm:left-6 top-4 sm:top-6 text-[10px] uppercase tracking-[0.32em] text-zinc-600 font-semibold">
-                  {plan.number}
+              {plan.previewUrl ? (
+                <a
+                  href={plan.previewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`View ${plan.name} example site`}
+                  className={`relative block h-40 sm:h-56 bg-gradient-to-br ${plan.gradient} overflow-hidden group/preview`}
+                >
+                  <div className="absolute inset-0 bg-dot-grid opacity-50" />
+                  <PlanPreview type={plan.preview} />
+                  <div className="absolute left-4 sm:left-6 top-4 sm:top-6 text-[10px] uppercase tracking-[0.32em] text-zinc-600 font-semibold">
+                    {plan.number}
+                  </div>
+                  <div className="absolute bottom-4 sm:bottom-5 left-4 sm:left-6 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl border border-[#3b82f6]/25 bg-[#020408]/70 text-[#60a5fa] backdrop-blur-md">
+                    <Icon size={22} />
+                  </div>
+                  <div className="absolute bottom-5 right-6 text-6xl font-bold text-white/[0.07] select-none">
+                    {String(i + 1).padStart(2, "0")}
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#020408] via-[#020408]/10 to-transparent" />
+                  <div className="absolute inset-0 bg-black/0 group-hover/preview:bg-black/20 transition-colors duration-300" />
+                </a>
+              ) : (
+                <div className={`relative h-40 sm:h-56 bg-gradient-to-br ${plan.gradient} overflow-hidden`}>
+                  <div className="absolute inset-0 bg-dot-grid opacity-50" />
+                  <PlanPreview type={plan.preview} />
+                  <div className="absolute left-4 sm:left-6 top-4 sm:top-6 text-[10px] uppercase tracking-[0.32em] text-zinc-600 font-semibold">
+                    {plan.number}
+                  </div>
+                  <div className="absolute bottom-4 sm:bottom-5 left-4 sm:left-6 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl border border-[#3b82f6]/25 bg-[#020408]/70 text-[#60a5fa] backdrop-blur-md">
+                    <Icon size={22} />
+                  </div>
+                  <div className="absolute bottom-5 right-6 text-6xl font-bold text-white/[0.07] select-none">
+                    {String(i + 1).padStart(2, "0")}
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#020408] via-[#020408]/10 to-transparent" />
                 </div>
-                <div className="absolute bottom-4 sm:bottom-5 left-4 sm:left-6 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl border border-[#3b82f6]/25 bg-[#020408]/70 text-[#60a5fa] backdrop-blur-md">
-                  <Icon size={22} />
-                </div>
-                <div className="absolute bottom-5 right-6 text-6xl font-bold text-white/[0.07] select-none">
-                  {String(i + 1).padStart(2, "0")}
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-[#020408] via-[#020408]/10 to-transparent" />
-              </div>
+              )}
 
               <div className="p-5 sm:p-6">
                 <div className="flex flex-wrap gap-2 mb-4">

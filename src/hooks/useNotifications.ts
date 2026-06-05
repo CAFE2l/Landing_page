@@ -20,8 +20,10 @@ export function useNotifications(userId?: string) {
       return
     }
 
+    const client = supabase
+
     const fetchNotifications = async () => {
-      const { data } = await supabase
+      const { data } = await client
         .from("notifications")
         .select("*")
         .eq("user_id", userId)
@@ -35,7 +37,7 @@ export function useNotifications(userId?: string) {
 
     fetchNotifications()
 
-    const channel = supabase
+    const channel = client
       .channel("notifications")
       .on(
         "postgres_changes",
@@ -52,7 +54,7 @@ export function useNotifications(userId?: string) {
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      client.removeChannel(channel)
     }
   }, [userId])
 
