@@ -1,98 +1,239 @@
-import { useState, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { X, Upload, Star, Link as LinkIcon, Send } from "lucide-react"
-import { SERVICE_CATEGORIES, type FeedbackMedia, type ServiceCategory } from "../../data/feedbackStore"
+import { useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  X,
+  Upload,
+  Star,
+  Link as LinkIcon,
+  Send,
+  AlertCircle,
+  CheckCircle2,
+  Loader,
+} from "lucide-react";
+import {
+  SERVICE_CATEGORIES,
+  type FeedbackMedia,
+  type ServiceCategory,
+} from "../../data/feedbackStore";
+import { uploadFeedbackMedia } from "../../lib/cloudinary";
 
 interface FeedbackFormProps {
-  open: boolean
-  onClose: () => void
-  onSubmit: (data: FeedbackFormData) => void
-  isSubmitting?: boolean
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (data: FeedbackFormData) => void;
+  isSubmitting?: boolean;
 }
 
 export interface FeedbackFormData {
-  serviceCategory: ServiceCategory
-  projectTitle: string
-  projectUrl: string
-  rating: number
-  title: string
-  content: string
-  media: FeedbackMedia[]
-  serviceDate: string
-  improvementSuggestion: string
+  serviceCategory: ServiceCategory;
+  projectTitle: string;
+  projectUrl: string;
+  rating: number;
+  title: string;
+  content: string;
+  media: FeedbackMedia[];
+  serviceDate: string;
+  improvementSuggestion: string;
 }
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "video/mp4", "video/webm", "video/quicktime"]
+interface MediaUploadState {
+  id: string;
+  file: File;
+  preview: string;
+  type: "image" | "video";
+  progress: number;
+  status: "pending" | "uploading" | "done" | "error";
+  error?: string;
+}
 
-export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: FeedbackFormProps) {
-  const [step, setStep] = useState(0)
-  const [serviceCategory, setServiceCategory] = useState<ServiceCategory>("Landing Page")
-  const [projectTitle, setProjectTitle] = useState("")
-  const [projectUrl, setProjectUrl] = useState("")
-  const [rating, setRating] = useState(0)
-  const [hoverRating, setHoverRating] = useState(0)
-  const [title, setTitle] = useState("")
-  const [content, setContent] = useState("")
-  const [serviceDate, setServiceDate] = useState("")
-  const [improvementSuggestion, setImprovementSuggestion] = useState("")
-  const [media, setMedia] = useState<FeedbackMedia[]>([])
-  const [uploadError, setUploadError] = useState("")
-  const [dragOver, setDragOver] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+];
+
+export default function FeedbackForm({
+  open,
+  onClose,
+  onSubmit,
+  isSubmitting,
+}: FeedbackFormProps) {
+  const [step, setStep] = useState(0);
+  const [serviceCategory, setServiceCategory] =
+    useState<ServiceCategory>("Landing Page");
+  const [projectTitle, setProjectTitle] = useState("");
+  const [projectUrl, setProjectUrl] = useState("");
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [serviceDate, setServiceDate] = useState("");
+  const [improvementSuggestion, setImprovementSuggestion] = useState("");
+  const [media, setMedia] = useState<FeedbackMedia[]>([]);
+  const [uploadStates, setUploadStates] = useState<
+    Map<string, MediaUploadState>
+  >(new Map());
+  const [uploadError, setUploadError] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadIdRef = useRef(0);
 
   const reset = () => {
-    setStep(0)
-    setServiceCategory("Landing Page")
-    setProjectTitle("")
-    setProjectUrl("")
-    setRating(0)
-    setHoverRating(0)
-    setTitle("")
-    setContent("")
-    setServiceDate("")
-    setImprovementSuggestion("")
-    setMedia([])
-    setUploadError("")
-  }
+    setStep(0);
+    setServiceCategory("Landing Page");
+    setProjectTitle("");
+    setProjectUrl("");
+    setRating(0);
+    setHoverRating(0);
+    setTitle("");
+    setContent("");
+    setServiceDate("");
+    setImprovementSuggestion("");
+    setMedia([]);
+    setUploadStates(new Map());
+    setUploadError("");
+  };
 
   const handleClose = () => {
-    reset()
-    onClose()
-  }
+    reset();
+    onClose();
+  };
 
   const handleFiles = async (files: FileList | File[]) => {
-    setUploadError("")
-    const arr = Array.from(files)
+    setUploadError("");
+    const arr = Array.from(files);
+
     for (const f of arr) {
       if (f.size > MAX_FILE_SIZE) {
-        setUploadError(`File too large: ${f.name} (max 50MB)`)
-        continue
+        setUploadError(`File too large: ${f.name} (max 50MB)`);
+        continue;
       }
       if (!ALLOWED_TYPES.includes(f.type)) {
-        setUploadError(`Unsupported type: ${f.name}`)
-        continue
+        setUploadError(`Unsupported type: ${f.name}`);
+        continue;
       }
-      const type = f.type.startsWith("video/") ? "video" : "image"
-      const url = URL.createObjectURL(f)
-      setMedia((prev) => [...prev, { url, type, altText: f.name }])
+
+      const type = f.type.startsWith("video/") ? "video" : "image";
+      const preview = URL.createObjectURL(f);
+      uploadIdRef.current += 1;
+      const id = `${f.name}-${f.lastModified}-${uploadIdRef.current}`;
+
+      // Add to upload states
+      const uploadState: MediaUploadState = {
+        id,
+        file: f,
+        preview,
+        type,
+        progress: 0,
+        status: "pending",
+      };
+
+      setUploadStates((prev) => new Map(prev).set(id, uploadState));
+
+      // Start upload
+      uploadToCloudinary(id, f, type);
     }
-  }
+  };
+
+  const uploadToCloudinary = async (
+    id: string,
+    file: File,
+    type: "image" | "video",
+  ) => {
+    try {
+      // Update status to uploading
+      setUploadStates((prev) => {
+        const map = new Map(prev);
+        const state = map.get(id)!;
+        map.set(id, { ...state, status: "uploading" });
+        return map;
+      });
+
+      // Upload file
+      const result = await uploadFeedbackMedia(file, (progress) => {
+        setUploadStates((prev) => {
+          const map = new Map(prev);
+          const state = map.get(id)!;
+          map.set(id, { ...state, progress });
+          return map;
+        });
+      });
+
+      // Add to media list
+      setMedia((prev) => [
+        ...prev,
+        {
+          url: result.secure_url,
+          type,
+          altText: file.name,
+        },
+      ]);
+
+      // Update status to done
+      setUploadStates((prev) => {
+        const map = new Map(prev);
+        const state = map.get(id)!;
+        map.set(id, { ...state, status: "done" });
+        return map;
+      });
+
+      // Remove from upload states after success (auto-cleanup)
+      setTimeout(() => {
+        setUploadStates((prev) => {
+          const map = new Map(prev);
+          map.delete(id);
+          return map;
+        });
+      }, 500); // Show success state for 500ms
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Upload failed";
+      setUploadStates((prev) => {
+        const map = new Map(prev);
+        const state = map.get(id)!;
+        map.set(id, { ...state, status: "error", error: errorMsg });
+        return map;
+      });
+      setUploadError(errorMsg);
+
+      // Remove from upload states after error (auto-cleanup)
+      setTimeout(() => {
+        setUploadStates((prev) => {
+          const map = new Map(prev);
+          map.delete(id);
+          return map;
+        });
+      }, 2000); // Show error state for 2s
+    }
+  };
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setDragOver(false)
-    if (e.dataTransfer.files) handleFiles(e.dataTransfer.files)
-  }
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files) handleFiles(e.dataTransfer.files);
+  };
 
   const removeMedia = (index: number) => {
-    setMedia((prev) => prev.filter((_, i) => i !== index))
-  }
+    setMedia((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeUpload = (id: string) => {
+    setUploadStates((prev) => {
+      const map = new Map(prev);
+      map.delete(id);
+      return map;
+    });
+  };
 
   const canProceed = () => {
-    if (step === 0) return rating > 0 && title.trim().length > 0 && content.trim().length > 0
-    return true
-  }
+    if (step === 0)
+      return rating > 0 && title.trim().length > 0 && content.trim().length > 0;
+    return true;
+  };
 
   const handleSubmit = () => {
     onSubmit({
@@ -105,8 +246,8 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
       media,
       serviceDate,
       improvementSuggestion: improvementSuggestion.trim(),
-    })
-  }
+    });
+  };
 
   return (
     <AnimatePresence>
@@ -125,7 +266,10 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
             className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border border-white/[0.08] bg-[#0A0A0F] p-6 sm:p-8 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <button onClick={handleClose} className="absolute top-4 right-4 p-2 rounded-xl text-[#6B6B80] hover:text-[#F0F0F5] hover:bg-white/[0.04] transition-colors">
+            <button
+              onClick={handleClose}
+              className="absolute top-4 right-4 p-2 rounded-xl text-[#6B6B80] hover:text-[#F0F0F5] hover:bg-white/[0.04] transition-colors"
+            >
               <X size={18} />
             </button>
 
@@ -134,14 +278,19 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
                 <Send size={18} />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-[#F0F0F5]">Share Your Feedback</h2>
+                <h2 className="text-lg font-bold text-[#F0F0F5]">
+                  Share Your Feedback
+                </h2>
                 <p className="text-xs text-[#6B6B80]">Step {step + 1} of 2</p>
               </div>
             </div>
 
             <div className="flex gap-2 mb-6">
               {[0, 1].map((i) => (
-                <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? "bg-[#4F6EF7]" : "bg-[#1E1E2A]"}`} />
+                <div
+                  key={i}
+                  className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? "bg-[#4F6EF7]" : "bg-[#1E1E2A]"}`}
+                />
               ))}
             </div>
 
@@ -149,7 +298,9 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
               <div className="space-y-5">
                 {/* Rating */}
                 <div>
-                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">Rating *</label>
+                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">
+                    Rating *
+                  </label>
                   <div className="flex gap-1">
                     {[1, 2, 3, 4, 5].map((n) => (
                       <button
@@ -175,7 +326,9 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
 
                 {/* Title */}
                 <div>
-                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">Feedback Title *</label>
+                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">
+                    Feedback Title *
+                  </label>
                   <input
                     type="text"
                     value={title}
@@ -188,7 +341,9 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
 
                 {/* Content */}
                 <div>
-                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">Your Feedback *</label>
+                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">
+                    Your Feedback *
+                  </label>
                   <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
@@ -200,7 +355,9 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
 
                 {/* Category */}
                 <div>
-                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">Service Category *</label>
+                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">
+                    Service Category *
+                  </label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {SERVICE_CATEGORIES.map((cat) => (
                       <button
@@ -221,7 +378,9 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
 
                 {/* Project Title */}
                 <div>
-                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">Project Title</label>
+                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">
+                    Project Title
+                  </label>
                   <input
                     type="text"
                     value={projectTitle}
@@ -233,9 +392,14 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
 
                 {/* Project URL */}
                 <div>
-                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">Project URL</label>
+                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">
+                    Project URL
+                  </label>
                   <div className="relative">
-                    <LinkIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B80]" />
+                    <LinkIcon
+                      size={16}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B80]"
+                    />
                     <input
                       type="url"
                       value={projectUrl}
@@ -248,7 +412,9 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
 
                 {/* Service Date */}
                 <div>
-                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">Service Date</label>
+                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">
+                    Service Date
+                  </label>
                   <input
                     type="date"
                     value={serviceDate}
@@ -284,13 +450,20 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
               <div className="space-y-5">
                 {/* Media Upload */}
                 <div>
-                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">Photos & Videos</label>
+                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">
+                    Photos & Videos
+                  </label>
                   <div
-                    onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOver(true);
+                    }}
                     onDragLeave={() => setDragOver(false)}
                     onDrop={handleDrop}
                     className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-200 ${
-                      dragOver ? "border-[#4F6EF7] bg-[#4F6EF7]/5" : "border-[#1E1E2A] hover:border-[#4F6EF7]/30"
+                      dragOver
+                        ? "border-[#4F6EF7] bg-[#4F6EF7]/5"
+                        : "border-[#1E1E2A] hover:border-[#4F6EF7]/30"
                     }`}
                   >
                     <input
@@ -299,9 +472,14 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
                       multiple
                       accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.mov"
                       className="hidden"
-                      onChange={(e) => e.target.files && handleFiles(e.target.files)}
+                      onChange={(e) =>
+                        e.target.files && handleFiles(e.target.files)
+                      }
                     />
-                    <Upload size={24} className={`mx-auto mb-2 ${dragOver ? "text-[#4F6EF7]" : "text-[#6B6B80]"}`} />
+                    <Upload
+                      size={24}
+                      className={`mx-auto mb-2 ${dragOver ? "text-[#4F6EF7]" : "text-[#6B6B80]"}`}
+                    />
                     <p className="text-sm text-[#6B6B80]">
                       <button
                         type="button"
@@ -312,34 +490,125 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
                       </button>{" "}
                       or drag and drop
                     </p>
-                    <p className="text-[10px] text-[#6B6B80] mt-1">JPG, PNG, GIF, WebP, MP4 up to 50MB</p>
+                    <p className="text-[10px] text-[#6B6B80] mt-1">
+                      JPG, PNG, GIF, WebP, MP4 up to 50MB
+                    </p>
                   </div>
-                  {uploadError && <p className="text-xs text-red-400 mt-2">{uploadError}</p>}
-                  {media.length > 0 && (
-                    <div className="grid grid-cols-4 gap-2 mt-3">
-                      {media.map((m, i) => (
-                        <div key={i} className="relative group rounded-xl overflow-hidden border border-[#1E1E2A] aspect-square">
-                          {m.type === "image" ? (
-                            <img src={m.url} alt={m.altText || ""} className="w-full h-full object-cover" />
-                          ) : (
-                            <video src={m.url} className="w-full h-full object-cover" />
+
+                  {/* Upload errors */}
+                  {uploadError && (
+                    <div className="flex items-center gap-2 mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
+                      <AlertCircle
+                        size={16}
+                        className="text-red-400 flex-shrink-0"
+                      />
+                      <p className="text-xs text-red-400">{uploadError}</p>
+                    </div>
+                  )}
+
+                  {/* Upload states */}
+                  {uploadStates.size > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {Array.from(uploadStates.values()).map((state) => (
+                        <div
+                          key={state.id}
+                          className="p-3 bg-[#0A0A0F] border border-[#1E1E2A] rounded-xl"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {state.status === "uploading" && (
+                                <Loader
+                                  size={14}
+                                  className="text-[#4F6EF7] animate-spin flex-shrink-0"
+                                />
+                              )}
+                              {state.status === "done" && (
+                                <CheckCircle2
+                                  size={14}
+                                  className="text-green-400 flex-shrink-0"
+                                />
+                              )}
+                              {state.status === "error" && (
+                                <AlertCircle
+                                  size={14}
+                                  className="text-red-400 flex-shrink-0"
+                                />
+                              )}
+                              <span className="text-xs text-[#6B6B80] truncate">
+                                {state.file.name}
+                              </span>
+                            </div>
+                            {state.status !== "done" && (
+                              <button
+                                type="button"
+                                onClick={() => removeUpload(state.id)}
+                                className="ml-2 p-1 text-[#6B6B80] hover:text-red-400 transition-colors flex-shrink-0"
+                              >
+                                <X size={12} />
+                              </button>
+                            )}
+                          </div>
+                          {state.status === "uploading" && (
+                            <div className="w-full bg-[#1E1E2A] rounded-full h-1 overflow-hidden">
+                              <div
+                                className="bg-[#4F6EF7] h-full rounded-full transition-all duration-300"
+                                style={{ width: `${state.progress}%` }}
+                              />
+                            </div>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => removeMedia(i)}
-                            className="absolute top-1 right-1 p-1 rounded-lg bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X size={12} />
-                          </button>
+                          {state.status === "error" && (
+                            <p className="text-[10px] text-red-400">
+                              {state.error}
+                            </p>
+                          )}
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Uploaded media preview */}
+                  {media.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-xs font-medium text-[#6B6B80] mb-2">
+                        Uploaded: {media.length}
+                      </p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {media.map((m, i) => (
+                          <div
+                            key={i}
+                            className="relative group rounded-xl overflow-hidden border border-[#1E1E2A] aspect-square"
+                          >
+                            {m.type === "image" ? (
+                              <img
+                                src={m.url}
+                                alt={m.altText || ""}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <video
+                                src={m.url}
+                                className="w-full h-full object-cover"
+                              />
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => removeMedia(i)}
+                              className="absolute top-1 right-1 p-1 rounded-lg bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
 
                 {/* Improvement Suggestion */}
                 <div>
-                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">Improvement Suggestions (optional)</label>
+                  <label className="block text-sm font-medium text-[#F0F0F5] mb-2">
+                    Improvement Suggestions (optional)
+                  </label>
                   <textarea
                     value={improvementSuggestion}
                     onChange={(e) => setImprovementSuggestion(e.target.value)}
@@ -360,10 +629,14 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || uploadStates.size > 0}
                     className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-[#4F6EF7] text-white hover:bg-[#6B85FF] shadow-[0_0_20px_rgba(79,110,247,0.15)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isSubmitting ? "Submitting..." : "Submit Feedback"}
+                    {isSubmitting
+                      ? "Submitting..."
+                      : uploadStates.size > 0
+                        ? "Uploading..."
+                        : "Submit Feedback"}
                   </button>
                 </div>
               </div>
@@ -372,5 +645,5 @@ export default function FeedbackForm({ open, onClose, onSubmit, isSubmitting }: 
         </motion.div>
       )}
     </AnimatePresence>
-  )
+  );
 }

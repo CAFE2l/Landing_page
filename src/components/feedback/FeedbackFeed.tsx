@@ -1,7 +1,7 @@
 import { AnimatePresence } from "framer-motion"
 import { Loader2, MessageCircle } from "lucide-react"
 import FeedbackCard from "./FeedbackCard"
-import type { FeedbackPost, ServiceCategory } from "../../data/feedbackStore"
+import type { FeedbackPost, FeedbackVoteType, ServiceCategory } from "../../data/feedbackStore"
 
 interface FeedbackFeedProps {
   posts: FeedbackPost[]
@@ -11,6 +11,10 @@ interface FeedbackFeedProps {
   onPostClick: (post: FeedbackPost) => void
   onHelpful: (postId: string) => void
   helpfulPosts: Set<string>
+  onVote?: (postId: string, voteType: FeedbackVoteType) => void
+  votes?: Map<string, FeedbackVoteType>
+  onSave?: (postId: string) => void
+  savedPosts?: Set<string>
   onCommentClick: (post: FeedbackPost) => void
   category: ServiceCategory | ""
   rating: number
@@ -27,7 +31,7 @@ const sortTabs = [
 
 export default function FeedbackFeed({
   posts, loading, sort, onSortChange, onPostClick, onHelpful,
-  helpfulPosts, onCommentClick, category, rating, search,
+  helpfulPosts, onVote, votes, onSave, savedPosts, onCommentClick, category, rating, search,
 }: FeedbackFeedProps) {
   const isEmpty = !loading && posts.length === 0
 
@@ -79,8 +83,12 @@ export default function FeedbackFeed({
                 index={i}
                 onClick={() => onPostClick(post)}
                 onHelpful={() => onHelpful(post.id)}
+                onVote={onVote ? (voteType) => onVote(post.id, voteType) : undefined}
+                onSave={onSave ? () => onSave(post.id) : undefined}
                 onComment={() => onCommentClick(post)}
                 helpful={helpfulPosts.has(post.id)}
+                vote={votes?.get(post.id) || null}
+                saved={savedPosts?.has(post.id) || false}
               />
             ))}
           </AnimatePresence>

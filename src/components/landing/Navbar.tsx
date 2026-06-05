@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Menu, X } from "lucide-react"
+import { Menu, MessageCircle, X } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import WhatsAppIcon from "./WhatsAppIcon"
 import UserMenu from "../auth/UserMenu"
 import { useAuth } from "../../contexts/AuthContext"
 import { wa, WA_MESSAGES } from "../../lib/utils"
+import { getUnreadMessageCount } from "../../data/feedbackServiceSupabase"
+import { supabase } from "../../lib/supabase/client"
 
 const links = [
   { name: "Services", href: "#services" },
@@ -22,10 +24,29 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState("")
+  const [unreadMessages, setUnreadMessages] = useState(0)
   const { user, isAdmin, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const isLanding = location.pathname === "/"
+
+  useEffect(() => {
+    if (!user?.id) {
+      setUnreadMessages(0)
+      return
+    }
+    const refresh = () => getUnreadMessageCount(user.id).then(setUnreadMessages).catch(() => setUnreadMessages(0))
+    refresh()
+    const client = supabase
+    if (!client) return
+    const channel = client
+      .channel(`navbar-messages:${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, refresh)
+      .subscribe()
+    return () => {
+      client.removeChannel(channel)
+    }
+  }, [user?.id])
 
   useEffect(() => {
     const onScroll = () => {
@@ -112,6 +133,20 @@ export default function Navbar() {
         </div>
 
         <div className="hidden lg:flex items-center gap-3">
+          {user && (
+            <Link
+              to="/dashboard/messages"
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition-all hover:border-[#3b82f6]/35 hover:text-white"
+              aria-label="Messages"
+            >
+              <MessageCircle size={17} />
+              {unreadMessages > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadMessages}
+                </span>
+              )}
+            </Link>
+          )}
           <UserMenu />
           <motion.a
             href={wa(WA_MESSAGES.general)}
@@ -163,10 +198,11 @@ export default function Navbar() {
                 {user ? (
                   <div className="space-y-2">
                     {[
-                      { label: "My Profile", href: "/profile" },
-                      { label: "My Posts", href: "/profile?tab=posts" },
-                      { label: "Saved Posts", href: "/profile?tab=saved" },
-                      { label: "Settings", href: "/profile?tab=settings" },
+                      { label: "My Profile", href: "/dashboard/profile" },
+                      { label: unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages", href: "/dashboard/messages" },
+                      { label: "My Posts", href: "/dashboard/posts" },
+                      { label: "Saved Posts", href: "/dashboard/saved" },
+                      { label: "Settings", href: "/dashboard/settings" },
                       ...(isAdmin ? [{ label: "Admin Panel", href: "/admin" }] : []),
                     ].map((item) => (
                       <Link

@@ -120,7 +120,7 @@ export default function MyDashboardPage() {
 
   useEffect(() => {
     if (!user?.uid) {
-      setLoading(false)
+      queueMicrotask(() => setLoading(false))
       return
     }
     listUserFeedbacks(user.uid)

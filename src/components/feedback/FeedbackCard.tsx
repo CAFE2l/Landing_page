@@ -1,18 +1,24 @@
 import { motion } from "framer-motion"
-import { Star, ThumbsUp, MessageCircle, BadgeCheck, Link as LinkIcon, Play } from "lucide-react"
-import type { FeedbackPost } from "../../data/feedbackStore"
+import { Star, ThumbsDown, ThumbsUp, MessageCircle, BadgeCheck, Link as LinkIcon, Play, Bookmark } from "lucide-react"
+import { Link } from "react-router-dom"
+import type { FeedbackPost, FeedbackVoteType } from "../../data/feedbackStore"
 
 interface FeedbackCardProps {
   post: FeedbackPost
   index: number
   onHelpful: () => void
+  onVote?: (voteType: FeedbackVoteType) => void
   onComment: () => void
   onClick: () => void
+  onSave?: () => void
   helpful: boolean
+  vote?: FeedbackVoteType | null
+  saved?: boolean
 }
 
-export default function FeedbackCard({ post, index, onHelpful, onComment, onClick, helpful }: FeedbackCardProps) {
+export default function FeedbackCard({ post, index, onHelpful, onVote, onComment, onClick, onSave, helpful, vote, saved }: FeedbackCardProps) {
   const displayRating = Math.round(post.rating)
+  const score = post.helpfulCount - (post.downvoteCount || 0)
 
   return (
     <motion.article
@@ -29,16 +35,26 @@ export default function FeedbackCard({ post, index, onHelpful, onComment, onClic
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
-            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#4F6EF7]/10 text-sm font-bold text-[#4F6EF7] overflow-hidden">
+            <Link
+              to={`/profile/${post.userId}`}
+              onClick={(e) => e.stopPropagation()}
+              className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4F6EF7]/10 text-sm font-bold text-[#4F6EF7] transition-all hover:ring-2 hover:ring-[#4F6EF7]/45"
+            >
               {post.userAvatar ? (
                 <img src={post.userAvatar} alt="" className="w-full h-full object-cover" />
               ) : (
                 post.userName[0]?.toUpperCase() || "U"
               )}
-            </div>
+            </Link>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-semibold text-[#F0F0F5]">{post.userName}</span>
+                <Link
+                  to={`/profile/${post.userId}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-sm font-semibold text-[#F0F0F5] transition-colors hover:text-[#8EA0FF] hover:underline"
+                >
+                  {post.userName}
+                </Link>
                 {post.isVerifiedClient && (
                   <BadgeCheck size={14} className="text-[#4F6EF7]" />
                 )}
@@ -51,14 +67,29 @@ export default function FeedbackCard({ post, index, onHelpful, onComment, onClic
               </div>
             </div>
           </div>
-          <div className="flex gap-0.5">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <Star
-                key={n}
-                size={14}
-                className={n <= displayRating ? "text-[#F59E0B] fill-[#F59E0B]" : "text-[#3A3A4A]"}
-              />
-            ))}
+          <div className="flex items-center gap-2">
+            <div className="hidden gap-0.5 sm:flex">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <Star
+                  key={n}
+                  size={14}
+                  className={n <= displayRating ? "text-[#F59E0B] fill-[#F59E0B]" : "text-[#3A3A4A]"}
+                />
+              ))}
+            </div>
+            {onSave && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onSave() }}
+                aria-label={saved ? "Remove saved post" : "Save post"}
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-all ${
+                  saved
+                    ? "border-[#4F6EF7]/30 bg-[#4F6EF7]/15 text-[#8EA0FF] shadow-[0_0_18px_rgba(79,110,247,0.16)]"
+                    : "border-white/[0.07] bg-white/[0.025] text-[#6B6B80] hover:border-[#4F6EF7]/25 hover:bg-[#4F6EF7]/10 hover:text-[#F0F0F5]"
+                }`}
+              >
+                <Bookmark size={15} className={saved ? "fill-current" : ""} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -136,17 +167,37 @@ export default function FeedbackCard({ post, index, onHelpful, onComment, onClic
 
         {/* Footer Actions */}
         <div className="flex items-center gap-3 pt-3 border-t border-white/[0.06]">
-          <button
-            onClick={(e) => { e.stopPropagation(); onHelpful() }}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              helpful
-                ? "bg-[#4F6EF7]/10 text-[#4F6EF7] border border-[#4F6EF7]/20"
-                : "text-[#6B6B80] hover:text-[#F0F0F5] hover:bg-white/[0.04] border border-transparent"
-            }`}
-          >
-            <ThumbsUp size={14} />
-            Helpful ({post.helpfulCount})
-          </button>
+          <div className="inline-flex items-center rounded-lg border border-white/[0.06] bg-white/[0.025] p-0.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onVote) onVote("up");
+                else onHelpful();
+              }}
+              aria-label="Like feedback"
+              className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-all ${
+                (vote || (helpful ? "up" : null)) === "up"
+                  ? "bg-[#4F6EF7]/15 text-[#7C8CFF]"
+                  : "text-[#6B6B80] hover:bg-white/[0.05] hover:text-[#F0F0F5]"
+              }`}
+            >
+              <ThumbsUp size={14} />
+            </button>
+            <span className="min-w-8 px-1 text-center text-xs font-semibold text-[#F0F0F5]">
+              {score}
+            </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); onVote?.("down") }}
+              aria-label="Dislike feedback"
+              className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-all ${
+                vote === "down"
+                  ? "bg-[#8B5CF6]/15 text-[#C4B5FD]"
+                  : "text-[#6B6B80] hover:bg-white/[0.05] hover:text-[#F0F0F5]"
+              }`}
+            >
+              <ThumbsDown size={14} />
+            </button>
+          </div>
           <button
             onClick={(e) => { e.stopPropagation(); onComment() }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#6B6B80] hover:text-[#F0F0F5] hover:bg-white/[0.04] border border-transparent transition-all"

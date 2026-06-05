@@ -1,3 +1,24 @@
+# 🚀 Aplicar Migração Manualmente via Dashboard Supabase
+
+Como o script está tendo problemas de conexão, vamos fazer isso manualmente no dashboard (é bem rápido!):
+
+## Passos:
+
+1. **Abra o Dashboard Supabase:**
+   - Vá para: https://app.supabase.com
+   - Clique no projeto: `iuzvmlhowqghbbduhmzt`
+
+2. **Acesse o SQL Editor:**
+   - No menu esquerdo, clique em **"SQL Editor"**
+   - Clique em **"New Query"**
+
+3. **Cole o SQL abaixo inteiro** e clique em **"Run"**
+
+---
+
+## ⬇️ COPIE E COLE TODO ESTE SQL:
+
+```sql
 -- Café Services — Migration 003: Extend feedback tables for forum features
 -- Adds columns for FeedbackPost, FeedbackComment, and helpful votes
 
@@ -12,7 +33,6 @@ alter table feedback_posts add column if not exists is_verified_client boolean d
 alter table feedback_posts add column if not exists is_verified_project boolean default false;
 alter table feedback_posts add column if not exists is_highlighted boolean default false;
 alter table feedback_posts add column if not exists helpful_count integer default 0;
-alter table feedback_posts add column if not exists downvote_count integer default 0;
 alter table feedback_posts add column if not exists comment_count integer default 0;
 alter table feedback_posts add column if not exists improvement_suggestion text default '';
 alter table feedback_posts add column if not exists admin_reply jsonb default null;
@@ -111,14 +131,12 @@ $$;
 drop policy if exists "Public can view approved" on feedback_posts;
 create policy "Public can view approved"
   on feedback_posts for select
-  to anon, authenticated
   using (status in ('approved', 'highlighted'));
 
 drop policy if exists "Authenticated users can insert" on feedback_posts;
 create policy "Authenticated users can insert"
   on feedback_posts for insert
-  to authenticated
-  with check ((select auth.uid()) = user_id);
+  with check (auth.role() = 'authenticated');
 
 drop policy if exists "Admin can manage all feedback" on feedback_posts;
 create policy "Admin can manage all feedback"
@@ -130,43 +148,14 @@ create policy "Admin can manage all feedback"
 drop policy if exists "Users can update own pending posts" on feedback_posts;
 create policy "Users can update own pending posts"
   on feedback_posts for update
-  to authenticated
-  using ((select auth.uid()) = user_id and status = 'pending')
-  with check ((select auth.uid()) = user_id and status = 'pending');
+  using (auth.uid() = user_id and status = 'pending')
+  with check (auth.uid() = user_id and status = 'pending');
 
 -- Users can delete their own pending posts
 drop policy if exists "Users can delete own pending posts" on feedback_posts;
 create policy "Users can delete own pending posts"
   on feedback_posts for delete
-  to authenticated
-  using ((select auth.uid()) = user_id and status = 'pending');
-
--- ============================================================
--- RLS for feedback_media insert/select from forum clients
--- ============================================================
-drop policy if exists "Public can view approved post media" on feedback_media;
-create policy "Public can view approved post media"
-  on feedback_media for select
-  to anon, authenticated
-  using (
-    exists (
-      select 1 from feedback_posts
-      where feedback_posts.id = feedback_media.post_id
-      and feedback_posts.status in ('approved', 'highlighted')
-    )
-  );
-
-drop policy if exists "Authenticated users can add media to own posts" on feedback_media;
-create policy "Authenticated users can add media to own posts"
-  on feedback_media for insert
-  to authenticated
-  with check (
-    exists (
-      select 1 from feedback_posts
-      where feedback_posts.id = feedback_media.post_id
-      and feedback_posts.user_id = (select auth.uid())
-    )
-  );
+  using (auth.uid() = user_id and status = 'pending');
 
 -- ============================================================
 -- RLS for feedback_comments read policy (allow reading on approved/+ posts)
@@ -174,7 +163,6 @@ create policy "Authenticated users can add media to own posts"
 drop policy if exists "Public can read comments on approved posts" on feedback_comments;
 create policy "Public can read comments on approved posts"
   on feedback_comments for select
-  to anon, authenticated
   using (
     exists (
       select 1 from feedback_posts
@@ -182,40 +170,19 @@ create policy "Public can read comments on approved posts"
       and feedback_posts.status in ('approved', 'highlighted')
     )
   );
+```
 
-drop policy if exists "Authenticated users can comment" on feedback_comments;
-create policy "Authenticated users can comment"
-  on feedback_comments for insert
-  to authenticated
-  with check ((select auth.uid()) = user_id);
+4. **Clique em "Run"** (ou Ctrl+Enter)
 
--- ============================================================
--- Vote type support for Reddit-style up/down votes
--- ============================================================
-alter table feedback_helpful_votes add column if not exists vote_type text not null default 'up'
-  check (vote_type in ('up','down'));
+5. **Aguarde até ver ✅ "Success"**
 
-create or replace function increment_downvote_count(post_id uuid)
-returns void language plpgsql security definer as $$
-begin
-  update feedback_posts set downvote_count = downvote_count + 1 where id = post_id;
-end;
-$$;
+6. **Pronto!** Agora seu app vai funcionar sem o erro de `comment_count`
 
-create or replace function decrement_downvote_count(post_id uuid)
-returns void language plpgsql security definer as $$
-begin
-  update feedback_posts set downvote_count = greatest(0, downvote_count - 1) where id = post_id;
-end;
-$$;
+---
 
-grant select, insert, update, delete on feedback_helpful_votes to authenticated;
-grant select, insert on feedback_comments to authenticated;
-grant select, insert on feedback_media to authenticated;
-grant select on feedback_media to anon;
-grant execute on function increment_comment_count(uuid) to authenticated;
-grant execute on function decrement_comment_count(uuid) to authenticated;
-grant execute on function increment_helpful_count(uuid) to authenticated;
-grant execute on function decrement_helpful_count(uuid) to authenticated;
-grant execute on function increment_downvote_count(uuid) to authenticated;
-grant execute on function decrement_downvote_count(uuid) to authenticated;
+## ✅ Depois disso:
+
+- Volte ao app
+- Teste criar um novo feedback com imagem/vídeo
+- Tudo deve funcionar perfeitamente!
+

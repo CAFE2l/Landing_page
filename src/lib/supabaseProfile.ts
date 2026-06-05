@@ -1,12 +1,14 @@
-import { supabase, supabaseConfigured } from "./supabase/client"
-import { saveCurrentUser, type UserProfile } from "../data/feedbackStore"
+import { supabase, supabaseConfigured } from "./supabase/client";
+import { saveCurrentUser, type UserProfile } from "../data/feedbackStore";
 
 export async function syncProfileToStorage() {
-  if (!supabase || !supabaseConfigured) return null
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+  if (!supabase || !supabaseConfigured) return null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
 
-  const meta = user.user_metadata || {}
+  const meta = user.user_metadata || {};
   const profile: UserProfile = {
     uid: user.id,
     name: meta.name || user.email?.split("@")[0] || "User",
@@ -18,19 +20,20 @@ export async function syncProfileToStorage() {
     photoUrl: meta.avatar_url || meta.photoUrl || undefined,
     phone: meta.phone || undefined,
     countryCode: meta.countryCode || undefined,
-  }
-  saveCurrentUser(profile)
-  return profile
+  };
+  saveCurrentUser(profile);
+  return profile;
 }
 
 export async function updateProfileMetadata(updates: Record<string, unknown>) {
   if (!supabase || !supabaseConfigured) return
   await supabase.auth.updateUser({ data: updates })
-  await syncProfileToStorage()
+  const profile = await syncProfileToStorage();
+  if (profile) await syncFeedbackAuthor(profile);
 }
 
 export async function upsertPublicUser(profile: UserProfile) {
-  if (!supabase || !supabaseConfigured) return
+  if (!supabase || !supabaseConfigured) return;
   try {
     await supabase.from("users").upsert(
       {
@@ -47,27 +50,69 @@ export async function upsertPublicUser(profile: UserProfile) {
         updated_at: new Date().toISOString(),
       },
       { onConflict: "id" },
-    )
+    );
+    await supabase.from("profiles").upsert(
+      {
+        id: profile.uid,
+        full_name: profile.name,
+        username: profile.username || null,
+        avatar_url: profile.photoUrl || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" },
+    );
+    await syncFeedbackAuthor(profile);
   } catch {
     // Table may not exist yet — silently fail
   }
 }
 
-export async function checkUsernameAvailabilitySupabase(username: string, currentUid?: string) {
+export async function syncFeedbackAuthor(profile: UserProfile) {
+  if (!supabase || !supabaseConfigured || !profile.uid) return;
+  try {
+    await supabase
+      .from("feedback_posts")
+      .update({
+        user_name: profile.name,
+        user_avatar: profile.photoUrl || "",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", profile.uid);
+
+    await supabase
+      .from("feedback_comments")
+      .update({
+        user_name: profile.name,
+        user_avatar: profile.photoUrl || "",
+      })
+      .eq("user_id", profile.uid);
+  } catch {
+    // Feedback tables may not be available in every environment.
+  }
+}
+
+export async function checkUsernameAvailabilitySupabase(
+  username: string,
+  currentUid?: string,
+) {
   if (!supabase || !supabaseConfigured) {
-    return { available: false, message: "Supabase not configured", username }
+    return { available: false, message: "Supabase not configured", username };
   }
   try {
     const { data, error } = await supabase
       .from("users")
       .select("id")
       .eq("username", username)
-      .maybeSingle()
+      .maybeSingle();
 
-    if (error) throw error
-    const available = !data || data.id === currentUid
-    return { available, message: available ? "Username available" : "Username already taken", username }
+    if (error) throw error;
+    const available = !data || data.id === currentUid;
+    return {
+      available,
+      message: available ? "Username available" : "Username already taken",
+      username,
+    };
   } catch {
-    return { available: true, message: "Username available", username }
+    return { available: true, message: "Username available", username };
   }
 }

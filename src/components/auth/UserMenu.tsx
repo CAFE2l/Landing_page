@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Link, useNavigate } from "react-router-dom"
-import { User, Settings, Bookmark, FileText, LogOut, Shield, ChevronDown } from "lucide-react"
+import { User, Settings, Bookmark, FileText, LogOut, Shield, ChevronDown, MessageCircle } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
 import { getInitials } from "../../lib/utils"
 
 const dropdownItems = [
-  { label: "My Profile", href: "/profile", icon: User },
-  { label: "My Posts", href: "/profile?tab=posts", icon: FileText },
-  { label: "Saved Posts", href: "/profile?tab=saved", icon: Bookmark },
-  { label: "Settings", href: "/profile?tab=settings", icon: Settings },
+  { label: "My Profile", href: "/dashboard/profile", icon: User },
+  { label: "Messages", href: "/dashboard/messages", icon: MessageCircle },
+  { label: "My Posts", href: "/dashboard/posts", icon: FileText },
+  { label: "Saved Posts", href: "/dashboard/saved", icon: Bookmark },
+  { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ]
 
 const adminItem = { label: "Admin Panel", href: "/admin", icon: Shield }

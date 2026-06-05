@@ -8,6 +8,10 @@ import FeedbackPage from "./pages/FeedbackPage"
 import LandingPage from "./pages/LandingPage"
 import MyDashboardPage from "./pages/MyDashboardPage"
 import ProfilePage from "./pages/ProfilePage"
+import SavedPostsPage from "./pages/SavedPostsPage"
+import PublicProfilePage from "./pages/PublicProfilePage"
+import MessagesPage from "./pages/MessagesPage"
+import ConversationPage from "./pages/ConversationPage"
 import AdminShell from "./components/admin/AdminShell"
 import AdminLogin from "./pages/admin/Login"
 import AdminDashboard from "./pages/admin/Dashboard"
@@ -25,6 +29,7 @@ import {
   type UserProfile,
 } from "./data/feedbackStore"
 import { createFeedback, listPublicFeedbacks } from "./data/firestoreStore"
+import { Toaster } from "react-hot-toast"
 
 function App() {
   const [feedbacks, setFeedbacks] = useState<FeedbackEntry[]>(() => loadFeedbacks())
@@ -46,6 +51,16 @@ function App() {
 
   return (
     <AuthProvider>
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: "#0A0A0F",
+            color: "#F0F0F5",
+            border: "1px solid rgba(255,255,255,0.08)",
+          },
+        }}
+      />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage feedbacks={feedbacks} />} />
@@ -54,6 +69,13 @@ function App() {
           <Route path="/login" element={<AuthPage mode="login" onAuth={setUser} />} />
           <Route path="/signup" element={<AuthPage mode="signup" onAuth={setUser} />} />
           <Route path="/my-account" element={<ProtectedRoute><MyDashboardPage /></ProtectedRoute>} />
+          <Route path="/dashboard/posts" element={<ProtectedRoute><MyDashboardPage /></ProtectedRoute>} />
+          <Route path="/dashboard/profile" element={<ProtectedRoute><ProfilePage user={user} onSubmitFeedback={addFeedback} /></ProtectedRoute>} />
+          <Route path="/dashboard/settings" element={<ProtectedRoute><ProfilePage user={user} onSubmitFeedback={addFeedback} /></ProtectedRoute>} />
+          <Route path="/dashboard/saved" element={<ProtectedRoute><SavedPostsPage /></ProtectedRoute>} />
+          <Route path="/dashboard/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
+          <Route path="/dashboard/messages/:conversationId" element={<ProtectedRoute><ConversationPage /></ProtectedRoute>} />
+          <Route path="/profile/:userId" element={<PublicProfilePage />} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage user={user} onSubmitFeedback={addFeedback} /></ProtectedRoute>} />
           <Route path="/perfil" element={<ProtectedRoute><ProfilePage user={user} onSubmitFeedback={addFeedback} /></ProtectedRoute>} />
           <Route path="/admin" element={<AdminRoute><AdminPage user={user} /></AdminRoute>} />

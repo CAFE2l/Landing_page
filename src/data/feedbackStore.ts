@@ -81,12 +81,16 @@ export interface FeedbackPost {
   isVerifiedProject: boolean
   isHighlighted: boolean
   helpfulCount: number
+  downvoteCount?: number
   commentCount: number
   createdAt: string
   updatedAt: string
   adminReply?: FeedbackAdminReply
   improvementSuggestion?: string
+  savedAt?: string
 }
+
+export type FeedbackVoteType = "up" | "down"
 
 export interface FeedbackComment {
   id: string

@@ -53,7 +53,9 @@ export default function AdminFeedbackManagement() {
     setLoading(false)
   }
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    queueMicrotask(() => loadData())
+  }, [])
 
   const filtered = posts.filter((p) => {
     if (statusFilter !== "all" && p.status !== statusFilter) return false

@@ -1,3 +1,4 @@
+@import url("https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&display=swap");
 @import "tailwindcss";
 
 @theme {
@@ -104,6 +105,10 @@
   50% { opacity: 0.3; }
 }
 
+@keyframes conic-sweep {
+  to { transform: rotate(1turn); }
+}
+
 @utility animate-marquee {
   animation: marquee 40s linear infinite;
 }
@@ -158,6 +163,31 @@
   background-size: 60px 60px;
   animation: grid-move 3s linear infinite;
   mask-image: linear-gradient(to top, black 0%, rgba(0, 0, 0, 0.75) 48%, transparent 100%);
+}
+
+.feedback-input-ring {
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.feedback-input-ring::before {
+  content: "";
+  position: absolute;
+  inset: -120%;
+  z-index: 0;
+  opacity: 0;
+  background: conic-gradient(from 0deg, #2563eb, #8b5cf6, #2563eb);
+  transition: opacity 180ms ease;
+}
+
+.feedback-input-ring:focus-within::before {
+  opacity: 1;
+  animation: conic-sweep 3s linear infinite;
+}
+
+.feedback-input-ring > input {
+  position: relative;
+  z-index: 1;
 }
 
 html {
