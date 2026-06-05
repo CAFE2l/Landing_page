@@ -222,13 +222,13 @@ export default function Topbar({ title, user }: TopbarProps) {
                 </div>
               ) : !hasAnyResult ? (
                 <div className="px-4 py-8 text-center text-sm text-white/30">
-                  Nenhum resultado para '<span className="text-white/50">{query}</span>'
+                  No results for '<span className="text-white/50">{query}</span>'
                 </div>
               ) : (
                 <div className="max-h-80 overflow-y-auto">
                   {results.clients.length > 0 && (
                     <div>
-                      <div className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/30">Clientes</div>
+                      <div className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/30">Clients</div>
                       {results.clients.map((client) => (
                         <button
                           key={client.id}
@@ -297,10 +297,10 @@ export default function Topbar({ title, user }: TopbarProps) {
               className="absolute right-0 top-full mt-2 w-80 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl"
             >
               <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
-                <span className="text-sm font-semibold text-white">Notificações</span>
+                <span className="text-sm font-semibold text-white">Notifications</span>
                 {notifications.length > 0 && (
                   <button onClick={markAllNotificationsRead} className="text-[11px] text-[#4f6ef7] hover:text-[#6b85ff] transition-colors">
-                    Marcar todas como lidas
+                    Mark all as read
                   </button>
                 )}
               </div>
@@ -312,7 +312,7 @@ export default function Topbar({ title, user }: TopbarProps) {
               ) : notifications.length === 0 ? (
                 <div className="flex flex-col items-center py-8 text-center">
                   <Bell size={24} className="mb-2 text-white/20" />
-                  <p className="text-sm text-white/30">Nenhuma notificação</p>
+                  <p className="text-sm text-white/30">No notifications</p>
                 </div>
               ) : (
                 <div className="max-h-72 overflow-y-auto">
@@ -386,14 +386,14 @@ export default function Topbar({ title, user }: TopbarProps) {
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/5 hover:text-white"
                 >
                   <User size={16} />
-                  Meu Perfil
+                  My Profile
                 </button>
                 <button
                   onClick={() => { setProfileOpen(false); navigate("/admin/settings") }}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/5 hover:text-white"
                 >
                   <Settings size={16} />
-                  Configurações
+                  Settings
                 </button>
                 <a
                   href="/"
@@ -402,7 +402,7 @@ export default function Topbar({ title, user }: TopbarProps) {
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/5 hover:text-white"
                 >
                   <ExternalLink size={16} />
-                  Voltar ao Site
+                  Back to Site
                 </a>
               </div>
 
@@ -412,7 +412,7 @@ export default function Topbar({ title, user }: TopbarProps) {
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-red-500/10 hover:text-red-400"
                 >
                   <LogOut size={16} />
-                  Sair
+                  Sign Out
                 </button>
               </div>
             </motion.div>

@@ -17,7 +17,7 @@ const VOTES_TABLE = "feedback_votes";
 const REACTIONS_TABLE = "feedback_reactions";
 const SAVED_TABLE = "saved_feedbacks";
 const PROFILES_TABLE = "profiles";
-const FOLLOWS_TABLE = "follows";
+const FOLLOWS_TABLE = "social_follows";
 const CONVERSATIONS_TABLE = "conversations";
 const MESSAGES_TABLE = "messages";
 

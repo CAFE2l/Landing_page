@@ -277,7 +277,7 @@ export default function FeedbackDetail({ post, open, onClose, onReaction, userRe
                         type="text"
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
-                        placeholder="Compartilhe sua resposta sobre este feedback..."
+                        placeholder="Share your thoughts on this feedback..."
                         className="w-full rounded-xl bg-transparent px-4 py-3 text-sm text-[#F0F0F5] placeholder-[#77778F] outline-none"
                       />
                     </div>
@@ -300,7 +300,7 @@ export default function FeedbackDetail({ post, open, onClose, onReaction, userRe
                           <motion.path d="M15 18.5C15 14.9 17.9 12 21.5 12H32.5C36.1 12 39 14.9 39 18.5V27.5C39 31.1 36.1 34 32.5 34H25L18 40V34H21.5C17.9 34 15 31.1 15 27.5V18.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.1, ease: "easeInOut" }} />
                           <motion.path d="M22 23H34M22 28H30" stroke="currentColor" strokeWidth="2" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.3, duration: 0.8 }} />
                         </motion.svg>
-                        <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="text-sm font-medium text-[#F0F0F5]">Seja o primeiro a comentar</motion.p>
+                        <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="text-sm font-medium text-[#F0F0F5]">Be the first to comment</motion.p>
                       </motion.div>
                     )}
                     {!loaded && (

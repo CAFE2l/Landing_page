@@ -3,9 +3,12 @@
 import { useState, useEffect, type FormEvent } from "react"
 import { useParams, useNavigate, Link } from "react-router-dom"
 import { motion } from "framer-motion"
-import { ArrowLeft, Loader2, User, Mail, Phone, Building, Globe, Calendar, DollarSign, Send, Layers, FileText } from "lucide-react"
+import { ArrowLeft, Loader2, User, Mail, Building, Globe, Calendar, DollarSign, Send, Layers, FileText } from "lucide-react"
 import { useAuth } from "../contexts/AuthContext"
 import { createServiceOrder } from "../lib/serviceOrdersService"
+import PhoneInput, { type PhoneFields } from "../components/ui/PhoneInput"
+import TechPremiumBackground from "../components/ui/TechPremiumBackground"
+import { ensureProfileFromAuthUser } from "../lib/supabaseProfile"
 import toast from "react-hot-toast"
 
 const PROJECT_TYPES = [
@@ -84,8 +87,10 @@ export default function HirePage() {
   const isSaaS = serviceSlug === "saas-dashboard"
 
   const [form, setForm] = useState<FormData>(initialForm)
+  const [phoneFields, setPhoneFields] = useState<PhoneFields | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
+  const [profileLoaded, setProfileLoaded] = useState(false)
 
   useEffect(() => {
     if (!serviceInfo) {
@@ -94,15 +99,31 @@ export default function HirePage() {
   }, [serviceInfo, navigate])
 
   useEffect(() => {
-    if (user && !form.fullName) {
-      const meta = user.user_metadata || {}
-      setForm((prev) => ({
-        ...prev,
-        fullName: (meta.full_name as string) || prev.fullName,
-        email: user.email || prev.email,
-      }))
+    if (!user || profileLoaded) return
+
+    const loadProfile = async () => {
+      try {
+        const profile = await ensureProfileFromAuthUser(user)
+        setForm((prev) => ({
+          ...prev,
+          fullName: profile.name || prev.fullName,
+          email: profile.email || prev.email,
+          whatsapp: profile.phone || prev.whatsapp,
+          company: profile.company || prev.company,
+        }))
+      } catch {
+        const meta = user.user_metadata || {}
+        setForm((prev) => ({
+          ...prev,
+          fullName: (meta.full_name as string) || prev.fullName,
+          email: user.email || prev.email,
+        }))
+      }
+      setProfileLoaded(true)
     }
-  }, [user])
+
+    loadProfile()
+  }, [user, profileLoaded])
 
   const update = (field: keyof FormData, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -125,7 +146,8 @@ export default function HirePage() {
         userId: user?.id || undefined,
         clientName: form.fullName.trim(),
         clientEmail: form.email.trim(),
-        clientPhone: form.whatsapp.trim(),
+        clientPhone: phoneFields?.phone_e164 || form.whatsapp.trim(),
+        phoneFields: phoneFields || undefined,
         company: form.company.trim() || undefined,
         serviceSlug: serviceSlug!,
         serviceName: serviceInfo.name,
@@ -142,7 +164,7 @@ export default function HirePage() {
       })
 
       if (result) {
-        toast.success("Request sent! Proceed to payment.")
+        toast.success("Order submitted! Payment is pending.")
         navigate(`/checkout/${result.id}`)
       }
     } catch {
@@ -157,12 +179,13 @@ export default function HirePage() {
   if (isSaaS) {
     const waMessage = "Hello! I'd like to discuss a Web App or SaaS project. Can we schedule a call to talk about the scope?"
     return (
-      <div className="min-h-screen bg-[#020408] text-[#f0f0f5]">
-        <div className="container mx-auto px-4 py-20 max-w-lg">
+      <div className="relative min-h-screen text-[#f0f0f5]">
+        <TechPremiumBackground />
+        <div className="relative z-10 container mx-auto px-4 py-20 max-w-lg">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-8 text-center"
+            className="rounded-2xl border border-white/[0.1] bg-white/[0.04] backdrop-blur-xl p-8 text-center shadow-[0_8px_40px_rgba(0,0,0,0.3)]"
           >
             <h1 className="text-2xl font-bold mb-2">Let's Discuss Your SaaS</h1>
             <p className="text-zinc-400 mb-6">
@@ -183,8 +206,9 @@ export default function HirePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#020408] text-[#f0f0f5]">
-      <div className="container mx-auto px-4 py-12 max-w-2xl">
+    <div className="relative min-h-screen text-[#f0f0f5]">
+      <TechPremiumBackground />
+      <div className="relative z-10 container mx-auto px-4 py-12 max-w-2xl">
         <Link
           to="/#work"
           className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white mb-8 transition-colors"
@@ -208,7 +232,7 @@ export default function HirePage() {
             <span className="text-zinc-500">Timeline: <span className="text-white">{serviceInfo.timeline}</span></span>
           </div>
           <div className="mt-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 px-4 py-2 text-xs text-yellow-400">
-            After submitting, you'll pay 50% upfront (${serviceInfo.price / 2}) to start.
+            50% upfront (${serviceInfo.price / 2}) required to start. Payment instructions will be sent after submission.
           </div>
         </motion.div>
 
@@ -216,7 +240,7 @@ export default function HirePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0, transition: { delay: 0.1 } }}
           onSubmit={handleSubmit}
-          className="space-y-5"
+          className="space-y-5 rounded-2xl border border-white/[0.1] bg-white/[0.04] backdrop-blur-xl p-6 shadow-[0_8px_40px_rgba(0,0,0,0.25)]"
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
@@ -252,18 +276,16 @@ export default function HirePage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1.5">
-                WhatsApp <span className="text-red-400">*</span>
-              </label>
-              <div className="relative">
-                <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                <input
-                  value={form.whatsapp}
-                  onChange={(e) => update("whatsapp", e.target.value)}
-                  placeholder="+55 41 99999-9999"
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-zinc-600 outline-none focus:border-blue-500/40 transition-colors"
-                />
-              </div>
+              <PhoneInput
+                value={form.whatsapp}
+                onChange={(e164) => update("whatsapp", e164)}
+                onPhoneChange={setPhoneFields}
+                required
+                label="WhatsApp"
+                placeholder="Phone number"
+                id="whatsapp"
+                name="whatsapp"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-1.5">
@@ -422,14 +444,14 @@ export default function HirePage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-[0_0_30px_rgba(37,99,235,0.2)]"
           >
             {submitting ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
               <Send size={16} />
             )}
-            {submitting ? "Sending..." : `Send Request — $${serviceInfo.price / 2} upfront`}
+            {submitting ? "Submitting..." : "Submit Order"}
           </button>
         </motion.form>
       </div>

@@ -199,7 +199,7 @@ export default function AdminPage({ user }: AdminPageProps) {
   }, [isAdmin])
 
   if (!user) return <Navigate to="/login" replace />
-  if (!isAdmin) return <Navigate to="/perfil" replace state={{ error: "Admin access only." }} />
+  if (!isAdmin) return <Navigate to="/profile" replace state={{ error: "Admin access only." }} />
 
   const pendingFeedbacks = feedbacks.filter((item) => (item.status || "pending") === "pending")
   const approvedFeedbacks = feedbacks.filter((item) => (item.status || (item.approved ? "approved" : "pending")) === "approved")

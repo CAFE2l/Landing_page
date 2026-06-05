@@ -404,7 +404,7 @@ export default function FeedbackForm({
                       type="url"
                       value={projectUrl}
                       onChange={(e) => setProjectUrl(e.target.value)}
-                      placeholder="https://seusite.com/projeto"
+                        placeholder="https://your-site.com/project"
                       className="w-full bg-[#0A0A0F] border border-[#1E1E2A] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#F0F0F5] placeholder-[#6B6B80] focus:outline-none focus:border-[#4F6EF7]/50 transition-all"
                     />
                   </div>

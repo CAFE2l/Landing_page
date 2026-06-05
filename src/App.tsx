@@ -19,6 +19,7 @@ import AdminSettings from "./pages/admin/Settings"
 import AdminFeedbackManagement from "./pages/admin/AdminFeedbackManagement"
 import HirePage from "./pages/HirePage"
 import CheckoutPage from "./pages/CheckoutPage"
+import OrdersDashboardPage from "./pages/OrdersDashboardPage"
 import AdminServiceOrders from "./pages/admin/ServiceOrders"
 import { ProtectedRoute } from "./components/auth/ProtectedRoute"
 import { AdminRoute } from "./components/auth/AdminRoute"
@@ -77,11 +78,11 @@ function App() {
           <Route path="/dashboard/settings" element={<ProtectedRoute><ProfilePage user={user} onSubmitFeedback={addFeedback} /></ProtectedRoute>} />
           <Route path="/dashboard/saved" element={<ProtectedRoute><SavedPostsPage /></ProtectedRoute>} />
           <Route path="/dashboard/messages" element={<ProtectedRoute><ChatErrorBoundary><MessagesPage /></ChatErrorBoundary></ProtectedRoute>} />
+          <Route path="/dashboard/orders" element={<ProtectedRoute><OrdersDashboardPage /></ProtectedRoute>} />
           <Route path="/hire/:serviceSlug" element={<HirePage />} />
           <Route path="/checkout/:orderId" element={<CheckoutPage />} />
           <Route path="/profile/:userId" element={<PublicProfilePage />} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage user={user} onSubmitFeedback={addFeedback} /></ProtectedRoute>} />
-          <Route path="/perfil" element={<ProtectedRoute><ProfilePage user={user} onSubmitFeedback={addFeedback} /></ProtectedRoute>} />
           <Route path="/admin" element={<AdminRoute><AdminShell /></AdminRoute>}>
             <Route index element={<AdminDashboard />} />
           </Route>

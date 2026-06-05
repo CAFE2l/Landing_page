@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import toast from "react-hot-toast"
 import type { Client, ClientNote, ClientStatus } from "../../lib/types/client"
+import { formatPhoneDisplay } from "../../components/ui/PhoneInput"
 import { getInitials, formatDate, timeAgo } from "../../lib/utils"
 import { useAuth } from "../../contexts/AuthContext"
 import { getSupabaseClient } from "../../data/adminServiceSupabase"
@@ -20,6 +21,7 @@ import {
 import { createOrGetConversation } from "../../lib/chatService"
 import { useChatStore } from "../../lib/store/chatStore"
 import { fetchFollowCounts, isFollowing, toggleFollow } from "../../lib/socialService"
+import FollowButton from "../../components/ui/FollowButton"
 
 type SortField = "name" | "createdAt" | "projectsCount" | "feedbackCount" | "lastActivity"
 type SortDir = "asc" | "desc"
@@ -608,7 +610,7 @@ function ClientDrawer({
 
   const infoSections = [
     { icon: Mail, label: "Email", value: client.email },
-    { icon: Phone, label: "Phone", value: client.phone || "—" },
+    { icon: Phone, label: "Phone", value: client.phone ? formatPhoneDisplay(client.phone) : "—" },
     { icon: MapPin, label: "Location", value: client.location || "—" },
     { icon: Briefcase, label: "Company", value: client.company || "—" },
     { icon: FileText, label: "Bio", value: client.bio || "—" },
@@ -685,25 +687,22 @@ function ClientDrawer({
                 <MessageCircle size={16} />
                 Send Message
               </button>
-              <motion.button
-                onClick={handleFollowToggle}
-                disabled={followLoading || !adminId}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
-                className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
-                  following
-                    ? "border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30"
-                    : "border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 shadow-[0_0_16px_rgba(37,99,235,0.12)]"
-                }`}
-              >
-                {followLoading ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : following ? (
-                  "Following"
-                ) : (
-                  "Follow"
-                )}
-              </motion.button>
+              {adminId && client.id && (
+                <FollowButton
+                  currentUserId={adminId}
+                  targetUserId={client.id}
+                  targetUserName={client.name}
+                  initialFollowing={following}
+                  onStateChange={(nowFollowing) => {
+                    setFollowing(nowFollowing)
+                    setSocialCounts((prev) => ({
+                      ...prev,
+                      followers: nowFollowing ? prev.followers + 1 : Math.max(0, prev.followers - 1),
+                    }))
+                  }}
+                  className="flex-1"
+                />
+              )}
             </div>
 
             {/* Stats cards — extended with social */}

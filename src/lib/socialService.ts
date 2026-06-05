@@ -182,7 +182,7 @@ export async function toggleFollow(
       .from("social_follows")
       .delete()
       .eq("id", (existing as { id: string }).id)
-    return !error ? false : false
+    return !error
   }
 
   const { error } = await supabase

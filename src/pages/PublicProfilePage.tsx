@@ -1,16 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Edit3, MessageCircle, UserPlus, Users, Trash2, Loader2, Shield } from "lucide-react";
+import { Edit3, MessageCircle, Users, Trash2, Loader2, Shield } from "lucide-react";
 import toast from "react-hot-toast";
 import PageShell from "./PageShell";
 import FeedbackCard from "../components/feedback/FeedbackCard";
+import FollowButton from "../components/ui/FollowButton";
 import { useAuth } from "../contexts/AuthContext";
 import {
   fetchPublicProfile,
   getOrCreateConversation,
-  isFollowingProfile,
-  toggleFollowProfile,
   type PublicProfileData,
 } from "../data/feedbackServiceSupabase";
 import { deleteClient } from "../lib/adminClientService";
@@ -38,7 +37,9 @@ export default function PublicProfilePage() {
 
   useEffect(() => {
     if (!user?.id || !userId || user.id === userId) return;
-    isFollowingProfile(user.id, userId).then(setFollowing);
+    import("../lib/socialService").then(({ isFollowing }) =>
+      isFollowing(user.id!, userId!).then(setFollowing),
+    );
   }, [user?.id, userId]);
 
   const handleDeleteUser = async () => {
@@ -55,13 +56,8 @@ export default function PublicProfilePage() {
     }
   }
 
-  const handleFollow = async () => {
-    if (!user?.id || !userId) {
-      toast.error("Login to follow users");
-      return;
-    }
-    const next = await toggleFollowProfile(user.id, userId);
-    setFollowing(next);
+  const handleFollowStateChange = (nowFollowing: boolean) => {
+    setFollowing(nowFollowing);
     setProfile((current) =>
       current
         ? {
@@ -70,7 +66,7 @@ export default function PublicProfilePage() {
               ...current.stats,
               followers: Math.max(
                 0,
-                current.stats.followers + (next ? 1 : -1),
+                current.stats.followers + (nowFollowing ? 1 : -1),
               ),
             },
           }
@@ -135,9 +131,15 @@ export default function PublicProfilePage() {
                   </Link>
                 ) : (
                   <>
-                    <button onClick={handleFollow} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${following ? "bg-[#22C55E] text-[#05110A]" : "border border-white/[0.1] text-[#F0F0F5] hover:bg-white/[0.06]"}`}>
-                      <UserPlus size={16} /> {following ? "Following" : "Follow"}
-                    </button>
+                    {user?.id && userId && (
+                      <FollowButton
+                        currentUserId={user.id}
+                        targetUserId={userId}
+                        targetUserName={profile?.name}
+                        initialFollowing={following}
+                        onStateChange={handleFollowStateChange}
+                      />
+                    )}
                     <button onClick={handleMessage} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#8B5CF6] px-4 py-2.5 text-sm font-semibold text-white">
                       <MessageCircle size={16} /> Send Message
                     </button>

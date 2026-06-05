@@ -16,6 +16,7 @@ import {
   fetchSocialPosts, createSocialPost, toggleSocialLike, addPostComment,
   fetchPostComments, toggleFollow, isFollowing,
 } from "../lib/socialService"
+import FollowButton from "../components/ui/FollowButton"
 import type { ChatConversation as ChatConv, ChatMessage, SocialPost } from "../data/feedbackStore"
 import toast from "react-hot-toast"
 
@@ -344,9 +345,9 @@ export default function MessagesPage() {
       {/* Tabs */}
       <div className="flex border-b border-white/[0.06] shrink-0">
         {([
-          { key: "conversations" as Tab, label: "Conversas", icon: MessageCircle },
+          { key: "conversations" as Tab, label: "Conversations", icon: MessageCircle },
           { key: "status" as Tab, label: "Status", icon: Hash },
-          { key: "following" as Tab, label: "Seguindo", icon: UserPlus },
+          { key: "following" as Tab, label: "Following", icon: UserPlus },
         ]).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -372,7 +373,7 @@ export default function MessagesPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar conversas..."
+                    placeholder="Search conversations..."
                 className="w-full rounded-xl border border-white/[0.06] bg-white/[0.03] py-2 pl-9 pr-3 text-sm text-white placeholder:text-[#4A4A5A] outline-none focus:border-[#4F6EF7]/30 transition-all"
               />
             </div>
@@ -387,7 +388,7 @@ export default function MessagesPage() {
                       : "text-[#6B6B80] hover:bg-white/[0.04]"
                   }`}
                 >
-                  {f === "all" ? "Todas" : "Não lidas"}
+                  {f === "all" ? "All" : "Unread"}
                 </button>
               ))}
             </div>
@@ -408,14 +409,14 @@ export default function MessagesPage() {
                   className="flex items-center gap-2 rounded-xl bg-[#4F6EF7] px-4 py-2 text-xs font-medium text-white hover:bg-[#4F6EF7]/90 transition-all"
                 >
                   <RefreshCw size={13} />
-                  Tentar novamente
+                    Retry
                 </button>
               </div>
             ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center px-4">
                 <MessageCircle size={32} className="text-[#4A4A5A] mb-3" />
-                <p className="text-sm text-[#6B6B80]">Nenhuma conversa</p>
-                <p className="text-xs text-[#4A4A5A] mt-1">Visite o perfil de alguém para iniciar</p>
+                <p className="text-sm text-[#6B6B80]">No conversations</p>
+                <p className="text-xs text-[#4A4A5A] mt-1">Visit someone's profile to start one</p>
               </div>
             ) : (
               <div className="py-1">
@@ -441,11 +442,11 @@ export default function MessagesPage() {
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-semibold text-white truncate">{conv.otherUser.name}</p>
                         <p className="text-[10px] text-[#4A4A5A] shrink-0 ml-2">
-                          {new Date(conv.lastMessageAt).toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}
+                          {new Date(conv.lastMessageAt).toLocaleDateString("en-US", { day: "numeric", month: "short" })}
                         </p>
                       </div>
                       <div className="flex items-center justify-between mt-0.5">
-                        <p className="text-xs text-[#6B6B80] truncate">{conv.lastMessage || "Iniciar conversa"}</p>
+                        <p className="text-xs text-[#6B6B80] truncate">{conv.lastMessage || "Start a conversation"}</p>
                         {conv.unreadCount > 0 && (
                           <span className="ml-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#4F6EF7] px-1.5 text-[9px] font-bold text-white">
                             {conv.unreadCount}
@@ -477,7 +478,7 @@ export default function MessagesPage() {
                 <textarea
                   value={postInput}
                   onChange={(e) => setPostInput(e.target.value)}
-                  placeholder="Compartilhe uma atualização..."
+                  placeholder="Share an update..."
                   rows={2}
                   className="w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-[#4A4A5A] outline-none focus:border-[#4F6EF7]/30 transition-all"
                 />
@@ -509,7 +510,7 @@ export default function MessagesPage() {
                     className="inline-flex items-center gap-1.5 rounded-xl bg-[#4F6EF7] px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40 hover:bg-[#6B85FF] transition-all"
                   >
                     {posting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                    Publicar
+                    Publish
                   </button>
                 </div>
               </div>
@@ -524,16 +525,16 @@ export default function MessagesPage() {
           ) : postError ? (
             <div className="flex flex-col items-center justify-center py-20 text-center px-4">
               <p className="text-sm text-red-400">{postError}</p>
-              <button onClick={() => loadPosts(tab === "following" ? "following" : "all")} className="mt-3 text-xs text-[#4F6EF7] hover:underline">Tentar novamente</button>
+              <button onClick={() => loadPosts(tab === "following" ? "following" : "all")} className="mt-3 text-xs text-[#4F6EF7] hover:underline">Retry</button>
             </div>
           ) : posts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center px-4">
               <Hash size={32} className="text-[#4A4A5A] mb-3" />
               <p className="text-sm text-[#6B6B80]">
-                {tab === "following" ? "Nenhum post das pessoas que você segue" : "Nenhum post ainda"}
+                {tab === "following" ? "No posts from people you follow" : "No posts yet"}
               </p>
               <p className="text-xs text-[#4A4A5A] mt-1">
-                {tab === "following" ? "Siga usuários para ver atualizações deles aqui" : "Seja o primeiro a publicar"}
+                {tab === "following" ? "Follow users to see their updates here" : "Be the first to publish"}
               </p>
             </div>
           ) : (
@@ -559,7 +560,7 @@ export default function MessagesPage() {
                           <span className="text-[11px] text-[#4A4A5A]">@{post.user.username}</span>
                         )}
                         <span className="text-[10px] text-[#4A4A5A] ml-auto">
-                          {new Date(post.createdAt).toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}
+                          {new Date(post.createdAt).toLocaleDateString("en-US", { day: "numeric", month: "short" })}
                         </span>
                       </div>
                       <p className="mt-1 text-sm text-[#A0A0B5] whitespace-pre-line">{post.content}</p>
@@ -605,7 +606,7 @@ export default function MessagesPage() {
                             }}
                             className="ml-auto text-[10px] text-[#4F6EF7] hover:underline"
                           >
-                            Seguir
+                            Follow
                           </button>
                         )}
                       </div>
@@ -639,7 +640,7 @@ export default function MessagesPage() {
                                 value={commentInput[post.id] || ""}
                                 onChange={(e) => setCommentInput((prev) => ({ ...prev, [post.id]: e.target.value }))}
                                 onKeyDown={(e) => { if (e.key === "Enter") handleComment(post.id) }}
-                                placeholder="Escreva um comentário..."
+                                placeholder="Write a comment..."
                                 className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-xs text-white placeholder:text-[#4A4A5A] outline-none focus:border-[#4F6EF7]/30 transition-all"
                               />
                               <button
@@ -670,9 +671,9 @@ export default function MessagesPage() {
       <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-white/[0.06] bg-white/[0.03] mb-5">
         <MessageCircle size={32} className="text-[#4A4A5A]" />
       </div>
-      <p className="text-lg font-semibold text-white mb-1">Suas Mensagens</p>
+      <p className="text-lg font-semibold text-white mb-1">Your Messages</p>
       <p className="text-sm text-[#6B6B80] max-w-xs">
-        Selecione uma conversa para começar a conversar ou vá para Status para ver atualizações da comunidade
+        Select a conversation to start chatting or go to Status to see community updates
       </p>
     </div>
   )
@@ -722,15 +723,15 @@ export default function MessagesPage() {
         ) : msgError ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <p className="text-sm text-red-400">{msgError}</p>
-            <button onClick={loadMessages} className="mt-3 text-xs text-[#4F6EF7] hover:underline">Tentar novamente</button>
+            <button onClick={loadMessages} className="mt-3 text-xs text-[#4F6EF7] hover:underline">                  Retry</button>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.03] mb-4">
               <MessageCircle size={24} className="text-[#4F6EF7]" />
             </div>
-            <p className="text-sm text-[#6B6B80]">Nenhuma mensagem ainda</p>
-            <p className="text-xs text-[#4A4A5A] mt-1">Envie sua primeira mensagem abaixo</p>
+                <p className="text-sm text-[#6B6B80]">No messages yet</p>
+                <p className="text-xs text-[#4A4A5A] mt-1">Send your first message below</p>
           </div>
         ) : (
           messages.map((msg) => {
@@ -761,7 +762,7 @@ export default function MessagesPage() {
                     msg.content
                   )}
                   <div className={`text-[10px] mt-1 ${isOwn ? "text-white/50 text-right" : "text-[#4A4A5A]"}`}>
-                    {new Date(msg.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(msg.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                     {isOwn && (
                       <span className="ml-1">{msg.readAt ? "✓✓" : "✓"}</span>
                     )}
@@ -782,7 +783,7 @@ export default function MessagesPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={`Mensagem para ${activeConv.otherUser.name}...`}
+                  placeholder={`Message ${activeConv.otherUser.name}...`}
               rows={1}
               className="w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 pr-20 text-sm text-white placeholder:text-[#4A4A5A] outline-none focus:border-[#4F6EF7]/40 transition-all min-h-[40px] max-h-[120px]"
             />
@@ -821,7 +822,7 @@ export default function MessagesPage() {
       <Navbar />
       <div
         className="flex overflow-hidden border-t border-white/[0.06]"
-        style={{ height: "calc(100vh - 64px)" }}
+        style={{ height: "100vh", paddingTop: "64px" }}
       >
         {/* Mobile: show list or chat */}
         <div className="flex w-full md:hidden">
@@ -905,31 +906,26 @@ export default function MessagesPage() {
                     </div>
                     <div className="text-center">
                       <p className="text-lg font-bold text-white">{drawerProfile.followers}</p>
-                      <p className="text-[10px] text-[#4A4A5A]">Seguidores</p>
+                      <p className="text-[10px] text-[#4A4A5A]">Followers</p>
                     </div>
                     <div className="text-center">
                       <p className="text-lg font-bold text-white">{drawerProfile.following}</p>
-                      <p className="text-[10px] text-[#4A4A5A]">Seguindo</p>
+                      <p className="text-[10px] text-[#4A4A5A]">Following</p>
                     </div>
                   </div>
                   <div className="mt-5 flex gap-3">
                     {uid && drawerProfile.id !== uid && (
                       <>
-                        <button
-                          onClick={async () => {
-                            const result = await toggleFollow(uid, drawerProfile.id)
-                            if (result) {
-                              setDrawerProfile((prev) => prev ? { ...prev, following_: !prev.following_, followers: prev.following_ ? prev.followers - 1 : prev.followers + 1 } : prev)
-                            }
+                        <FollowButton
+                          currentUserId={uid}
+                          targetUserId={drawerProfile.id}
+                          targetUserName={drawerProfile.name}
+                          initialFollowing={drawerProfile.following_}
+                          onStateChange={(nowFollowing) => {
+                            setDrawerProfile((prev) => prev ? { ...prev, following_: nowFollowing, followers: nowFollowing ? prev.followers + 1 : Math.max(0, prev.followers - 1) } : prev)
                           }}
-                          className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all ${
-                            drawerProfile.following_
-                              ? "border border-white/[0.1] text-[#F0F0F5] hover:bg-white/[0.06]"
-                              : "bg-[#4F6EF7] text-white hover:bg-[#6B85FF]"
-                          }`}
-                        >
-                          {drawerProfile.following_ ? "Seguindo" : "Seguir"}
-                        </button>
+                          className="flex-1"
+                        />
                         <button
                           onClick={async () => {
                             const convId = await createOrGetConversation(uid, drawerProfile.id)
@@ -946,14 +942,14 @@ export default function MessagesPage() {
                           }}
                           className="flex-1 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] py-2.5 text-sm font-semibold text-white"
                         >
-                          Mensagem
+                          Message
                         </button>
                       </>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="py-8 text-center text-sm text-[#6B6B80]">Perfil não encontrado</div>
+                <div className="py-8 text-center text-sm text-[#6B6B80]">Profile not found</div>
               )}
               <button
                 onClick={() => setDrawerUserId(null)}

@@ -197,7 +197,7 @@ export default function FeedbackPage() {
       });
 
       if (id) {
-        toast.success("Feedback publicado com sucesso!");
+        toast.success("Feedback published successfully!");
         setShowForm(false);
         loadPosts();
       } else {

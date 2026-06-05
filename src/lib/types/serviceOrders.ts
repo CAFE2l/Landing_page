@@ -17,12 +17,18 @@ export type PaymentStatus =
 
 export type ServiceSlug = "landing-page" | "professional-website" | "website" | "saas-dashboard"
 
+export interface ServiceOrderProfile {
+  fullName: string | null
+  avatarUrl: string | null
+}
+
 export interface ServiceOrder {
   id: string
   userId: string | null
   clientName: string
   clientEmail: string
   clientPhone: string
+  profile: ServiceOrderProfile | null
   company: string | null
   serviceSlug: string
   serviceName: string
@@ -64,10 +70,26 @@ export const SERVICE_PLANS: Record<ServiceSlug, { name: string; price: number }>
   "saas-dashboard": { name: "Web App & SaaS", price: 0 },
 }
 
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  waiting_upfront_payment: "Payment Pending",
+  paid_upfront: "Upfront Paid",
+  remaining_paid: "Remaining Paid",
+  fully_paid: "Fully Paid",
+  refunded: "Refunded",
+}
+
+export const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
+  waiting_upfront_payment: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+  paid_upfront: "bg-green-500/10 text-green-400 border-green-500/20",
+  remaining_paid: "bg-teal-500/10 text-teal-400 border-teal-500/20",
+  fully_paid: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  refunded: "bg-red-500/10 text-red-400 border-red-500/20",
+}
+
 export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   new_request: "New Request",
-  waiting_payment: "Waiting Payment",
-  paid_upfront: "Paid Upfront",
+  waiting_payment: "Awaiting Payment Instructions",
+  paid_upfront: "Upfront Paid",
   in_progress: "In Progress",
   waiting_delivery_payment: "Waiting Delivery Payment",
   delivered: "Delivered",

@@ -8,9 +8,22 @@ import {
   Phone, Mail, DollarSign, Calendar,
   FileText, Edit3, RefreshCw,
 } from "lucide-react"
-import { fetchServiceOrders, updateServiceOrder, subscribeToServiceOrders, generateAdminWhatsAppLink } from "../../lib/serviceOrdersService"
-import type { ServiceOrder, ProjectStatus } from "../../lib/types/serviceOrders"
-import { PROJECT_STATUS_LABELS, PROJECT_STATUS_COLORS } from "../../lib/types/serviceOrders"
+import {
+  fetchServiceOrders,
+  updateServiceOrder,
+  subscribeToServiceOrders,
+  generateAdminWhatsAppLink,
+  getOrderDisplayName,
+  getOrderAvatarUrl,
+} from "../../lib/serviceOrdersService"
+import { formatPhoneDisplay } from "../../components/ui/PhoneInput"
+import type { ServiceOrder, ProjectStatus, PaymentStatus } from "../../lib/types/serviceOrders"
+import {
+  PROJECT_STATUS_LABELS,
+  PROJECT_STATUS_COLORS,
+  PAYMENT_STATUS_LABELS,
+  PAYMENT_STATUS_COLORS,
+} from "../../lib/types/serviceOrders"
 import { cn, timeAgo } from "../../lib/utils"
 import toast from "react-hot-toast"
 
@@ -19,7 +32,7 @@ type StatusTab = "all" | ProjectStatus
 const TABS: { key: StatusTab; label: string }[] = [
   { key: "all", label: "All" },
   { key: "new_request", label: "New" },
-  { key: "waiting_payment", label: "Waiting" },
+  { key: "waiting_payment", label: "Payment Pending" },
   { key: "paid_upfront", label: "Upfront Paid" },
   { key: "in_progress", label: "In Progress" },
   { key: "waiting_delivery_payment", label: "Delivery" },
@@ -29,8 +42,8 @@ const TABS: { key: StatusTab; label: string }[] = [
 ]
 
 const STATUS_ACTIONS: { from: ProjectStatus[]; to: ProjectStatus; label: string; icon: typeof ChevronDown }[] = [
-  { from: ["new_request"], to: "waiting_payment", label: "Move to Waiting Payment", icon: AlertCircle },
-  { from: ["waiting_payment"], to: "paid_upfront", label: "Mark Upfront Paid", icon: CheckCircle2 },
+  { from: ["new_request"], to: "waiting_payment", label: "Awaiting Payment Instructions", icon: AlertCircle },
+  { from: ["waiting_payment", "new_request"], to: "paid_upfront", label: "Mark Upfront Paid (manual)", icon: CheckCircle2 },
   { from: ["paid_upfront"], to: "in_progress", label: "Start Project", icon: Clock },
   { from: ["in_progress"], to: "waiting_delivery_payment", label: "Ready for Delivery Payment", icon: AlertCircle },
   { from: ["waiting_delivery_payment"], to: "delivered", label: "Deliver Project", icon: CheckCircle2 },
@@ -49,15 +62,51 @@ function StatusBadge({ status }: { status: ProjectStatus }) {
   )
 }
 
+function PaymentBadge({ status }: { status: PaymentStatus }) {
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium", PAYMENT_STATUS_COLORS[status])}>
+      <DollarSign size={11} />
+      {PAYMENT_STATUS_LABELS[status]}
+    </span>
+  )
+}
+
+function OrderAvatar({ order }: { order: ServiceOrder }) {
+  const avatarUrl = getOrderAvatarUrl(order)
+  const name = getOrderDisplayName(order)
+
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        className="h-10 w-10 shrink-0 rounded-full object-cover border border-white/10"
+      />
+    )
+  }
+
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/20 to-cyan-500/20 text-sm font-bold text-blue-400">
+      {name.charAt(0).toUpperCase()}
+    </div>
+  )
+}
+
 function OrderCard({ order, onUpdate }: { order: ServiceOrder; onUpdate: () => void }) {
   const [expanded, setExpanded] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const displayName = getOrderDisplayName(order)
 
   const availableActions = STATUS_ACTIONS.filter((a) => a.from.includes(order.projectStatus))
 
   const handleStatusUpdate = async (newStatus: ProjectStatus) => {
     setUpdating(true)
-    const ok = await updateServiceOrder(order.id, { projectStatus: newStatus })
+    const updates: Parameters<typeof updateServiceOrder>[1] = { projectStatus: newStatus }
+    if (newStatus === "paid_upfront") {
+      updates.upfrontPaid = true
+      updates.paymentStatus = "paid_upfront"
+    }
+    const ok = await updateServiceOrder(order.id, updates)
     setUpdating(false)
     if (ok) {
       toast.success(`Order → ${PROJECT_STATUS_LABELS[newStatus]}`)
@@ -71,26 +120,27 @@ function OrderCard({ order, onUpdate }: { order: ServiceOrder; onUpdate: () => v
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="group rounded-xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm hover:border-white/[0.12] transition-all duration-300 overflow-hidden"
+      className="group rounded-xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm hover:border-white/[0.12] transition-all duration-300 min-h-[220px] w-full"
     >
       <div className="p-5">
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex flex-col gap-3 mb-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/20 to-cyan-500/20 text-sm font-bold text-blue-400">
-              {order.clientName.charAt(0).toUpperCase()}
-            </div>
+            <OrderAvatar order={order} />
             <div className="min-w-0">
-              <h3 className="text-sm font-semibold text-white truncate">{order.clientName}</h3>
+              <h3 className="text-sm font-semibold text-white truncate">{displayName}</h3>
               <p className="text-xs text-zinc-500 truncate">{order.serviceName}</p>
               {order.company && (
                 <p className="text-xs text-zinc-600 truncate">{order.company}</p>
               )}
             </div>
           </div>
-          <StatusBadge status={order.projectStatus} />
+          <div className="flex flex-wrap gap-2 shrink-0">
+            <PaymentBadge status={order.paymentStatus} />
+            <StatusBadge status={order.projectStatus} />
+          </div>
         </div>
 
-        <div className="flex items-center gap-4 text-xs text-zinc-500 mb-3">
+        <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500 mb-3">
           <span className="flex items-center gap-1">
             <DollarSign size={12} />
             ${order.totalPrice}
@@ -106,7 +156,7 @@ function OrderCard({ order, onUpdate }: { order: ServiceOrder; onUpdate: () => v
             <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-0.5">Upfront</p>
             <p className={cn("text-sm font-semibold", order.upfrontPaid ? "text-green-400" : "text-yellow-400")}>
               ${order.upfrontAmount}
-              {order.upfrontPaid && " ✓"}
+              {order.upfrontPaid ? " ✓" : " pending"}
             </p>
           </div>
           <div className="rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-2">
@@ -124,22 +174,22 @@ function OrderCard({ order, onUpdate }: { order: ServiceOrder; onUpdate: () => v
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="space-y-3 overflow-hidden"
+              className="space-y-3"
             >
               <div className="border-t border-white/[0.06] pt-3 space-y-2 text-xs">
                 <div className="flex items-center gap-2 text-zinc-400">
-                  <Mail size={12} />
-                  <a href={`mailto:${order.clientEmail}`} className="hover:text-blue-400 transition-colors">{order.clientEmail}</a>
+                  <Mail size={12} className="shrink-0" />
+                  <a href={`mailto:${order.clientEmail}`} className="hover:text-blue-400 transition-colors truncate">{order.clientEmail}</a>
                 </div>
                 <div className="flex items-center gap-2 text-zinc-400">
-                  <Phone size={12} />
+                  <Phone size={12} className="shrink-0" />
                   <a href={`https://wa.me/${order.clientPhone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer" className="hover:text-green-400 transition-colors">
-                    {order.clientPhone}
+                    {formatPhoneDisplay(order.clientPhone)}
                   </a>
                 </div>
                 {order.currentProjectUrl && (
                   <div className="flex items-center gap-2 text-zinc-400">
-                    <ExternalLink size={12} />
+                    <ExternalLink size={12} className="shrink-0" />
                     <a href={order.currentProjectUrl} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition-colors truncate">
                       {order.currentProjectUrl}
                     </a>
@@ -147,7 +197,7 @@ function OrderCard({ order, onUpdate }: { order: ServiceOrder; onUpdate: () => v
                 )}
                 {order.desiredDeadline && (
                   <div className="flex items-center gap-2 text-zinc-400">
-                    <Calendar size={12} />
+                    <Calendar size={12} className="shrink-0" />
                     <span>Deadline: {order.desiredDeadline}</span>
                   </div>
                 )}
@@ -177,7 +227,7 @@ function OrderCard({ order, onUpdate }: { order: ServiceOrder; onUpdate: () => v
           )}
         </AnimatePresence>
 
-        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/[0.06]">
+        <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-white/[0.06]">
           <button
             onClick={() => setExpanded(!expanded)}
             className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs text-zinc-500 hover:text-white hover:bg-white/5 transition-colors"
@@ -214,10 +264,8 @@ function OrderCard({ order, onUpdate }: { order: ServiceOrder; onUpdate: () => v
             My WhatsApp
           </a>
 
-          <div className="flex-1" />
-
           {availableActions.length > 0 && (
-            <div className="relative group/actions">
+            <div className="relative group/actions ml-auto">
               <button
                 disabled={updating}
                 className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
@@ -232,9 +280,9 @@ function OrderCard({ order, onUpdate }: { order: ServiceOrder; onUpdate: () => v
                     <button
                       key={action.to}
                       onClick={() => handleStatusUpdate(action.to)}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-zinc-400 hover:text-white hover:bg-white/5 transition-colors text-left"
                     >
-                      <action.icon size={14} />
+                      <action.icon size={14} className="shrink-0" />
                       {action.label}
                     </button>
                   ))}
@@ -250,7 +298,7 @@ function OrderCard({ order, onUpdate }: { order: ServiceOrder; onUpdate: () => v
 
 function SkeletonCard() {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 animate-pulse">
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 animate-pulse min-h-[220px]">
       <div className="flex items-center gap-3 mb-4">
         <div className="h-10 w-10 rounded-full bg-white/5" />
         <div className="space-y-2 flex-1">
@@ -298,6 +346,7 @@ export default function ServiceOrders() {
       const q = search.toLowerCase()
       result = result.filter(
         (o) =>
+          getOrderDisplayName(o).toLowerCase().includes(q) ||
           o.clientName.toLowerCase().includes(q) ||
           o.clientEmail.toLowerCase().includes(q) ||
           o.clientPhone.includes(q) ||
@@ -317,7 +366,7 @@ export default function ServiceOrders() {
   }, [orders])
 
   return (
-    <div>
+    <div className="w-full min-w-0">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold text-white">Service Orders</h2>
@@ -363,7 +412,7 @@ export default function ServiceOrders() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <SkeletonCard key={i} />
           ))}
@@ -387,7 +436,7 @@ export default function ServiceOrders() {
       ) : (
         <motion.div
           layout
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 w-full"
         >
           <AnimatePresence mode="popLayout">
             {filtered.map((order) => (

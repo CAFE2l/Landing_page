@@ -1,14 +1,24 @@
 import { supabase, supabaseConfigured } from "./supabase/client"
 import type { ServiceOrder, Notification, ProjectStatus, PaymentStatus } from "./types/serviceOrders"
+import type { PhoneFields } from "../components/ui/PhoneInput"
+import { ensureProfileFromAuthUser } from "./supabaseProfile"
 import toast from "react-hot-toast"
 
+type ProfileJoin = { full_name: string | null; avatar_url: string | null } | null
+
 function mapOrder(row: Record<string, unknown>): ServiceOrder {
+  const profileRow = row.profiles as ProfileJoin | ProfileJoin[] | undefined
+  const profile = Array.isArray(profileRow) ? profileRow[0] : profileRow
+
   return {
     id: row.id as string,
     userId: (row.user_id as string) || null,
     clientName: row.client_name as string,
     clientEmail: row.client_email as string,
     clientPhone: row.client_phone as string,
+    profile: profile
+      ? { fullName: profile.full_name, avatarUrl: profile.avatar_url }
+      : null,
     company: (row.company as string) || null,
     serviceSlug: row.service_slug as string,
     serviceName: row.service_name as string,
@@ -34,30 +44,98 @@ function mapOrder(row: Record<string, unknown>): ServiceOrder {
   }
 }
 
-export async function fetchServiceOrders(): Promise<ServiceOrder[]> {
-  if (!supabase || !supabaseConfigured) return []
-  const { data, error } = await supabase
-    .from("service_orders")
-    .select("*")
-    .order("created_at", { ascending: false })
+export function getOrderDisplayName(order: ServiceOrder): string {
+  if (order.userId && order.profile?.fullName) return order.profile.fullName
+  return order.clientName
+}
 
-  if (error) {
-    console.error("fetchServiceOrders failed", error)
+export function getOrderAvatarUrl(order: ServiceOrder): string | null {
+  return order.profile?.avatarUrl || null
+}
+
+const ORDER_SELECT = `
+  *,
+  profiles (
+    full_name,
+    avatar_url
+  )
+`
+
+async function fetchOrdersWithFallback(filter?: { userId?: string }): Promise<ServiceOrder[]> {
+  if (!supabase || !supabaseConfigured) return []
+
+  let query = supabase.from("service_orders").select(ORDER_SELECT).order("created_at", { ascending: false })
+  if (filter?.userId) query = query.eq("user_id", filter.userId)
+
+  const { data, error } = await query
+  if (!error) return ((data || []) as Record<string, unknown>[]).map(mapOrder)
+
+  let fallbackQuery = supabase.from("service_orders").select("*").order("created_at", { ascending: false })
+  if (filter?.userId) fallbackQuery = fallbackQuery.eq("user_id", filter.userId)
+  const retry = await fallbackQuery
+  if (retry.error) {
+    console.error("fetchServiceOrders failed", retry.error)
     return []
   }
-  return ((data || []) as Record<string, unknown>[]).map(mapOrder)
+  return ((retry.data || []) as Record<string, unknown>[]).map(mapOrder)
+}
+
+export async function fetchServiceOrders(): Promise<ServiceOrder[]> {
+  return fetchOrdersWithFallback()
 }
 
 export async function fetchServiceOrder(id: string): Promise<ServiceOrder | null> {
   if (!supabase || !supabaseConfigured) return null
   const { data, error } = await supabase
     .from("service_orders")
+    .select(ORDER_SELECT)
+    .eq("id", id)
+    .maybeSingle()
+
+  if (!error && data) return mapOrder(data as Record<string, unknown>)
+
+  const retry = await supabase
+    .from("service_orders")
     .select("*")
     .eq("id", id)
     .maybeSingle()
 
-  if (error || !data) return null
-  return mapOrder(data as Record<string, unknown>)
+  if (retry.error || !retry.data) return null
+  return mapOrder(retry.data as Record<string, unknown>)
+}
+
+async function resolveClientFromProfile(
+  userId: string | undefined,
+  fallback: { clientName: string; clientEmail: string; clientPhone: string },
+): Promise<{ clientName: string; clientEmail: string; clientPhone: string; avatarUrl?: string }> {
+  if (!userId || !supabase || !supabaseConfigured) return fallback
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || user.id !== userId) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, email, phone, avatar_url")
+      .eq("id", userId)
+      .maybeSingle()
+
+    if (profile) {
+      return {
+        clientName: (profile.full_name as string) || fallback.clientName,
+        clientEmail: (profile.email as string) || fallback.clientEmail,
+        clientPhone: (profile.phone as string) || fallback.clientPhone,
+        avatarUrl: (profile.avatar_url as string) || undefined,
+      }
+    }
+    return fallback
+  }
+
+  const profile = await ensureProfileFromAuthUser(user)
+  return {
+    clientName: profile.name || fallback.clientName,
+    clientEmail: profile.email || fallback.clientEmail,
+    clientPhone: profile.phone || fallback.clientPhone,
+    avatarUrl: profile.photoUrl,
+  }
 }
 
 export async function createServiceOrder(
@@ -66,6 +144,7 @@ export async function createServiceOrder(
     clientName: string
     clientEmail: string
     clientPhone: string
+    phoneFields?: PhoneFields
     company?: string
     serviceSlug: string
     serviceName: string
@@ -86,17 +165,29 @@ export async function createServiceOrder(
   const upfrontAmount = Math.round(input.totalPrice * 0.5 * 100) / 100
   const remainingAmount = input.totalPrice - upfrontAmount
 
+  const resolved = await resolveClientFromProfile(input.userId, {
+    clientName: input.clientName,
+    clientEmail: input.clientEmail,
+    clientPhone: input.clientPhone,
+  })
+
+  const phoneE164 = input.phoneFields?.phone_e164 || input.clientPhone
+
   const payload: Record<string, unknown> = {
     user_id: input.userId || null,
-    client_name: input.clientName,
-    client_email: input.clientEmail,
-    client_phone: input.clientPhone,
+    client_name: input.clientName.trim(),
+    client_email: resolved.clientEmail,
+    client_phone: phoneE164,
     company: input.company || null,
     service_slug: input.serviceSlug,
     service_name: input.serviceName,
     total_price: input.totalPrice,
     upfront_amount: upfrontAmount,
     remaining_amount: remainingAmount,
+    upfront_paid: false,
+    remaining_paid: false,
+    payment_status: "waiting_upfront_payment",
+    project_status: "new_request",
     project_type: input.projectType || null,
     project_goal: input.projectGoal || null,
     project_description: input.projectDescription,
@@ -108,30 +199,72 @@ export async function createServiceOrder(
     additional_notes: input.additionalNotes || null,
   }
 
+  if (input.phoneFields) {
+    payload.phone_country_code = input.phoneFields.phone_country_code
+    payload.phone_country = input.phoneFields.phone_country
+    payload.phone_number = input.phoneFields.phone_number
+    payload.phone_e164 = input.phoneFields.phone_e164
+  }
+
   const { data, error } = await supabase
     .from("service_orders")
     .insert(payload)
-    .select()
+    .select(ORDER_SELECT)
     .single()
 
   if (error) {
+    if (input.phoneFields && error.message?.includes("phone_country")) {
+      const { phone_country_code: _a, phone_country: _b, phone_number: _c, phone_e164: _d, ...fallbackPayload } = payload
+      const retry = await supabase
+        .from("service_orders")
+        .insert(fallbackPayload)
+        .select(ORDER_SELECT)
+        .single()
+      if (retry.error) {
+        console.error("createServiceOrder failed", retry.error)
+        toast.error("Failed to create service order")
+        return null
+      }
+      const order = mapOrder(retry.data as Record<string, unknown>)
+      await notifyNewOrder(order, input.serviceName, upfrontAmount)
+      return order
+    }
     console.error("createServiceOrder failed", error)
     toast.error("Failed to create service order")
     return null
   }
 
   const order = mapOrder(data as Record<string, unknown>)
+  await notifyNewOrder(order, input.serviceName, upfrontAmount)
+  return order
+}
+
+async function notifyNewOrder(order: ServiceOrder, serviceName: string, upfrontAmount: number): Promise<void> {
+  const displayName = getOrderDisplayName(order)
 
   await createNotification({
     type: "new_service_order",
-    title: "New Service Order",
-    message: `${input.clientName} — ${input.serviceName} — $${upfrontAmount}`,
-    payload: { orderId: order.id },
+    title: "New order received",
+    message: `${displayName} — ${serviceName} — Payment Pending ($${upfrontAmount} upfront)`,
+    payload: { orderId: order.id, status: "waiting_upfront_payment" },
   })
 
   await createWebsiteBotMessage(order)
+}
 
-  return order
+export async function requestPaymentLink(orderId: string, method: string): Promise<boolean> {
+  const order = await fetchServiceOrder(orderId)
+  if (!order) return false
+
+  await createNotification({
+    type: "payment_link_request",
+    title: "Client requested a payment link",
+    message: `${getOrderDisplayName(order)} requested ${method} payment for order ${order.id.slice(0, 8)}`,
+    payload: { orderId, method, status: order.paymentStatus },
+  })
+
+  toast.success("Request sent! CAFÉ Services will contact you with payment details.")
+  return true
 }
 
 export async function updateServiceOrder(
@@ -154,6 +287,11 @@ export async function updateServiceOrder(
   if (updates.upfrontPaid !== undefined) dbPayload.upfront_paid = updates.upfrontPaid
   if (updates.remainingPaid !== undefined) dbPayload.remaining_paid = updates.remainingPaid
   if (updates.adminNotes !== undefined) dbPayload.admin_notes = updates.adminNotes
+
+  if (updates.projectStatus === "paid_upfront") {
+    dbPayload.upfront_paid = true
+    dbPayload.payment_status = "paid_upfront"
+  }
 
   const { error } = await supabase
     .from("service_orders")
@@ -179,15 +317,7 @@ export async function updateServiceOrder(
 }
 
 export async function fetchUserServiceOrders(userId: string): Promise<ServiceOrder[]> {
-  if (!supabase || !supabaseConfigured) return []
-  const { data, error } = await supabase
-    .from("service_orders")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-
-  if (error) return []
-  return ((data || []) as Record<string, unknown>[]).map(mapOrder)
+  return fetchOrdersWithFallback({ userId })
 }
 
 // ========== Notifications ==========
@@ -263,13 +393,14 @@ async function createWebsiteBotMessage(order: ServiceOrder): Promise<void> {
 
   const fakeBotUserId = "00000000-0000-0000-0000-000000000001"
   const adminUserId = "00000000-0000-0000-0000-000000000002"
+  const displayName = getOrderDisplayName(order)
 
   const botMessage = [
     `━━━━━━━━━━━━━━━━━━━━━━━━━`,
     `🆕 NEW SERVICE ORDER RECEIVED`,
     `━━━━━━━━━━━━━━━━━━━━━━━━━`,
     ``,
-    `Client: ${order.clientName}`,
+    `Client: ${displayName}`,
     `Email: ${order.clientEmail}`,
     `WhatsApp: ${order.clientPhone}`,
     order.company ? `Company: ${order.company}` : ``,
@@ -277,6 +408,8 @@ async function createWebsiteBotMessage(order: ServiceOrder): Promise<void> {
     `Total: $${order.totalPrice}`,
     `Upfront (50%): $${order.upfrontAmount}`,
     `Remaining (50%): $${order.remainingAmount}`,
+    `Payment Status: Payment Pending`,
+    `Project Status: New Request`,
     `Deadline: ${order.desiredDeadline || "To be discussed"}`,
     ``,
     `━━━━━━━━━━━━━━━━━━━━━━━━━`,
@@ -288,9 +421,10 @@ async function createWebsiteBotMessage(order: ServiceOrder): Promise<void> {
     ``,
     `━━━━━━━━━━━━━━━━━━━━━━━━━`,
     `Actions needed:`,
+    `  • Payment is pending. Send payment instructions to the client.`,
     `  • Open in admin → /admin/service-orders`,
     `  • Contact client via WhatsApp`,
-    `  • Set project status`,
+    `  • Mark upfront paid only after real payment`,
   ]
     .filter(Boolean)
     .join("\n")
@@ -334,7 +468,7 @@ async function createWebsiteBotMessage(order: ServiceOrder): Promise<void> {
   await supabase
     .from("conversations")
     .update({
-      last_message: `📦 New order: ${order.serviceName} — ${order.clientName}`,
+      last_message: `📦 New order: ${order.serviceName} — ${displayName} (Payment Pending)`,
       last_message_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -344,14 +478,16 @@ async function createWebsiteBotMessage(order: ServiceOrder): Promise<void> {
 // ========== WhatsApp notification ==========
 
 export function generateAdminWhatsAppLink(order: ServiceOrder): string {
+  const displayName = getOrderDisplayName(order)
   const msg = encodeURIComponent(
     `*New Service Order Received*\n\n` +
-    `Client: ${order.clientName}\n` +
+    `Client: ${displayName}\n` +
     `Email: ${order.clientEmail}\n` +
     `Phone: ${order.clientPhone}\n` +
     `Service: ${order.serviceName}\n` +
     `Total: $${order.totalPrice}\n` +
     `Upfront: $${order.upfrontAmount}\n` +
+    `Payment: ${order.paymentStatus}\n` +
     `Status: ${order.projectStatus}`
   )
   return `https://wa.me/554199999999?text=${msg}`

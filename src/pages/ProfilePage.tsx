@@ -21,31 +21,30 @@ import {
 import AuthBackground from "../components/auth/AuthBackground";
 import Navbar from "../components/landing/Navbar";
 import { AvatarUpload } from "../components/profile/AvatarUpload";
-import {
-  loadCurrentUser,
-  saveCurrentUser,
-  type FeedbackEntry,
-  type UserProfile,
-} from "../data/feedbackStore";
+import PhoneInput, { formatPhoneDisplay } from "../components/ui/PhoneInput";
+import FollowButton from "../components/ui/FollowButton";
+import { saveCurrentUser, type FeedbackEntry } from "../data/feedbackStore";
 import {
   updatePublicProfile,
   updateProfileMetadata,
 } from "../lib/supabaseProfile";
 import { supabase } from "../lib/supabase/client";
-import { fetchFollowCounts, fetchFollowersList, fetchFollowingList, fetchFollowingIds, toggleFollow } from "../lib/socialService";
-
-interface ProfilePageProps {
-  user: UserProfile | null;
-  onSubmitFeedback: (feedback: FeedbackEntry) => void;
-}
+import {
+  fetchFollowersList,
+  fetchFollowingList,
+  fetchFollowingIds,
+  toggleFollow,
+} from "../lib/socialService";
+import { parsePhoneNumberFromString } from "libphonenumber-js";
+import { useUserProfile } from "../hooks/useUserProfile";
+import { useAuth } from "../contexts/AuthContext";
 
 type ActiveTab = "profile" | "security";
 
 interface ProfileForm {
   fullName: string;
   email: string;
-  countryCode: string;
-  phone: string;
+  phoneE164: string;
   location: string;
   locationCountryCode: string;
   bio: string;
@@ -61,41 +60,6 @@ const tabs = [
 
 const links = [
   { label: "My Account", icon: LayoutDashboard, href: "/my-account" },
-];
-
-const countryCodes = [
-  { country: "United States", code: "+1" },
-  { country: "Canada", code: "+1" },
-  { country: "United Kingdom", code: "+44" },
-  { country: "Brazil", code: "+55" },
-  { country: "Portugal", code: "+351" },
-  { country: "Spain", code: "+34" },
-  { country: "France", code: "+33" },
-  { country: "Germany", code: "+49" },
-  { country: "Italy", code: "+39" },
-  { country: "Netherlands", code: "+31" },
-  { country: "Ireland", code: "+353" },
-  { country: "Mexico", code: "+52" },
-  { country: "Argentina", code: "+54" },
-  { country: "Chile", code: "+56" },
-  { country: "Colombia", code: "+57" },
-  { country: "Peru", code: "+51" },
-  { country: "Uruguay", code: "+598" },
-  { country: "Paraguay", code: "+595" },
-  { country: "Japan", code: "+81" },
-  { country: "South Korea", code: "+82" },
-  { country: "China", code: "+86" },
-  { country: "India", code: "+91" },
-  { country: "Australia", code: "+61" },
-  { country: "New Zealand", code: "+64" },
-  { country: "South Africa", code: "+27" },
-  { country: "Nigeria", code: "+234" },
-  { country: "Kenya", code: "+254" },
-  { country: "South Sudan", code: "+211" },
-  { country: "United Arab Emirates", code: "+971" },
-  { country: "Saudi Arabia", code: "+966" },
-  { country: "Turkey", code: "+90" },
-  { country: "Israel", code: "+972" },
 ];
 
 const countries = [
@@ -142,259 +106,9 @@ const countries = [
 ];
 
 const getCountryFlag = (countryName?: string, code?: string) =>
-  countries.find((country) => country.code === code || country.name === countryName)?.flag || "";
-
-const phoneFormats: Record<
-  string,
-  { maxDigits: number; format: (d: string) => string }
-> = {
-  "+55": {
-    maxDigits: 11,
-    format: (d) => {
-      if (d.length <= 2) return d;
-      if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-      if (d.length <= 10)
-        return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-      return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7, 11)}`;
-    },
-  },
-  "+1": {
-    maxDigits: 11,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
-      return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6, 10)}`;
-    },
-  },
-  "+44": {
-    maxDigits: 11,
-    format: (d) => {
-      if (d.length <= 5) return d;
-      return `${d.slice(0, 5)} ${d.slice(5)}`;
-    },
-  },
-  "+351": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
-      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`;
-    },
-  },
-  "+34": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
-      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`;
-    },
-  },
-  "+33": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 2) return d;
-      if (d.length <= 4) return `${d.slice(0, 2)} ${d.slice(2)}`;
-      if (d.length <= 6)
-        return `${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4)}`;
-      if (d.length <= 8)
-        return `${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 6)} ${d.slice(6)}`;
-      return `${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 6)} ${d.slice(6, 8)} ${d.slice(8, 9)}`;
-    },
-  },
-  "+49": {
-    maxDigits: 11,
-    format: (d) => {
-      if (d.length <= 4) return d;
-      return `${d.slice(0, 4)} ${d.slice(4)}`;
-    },
-  },
-  "+39": {
-    maxDigits: 10,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
-      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 10)}`;
-    },
-  },
-  "+52": {
-    maxDigits: 10,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
-      return `${d.slice(0, 3)} ${d.slice(3, 6)}-${d.slice(6, 10)}`;
-    },
-  },
-  "+54": {
-    maxDigits: 10,
-    format: (d) => {
-      if (d.length <= 2) return d;
-      if (d.length <= 5) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-      if (d.length <= 8)
-        return `(${d.slice(0, 2)}) ${d.slice(2, 5)}-${d.slice(5)}`;
-      return `(${d.slice(0, 2)}) ${d.slice(2, 5)}-${d.slice(5, 10)}`;
-    },
-  },
-  "+56": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 2) return d;
-      if (d.length <= 5) return `${d.slice(0, 2)} ${d.slice(2)}`;
-      return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 9)}`;
-    },
-  },
-  "+57": {
-    maxDigits: 10,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
-      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 10)}`;
-    },
-  },
-  "+51": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
-      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`;
-    },
-  },
-  "+598": {
-    maxDigits: 8,
-    format: (d) => {
-      if (d.length <= 4) return d;
-      return `${d.slice(0, 4)} ${d.slice(4, 8)}`;
-    },
-  },
-  "+595": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
-      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`;
-    },
-  },
-  "+81": {
-    maxDigits: 11,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`;
-      return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6, 11)}`;
-    },
-  },
-  "+82": {
-    maxDigits: 11,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`;
-      return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7, 11)}`;
-    },
-  },
-  "+86": {
-    maxDigits: 11,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 7) return `${d.slice(0, 3)} ${d.slice(3)}`;
-      return `${d.slice(0, 3)} ${d.slice(3, 7)} ${d.slice(7, 11)}`;
-    },
-  },
-  "+91": {
-    maxDigits: 10,
-    format: (d) => {
-      if (d.length <= 5) return d;
-      return `${d.slice(0, 5)} ${d.slice(5, 10)}`;
-    },
-  },
-  "+61": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 4) return d;
-      return `${d.slice(0, 4)} ${d.slice(4, 9)}`;
-    },
-  },
-  "+64": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
-      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`;
-    },
-  },
-  "+27": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 2) return d;
-      if (d.length <= 5) return `${d.slice(0, 2)} ${d.slice(2)}`;
-      return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 9)}`;
-    },
-  },
-  "+234": {
-    maxDigits: 11,
-    format: (d) => {
-      if (d.length <= 4) return d;
-      if (d.length <= 8) return `${d.slice(0, 4)} ${d.slice(4)}`;
-      return `${d.slice(0, 4)} ${d.slice(4, 8)} ${d.slice(8, 11)}`;
-    },
-  },
-  "+254": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
-      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`;
-    },
-  },
-  "+211": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
-      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`;
-    },
-  },
-  "+971": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
-      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`;
-    },
-  },
-  "+966": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
-      return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 9)}`;
-    },
-  },
-  "+90": {
-    maxDigits: 10,
-    format: (d) => {
-      if (d.length <= 4) return d;
-      if (d.length <= 7) return `${d.slice(0, 4)} ${d.slice(4)}`;
-      return `${d.slice(0, 4)} ${d.slice(4, 7)} ${d.slice(7, 10)}`;
-    },
-  },
-  "+972": {
-    maxDigits: 9,
-    format: (d) => {
-      if (d.length <= 3) return d;
-      if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`;
-      return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6, 9)}`;
-    },
-  },
-};
-
-function getConfig(code: string) {
-  return phoneFormats[code] || { maxDigits: 15, format: (d: string) => d };
-}
-
-const maskPhone = (value: string, countryCode: string) => {
-  const digits = value.replace(/\D/g, "");
-  const config = getConfig(countryCode);
-  const limited = digits.slice(0, config.maxDigits);
-  return config.format(limited);
-};
+  countries.find(
+    (country) => country.code === code || country.name === countryName,
+  )?.flag || "";
 
 function CountUp({ value }: { value: number }) {
   const [count, setCount] = useState(0);
@@ -497,7 +211,9 @@ function CountrySelector({
       {open && (
         <div className="absolute z-50 mt-2 max-h-60 w-full overflow-y-auto rounded-xl border border-white/[0.08] bg-[#0d0d14]/95 shadow-[0_16px_48px_rgba(0,0,0,0.5)] backdrop-blur-xl">
           {filtered.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-white/35">No countries found</div>
+            <div className="px-4 py-3 text-sm text-white/35">
+              No countries found
+            </div>
           ) : (
             filtered.map((country) => {
               const selected = country.code === code || country.name === value;
@@ -591,11 +307,7 @@ function ProfileCompletionCard({
           >
             <span className="text-white/55">{item.label}</span>
             <span
-              className={
-                item.complete
-                  ? "text-[#22c55e]"
-                  : "text-white/25"
-              }
+              className={item.complete ? "text-[#22c55e]" : "text-white/25"}
             >
               {item.complete ? "Complete" : "Missing"}
             </span>
@@ -687,13 +399,15 @@ function getPasswordStrength(password: string) {
   return { score, label: "Strong password", color: "#22c55e", width: "100%" };
 }
 
-export default function ProfilePage({
-  user,
-  onSubmitFeedback,
-}: ProfilePageProps) {
+export default function ProfilePage() {
+  const { user: authUser } = useAuth();
+  const {
+    profile,
+    loading: profileLoading,
+    refresh: refreshProfile,
+  } = useUserProfile();
   const location = useLocation();
-  const storedUser = loadCurrentUser();
-  const profileUser = user || storedUser;
+
   const [activeTab, setActiveTab] = useState<ActiveTab>(() =>
     location.pathname.includes("settings") ||
     new URLSearchParams(location.search).get("tab") === "settings"
@@ -706,7 +420,6 @@ export default function ProfilePage({
     title: "Profile updated",
     subtitle: "Your changes were saved.",
   });
-  const [avatarUrl, setAvatarUrl] = useState(profileUser?.photoUrl || "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -714,72 +427,84 @@ export default function ProfilePage({
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
-  const [form, setForm] = useState<ProfileForm>(() => {
-    const stored = storedUser;
-    const initialCode = stored?.countryCode || profileUser?.countryCode || "+1";
-    const initialPhone = stored?.phone || profileUser?.phone || "";
-    return {
-      fullName: profileUser?.name || stored?.name || "",
-      email: profileUser?.email || stored?.email || "",
-      countryCode: initialCode,
-      phone: initialPhone ? maskPhone(initialPhone, initialCode) : "",
-      location: profileUser?.location || stored?.location || profileUser?.country || stored?.country || "",
-      locationCountryCode: profileUser?.locationCountryCode || stored?.locationCountryCode || "",
-      bio: profileUser?.bio || stored?.bio || "",
-    };
+
+  const [form, setForm] = useState<ProfileForm>({
+    fullName: "",
+    email: "",
+    phoneE164: "",
+    location: "",
+    locationCountryCode: "",
+    bio: "",
   });
   const [savedForm, setSavedForm] = useState(form);
 
-  // ========== Social (Following / Followers) ==========
-  const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 })
-  const [socialDrawer, setSocialDrawer] = useState<"followers" | "following" | null>(null)
-  const [socialList, setSocialList] = useState<Array<{ id: string; name: string; username: string | null; avatarUrl: string | null; bio: string | null }>>([])
-  const [socialSearch, setSocialSearch] = useState("")
-  const [socialLoading, setSocialLoading] = useState(false)
-  const [followingMap, setFollowingMap] = useState<Set<string>>(new Set())
-
   useEffect(() => {
-    if (profileUser?.uid) {
-      fetchFollowCounts(profileUser.uid).then(setFollowCounts)
+    if (profile) {
+      const newForm = {
+        fullName: profile.full_name || "",
+        email: profile.email || "",
+        phoneE164: "",
+        location: "",
+        locationCountryCode: "",
+        bio: profile.bio || "",
+      };
+      setForm(newForm);
+      setSavedForm(newForm);
     }
-  }, [profileUser?.uid])
+  }, [profile]);
+
+  // ========== Social (Following / Followers) ==========
+  const [socialDrawer, setSocialDrawer] = useState<
+    "followers" | "following" | null
+  >(null);
+  const [socialList, setSocialList] = useState<
+    Array<{
+      id: string;
+      name: string;
+      username: string | null;
+      avatarUrl: string | null;
+      bio: string | null;
+    }>
+  >([]);
+  const [socialSearch, setSocialSearch] = useState("");
+  const [socialLoading, setSocialLoading] = useState(false);
+  const [followingMap, setFollowingMap] = useState<Set<string>>(new Set());
 
   const openSocialDrawer = async (type: "followers" | "following") => {
-    if (!profileUser?.uid) return
-    setSocialDrawer(type)
-    setSocialSearch("")
-    setSocialLoading(true)
-    const list = type === "followers"
-      ? await fetchFollowersList(profileUser.uid)
-      : await fetchFollowingList(profileUser.uid)
-    setSocialList(list)
-    setSocialLoading(false)
+    if (!profile?.id) return;
+    setSocialDrawer(type);
+    setSocialSearch("");
+    setSocialLoading(true);
+    const list =
+      type === "followers"
+        ? await fetchFollowersList(profile.id)
+        : await fetchFollowingList(profile.id);
+    setSocialList(list);
+    setSocialLoading(false);
 
-    if (profileUser?.uid) {
-      const ids = await fetchFollowingIds(profileUser.uid)
-      setFollowingMap(ids)
+    if (profile?.id) {
+      const ids = await fetchFollowingIds(profile.id);
+      setFollowingMap(ids);
     }
-  }
+  };
 
   const handleToggleFollow = async (targetId: string) => {
-    if (!profileUser?.uid) return
-    const wasFollowing = followingMap.has(targetId)
-    const ok = await toggleFollow(profileUser.uid, targetId)
+    if (!profile?.id) return;
+    const wasFollowing = followingMap.has(targetId);
+    const ok = await toggleFollow(profile.id, targetId);
     if (ok !== undefined) {
       setFollowingMap((prev) => {
-        const next = new Set(prev)
-        if (wasFollowing) next.delete(targetId)
-        else next.add(targetId)
-        return next
-      })
-      setFollowCounts((prev) => ({
-        ...prev,
-        following: wasFollowing ? prev.following - 1 : prev.following + 1,
-      }))
+        const next = new Set(prev);
+        if (wasFollowing) next.delete(targetId);
+        else next.add(targetId);
+        return next;
+      });
+      refreshProfile();
     }
-  }
+  };
 
-  const displayName = savedForm.fullName || profileUser?.name || "Client";
+  const displayName = profile?.full_name || "User";
+  const avatarUrl = profile?.avatar_url || "";
   const passwordStrength = useMemo(
     () => getPasswordStrength(newPassword),
     [newPassword],
@@ -792,9 +517,7 @@ export default function ProfilePage({
     return () => window.clearTimeout(timeout);
   }, [showToast]);
 
-  if (!profileUser) return <Navigate to="/login" replace />;
-  // keep onSubmitFeedback reachable (some routes still pass it)
-  void onSubmitFeedback;
+  if (!authUser && !profileLoading) return <Navigate to="/login" replace />;
 
   const updateField = (field: keyof ProfileForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -806,33 +529,27 @@ export default function ProfilePage({
   };
 
   const saveProfile = async () => {
+    if (!profile?.id) return;
     setSavedForm(form);
     setIsEditing(false);
 
-    const rawPhone = form.phone.replace(/\D/g, "");
     const payload = {
       name: form.fullName,
-      phone: rawPhone,
-      countryCode: form.countryCode,
       bio: form.bio,
     };
 
     await updateProfileMetadata(payload);
 
-    const updated: UserProfile = {
-      ...profileUser,
-      uid: profileUser.uid,
+    await updatePublicProfile({
+      uid: profile.id,
       name: form.fullName,
-      photoUrl: avatarUrl || profileUser.photoUrl,
-      phone: rawPhone,
-      countryCode: form.countryCode,
-      location: form.location,
-      country: form.location,
-      locationCountryCode: form.locationCountryCode,
+      photoUrl: avatarUrl,
+      email: profile.email,
+      role: profile.role,
       bio: form.bio,
-    };
-    saveCurrentUser(updated);
-    await updatePublicProfile(updated);
+    } as any);
+
+    refreshProfile();
     window.dispatchEvent(new Event("cafe-profile-updated"));
 
     notify("Profile updated", "Your changes were saved.");
@@ -869,7 +586,7 @@ export default function ProfilePage({
       setPasswordLoading(true);
       // Re-authenticate with current password to validate ownership
       const { error: signError } = await supabase.auth.signInWithPassword({
-        email: profileUser.email || "",
+        email: profile?.email || "",
         password: currentPassword,
       });
       if (signError) {
@@ -910,7 +627,7 @@ export default function ProfilePage({
     { value: 0, label: "Feedbacks" },
   ];
 
-  const showBadge = profileUser.role || "client";
+  const showBadge = profile?.role || "client";
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#0a0a0f] px-4 pb-8 pt-28 text-white sm:px-6">
@@ -932,22 +649,26 @@ export default function ProfilePage({
               <motion.div
                 className="absolute inset-0 -z-10 scale-125 rounded-full bg-[#2563eb]/20 blur-xl"
                 animate={{ opacity: [0.4, 0.8, 0.4], scale: [1.2, 1.4, 1.2] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
               />
               <AvatarUpload
                 currentAvatarUrl={avatarUrl}
                 onUploadComplete={async (url) => {
-                  setAvatarUrl(url);
-                  const updated: UserProfile = {
-                    ...profileUser,
-                    uid: profileUser.uid, photoUrl: url,
-                    location: savedForm.location,
-                    locationCountryCode: savedForm.locationCountryCode,
-                    bio: savedForm.bio,
-                  };
-                  saveCurrentUser(updated);
+                  if (!profile?.id) return;
                   await updateProfileMetadata({ photoUrl: url });
-                  await updatePublicProfile(updated);
+                  await updatePublicProfile({
+                    uid: profile.id,
+                    name: profile.full_name,
+                    photoUrl: url,
+                    email: profile.email,
+                    role: profile.role,
+                    bio: profile.bio,
+                  } as any);
+                  refreshProfile();
                   window.dispatchEvent(new Event("cafe-profile-updated"));
                 }}
               />
@@ -956,10 +677,12 @@ export default function ProfilePage({
             <h1 className="mt-5 font-['Clash_Display',Inter,sans-serif] text-2xl font-semibold text-white">
               {displayName}
             </h1>
-            {profileUser.username && (
-              <p className="mt-0.5 text-sm text-[#60a5fa]/70">@{profileUser.username}</p>
+            {profile?.username && (
+              <p className="mt-0.5 text-sm text-[#60a5fa]/70">
+                @{profile.username}
+              </p>
             )}
-            <p className="mt-1 text-sm text-white/45">{profileUser.email}</p>
+            <p className="mt-1 text-sm text-white/45">{profile?.email}</p>
             <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs font-semibold text-[#b7c2ff] shadow-[0_6px_22px_rgba(59,130,246,0.12)]">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
               {showBadge === "admin" ? "Admin" : "Client Account"}
@@ -968,40 +691,50 @@ export default function ProfilePage({
 
           <div className="my-6 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
 
-          {/* Stats grid: 3 + 2 rows */}
-          <div className="grid grid-cols-3 gap-2.5">
-            {statItems.map((item) => (
-              <motion.div
-                key={item.label}
+          {/* Stats grid: 3 + 2 layout fixed */}
+          <div className="flex flex-col gap-2.5">
+            <div className="grid grid-cols-3 gap-2.5">
+              {statItems.map((item) => (
+                <motion.div
+                  key={item.label}
+                  whileHover={{ y: -2 }}
+                  className="flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-3.5 transition-all hover:border-blue-500/20 hover:shadow-[0_0_20px_rgba(37,99,235,0.08)]"
+                >
+                  <span className="bg-gradient-to-r from-[#60a5fa] to-[#a78bfa] bg-clip-text text-xl font-bold text-transparent">
+                    <CountUp value={item.value} />
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wider text-white/30">
+                    {item.label}
+                  </span>
+                </motion.div>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              <motion.button
                 whileHover={{ y: -2 }}
-                className="flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-3.5 transition-all hover:border-blue-500/20 hover:shadow-[0_0_20px_rgba(37,99,235,0.08)]"
+                onClick={() => openSocialDrawer("following")}
+                className="flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-3.5 transition-all hover:border-blue-500/20 hover:shadow-[0_0_20px_rgba(37,99,235,0.08)] cursor-pointer"
               >
                 <span className="bg-gradient-to-r from-[#60a5fa] to-[#a78bfa] bg-clip-text text-xl font-bold text-transparent">
-                  <CountUp value={item.value} />
+                  <CountUp value={profile?.following_count || 0} />
                 </span>
-                <span className="text-[10px] uppercase tracking-wider text-white/30">{item.label}</span>
-              </motion.div>
-            ))}
-            <motion.button
-              whileHover={{ y: -2 }}
-              onClick={() => openSocialDrawer("following")}
-              className="flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-3.5 transition-all hover:border-blue-500/20 hover:shadow-[0_0_20px_rgba(37,99,235,0.08)] cursor-pointer"
-            >
-              <span className="bg-gradient-to-r from-[#60a5fa] to-[#a78bfa] bg-clip-text text-xl font-bold text-transparent">
-                <CountUp value={followCounts.following} />
-              </span>
-              <span className="text-[10px] uppercase tracking-wider text-white/30">Following</span>
-            </motion.button>
-            <motion.button
-              whileHover={{ y: -2 }}
-              onClick={() => openSocialDrawer("followers")}
-              className="flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-3.5 transition-all hover:border-blue-500/20 hover:shadow-[0_0_20px_rgba(37,99,235,0.08)] cursor-pointer"
-            >
-              <span className="bg-gradient-to-r from-[#60a5fa] to-[#a78bfa] bg-clip-text text-xl font-bold text-transparent">
-                <CountUp value={followCounts.followers} />
-              </span>
-              <span className="text-[10px] uppercase tracking-wider text-white/30">Followers</span>
-            </motion.button>
+                <span className="text-[10px] uppercase tracking-wider text-white/30">
+                  Following
+                </span>
+              </motion.button>
+              <motion.button
+                whileHover={{ y: -2 }}
+                onClick={() => openSocialDrawer("followers")}
+                className="flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-3.5 transition-all hover:border-blue-500/20 hover:shadow-[0_0_20px_rgba(37,99,235,0.08)] cursor-pointer"
+              >
+                <span className="bg-gradient-to-r from-[#60a5fa] to-[#a78bfa] bg-clip-text text-xl font-bold text-transparent">
+                  <CountUp value={profile?.followers_count || 0} />
+                </span>
+                <span className="text-[10px] uppercase tracking-wider text-white/30">
+                  Followers
+                </span>
+              </motion.button>
+            </div>
           </div>
 
           {/* Info row */}
@@ -1009,7 +742,11 @@ export default function ProfilePage({
             {profileUser.createdAt && (
               <span className="flex items-center gap-1.5">
                 <CalendarDays size={12} className="text-white/20" />
-                Member since {new Date(profileUser.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                Member since{" "}
+                {new Date(profileUser.createdAt).toLocaleDateString("en-US", {
+                  month: "short",
+                  year: "numeric",
+                })}
               </span>
             )}
           </div>
@@ -1032,10 +769,16 @@ export default function ProfilePage({
                       : "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-white/45 transition-all duration-200 hover:bg-white/[0.04] hover:text-white"
                   }
                 >
-                  <Icon className={active ? "text-[#3b82f6]" : "text-[#475569]"} size={18} />
+                  <Icon
+                    className={active ? "text-[#3b82f6]" : "text-[#475569]"}
+                    size={18}
+                  />
                   {tab.label}
                   {active && (
-                    <motion.div layoutId="activeTab" className="ml-auto h-1.5 w-1.5 rounded-full bg-[#3b82f6]" />
+                    <motion.div
+                      layoutId="activeTab"
+                      className="ml-auto h-1.5 w-1.5 rounded-full bg-[#3b82f6]"
+                    />
                   )}
                 </motion.button>
               );
@@ -1044,11 +787,21 @@ export default function ProfilePage({
             {links.map((item) => {
               const Icon = item.icon;
               return (
-                <motion.div key={item.href} whileHover={{ x: 4 }} transition={{ duration: 0.15 }}>
-                  <Link to={item.href} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-white/45 transition-all duration-200 hover:bg-white/[0.04] hover:text-white">
+                <motion.div
+                  key={item.href}
+                  whileHover={{ x: 4 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Link
+                    to={item.href}
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-white/45 transition-all duration-200 hover:bg-white/[0.04] hover:text-white"
+                  >
                     <Icon className="text-[#475569]" size={18} />
                     {item.label}
-                    <ChevronRight className="ml-auto text-[#475569]" size={16} />
+                    <ChevronRight
+                      className="ml-auto text-[#475569]"
+                      size={16}
+                    />
                   </Link>
                 </motion.div>
               );
@@ -1127,8 +880,8 @@ export default function ProfilePage({
                       <ReadOnlyRow
                         label="Phone"
                         value={
-                          savedForm.phone
-                            ? `${savedForm.countryCode} ${savedForm.phone}`
+                          savedForm.phoneE164
+                            ? formatPhoneDisplay(savedForm.phoneE164)
                             : ""
                         }
                       />
@@ -1145,7 +898,7 @@ export default function ProfilePage({
                         avatarUrl={avatarUrl}
                         fullName={savedForm.fullName}
                         email={savedForm.email}
-                        phone={savedForm.phone}
+                        phone={savedForm.phoneE164}
                         location={savedForm.location}
                         bio={savedForm.bio}
                       />
@@ -1175,54 +928,20 @@ export default function ProfilePage({
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <motion.label
+                          <motion.div
                             initial={{ opacity: 0, x: -12 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.12 }}
-                            className="block"
                           >
-                            <span className="mb-2 block font-mono text-xs uppercase tracking-wider text-[#475569]">
-                              Phone
-                            </span>
-                            <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
-                              <select
-                                value={form.countryCode}
-                                onChange={(event) => {
-                                  const newCode = event.target.value;
-                                  updateField("countryCode", newCode);
-                                  updateField(
-                                    "phone",
-                                    maskPhone(form.phone, newCode),
-                                  );
-                                }}
-                                className="w-full rounded-xl border border-[#1a2d4a] bg-[#060d14] px-4 py-3 text-sm text-white outline-none transition-all duration-200 focus:border-[#2563eb] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
-                              >
-                                {countryCodes.map((item) => (
-                                  <option
-                                    key={`${item.country}-${item.code}`}
-                                    value={item.code}
-                                  >
-                                    {item.code} - {item.country}
-                                  </option>
-                                ))}
-                              </select>
-                              <input
-                                value={form.phone}
-                                onChange={(event) =>
-                                  updateField(
-                                    "phone",
-                                    maskPhone(
-                                      event.target.value,
-                                      form.countryCode,
-                                    ),
-                                  )
-                                }
-                                placeholder="Phone number"
-                                inputMode="numeric"
-                                className="w-full rounded-xl border border-[#1a2d4a] bg-[#060d14] px-4 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-[#475569] focus:border-[#2563eb] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
-                              />
-                            </div>
-                          </motion.label>
+                            <PhoneInput
+                              value={form.phoneE164}
+                              onChange={(e164) =>
+                                updateField("phoneE164", e164)
+                              }
+                              label="Phone"
+                              placeholder="Phone number"
+                            />
+                          </motion.div>
                         </div>
                         <div className="md:col-span-2">
                           <motion.label
@@ -1239,7 +958,10 @@ export default function ProfilePage({
                               code={form.locationCountryCode}
                               onSelect={(country) => {
                                 updateField("location", country.name);
-                                updateField("locationCountryCode", country.code);
+                                updateField(
+                                  "locationCountryCode",
+                                  country.code,
+                                );
                               }}
                             />
                           </motion.label>
@@ -1256,7 +978,12 @@ export default function ProfilePage({
                             </span>
                             <textarea
                               value={form.bio}
-                              onChange={(event) => updateField("bio", event.target.value.slice(0, 300))}
+                              onChange={(event) =>
+                                updateField(
+                                  "bio",
+                                  event.target.value.slice(0, 300),
+                                )
+                              }
                               placeholder="Tell clients a bit about yourself..."
                               rows={3}
                               maxLength={300}
@@ -1593,7 +1320,10 @@ export default function ProfilePage({
               {/* Search */}
               <div className="px-5 pt-3 pb-2">
                 <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                  <Search
+                    size={14}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+                  />
                   <input
                     value={socialSearch}
                     onChange={(e) => setSocialSearch(e.target.value)}
@@ -1613,7 +1343,9 @@ export default function ProfilePage({
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <UserPlus size={28} className="mb-3 text-white/15" />
                     <p className="text-sm text-white/30">
-                      {socialDrawer === "following" ? "Not following anyone yet" : "No followers yet"}
+                      {socialDrawer === "following"
+                        ? "Not following anyone yet"
+                        : "No followers yet"}
                     </p>
                   </div>
                 ) : (
@@ -1621,8 +1353,12 @@ export default function ProfilePage({
                     {socialList
                       .filter(
                         (u) =>
-                          u.name.toLowerCase().includes(socialSearch.toLowerCase()) ||
-                          (u.username || "").toLowerCase().includes(socialSearch.toLowerCase()),
+                          u.name
+                            .toLowerCase()
+                            .includes(socialSearch.toLowerCase()) ||
+                          (u.username || "")
+                            .toLowerCase()
+                            .includes(socialSearch.toLowerCase()),
                       )
                       .map((user) => (
                         <motion.div
@@ -1633,39 +1369,51 @@ export default function ProfilePage({
                         >
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-500/30 to-cyan-500/30 text-sm font-bold text-blue-400">
                             {user.avatarUrl ? (
-                              <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
+                              <img
+                                src={user.avatarUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
                             ) : (
                               user.name.charAt(0).toUpperCase()
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-white">{user.name}</p>
-                            {user.username && <p className="truncate text-xs text-white/40">@{user.username}</p>}
-                            {user.bio && <p className="truncate text-xs text-white/30 mt-0.5">{user.bio}</p>}
+                            <p className="truncate text-sm font-medium text-white">
+                              {user.name}
+                            </p>
+                            {user.username && (
+                              <p className="truncate text-xs text-white/40">
+                                @{user.username}
+                              </p>
+                            )}
+                            {user.bio && (
+                              <p className="truncate text-xs text-white/30 mt-0.5">
+                                {user.bio}
+                              </p>
+                            )}
                           </div>
-                          {socialDrawer === "following" && (
-                            <button
-                              onClick={() => handleToggleFollow(user.id)}
-                              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                                followingMap.has(user.id)
-                                  ? "border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30"
-                                  : "border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
-                              }`}
-                            >
-                              {followingMap.has(user.id) ? "Following" : "Follow Back"}
-                            </button>
-                          )}
-                          {socialDrawer === "followers" && profileUser?.uid !== user.id && (
-                            <button
-                              onClick={() => handleToggleFollow(user.id)}
-                              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                                followingMap.has(user.id)
-                                  ? "border border-green-500/30 bg-green-500/10 text-green-400"
-                                  : "border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
-                              }`}
-                            >
-                              {followingMap.has(user.id) ? "Following" : "Follow"}
-                            </button>
+                          {profileUser?.uid && profileUser.uid !== user.id && (
+                            <FollowButton
+                              currentUserId={profileUser.uid}
+                              targetUserId={user.id}
+                              initialFollowing={followingMap.has(user.id)}
+                              onStateChange={(nowFollowing) => {
+                                setFollowingMap((prev) => {
+                                  const next = new Set(prev);
+                                  if (nowFollowing) next.add(user.id);
+                                  else next.delete(user.id);
+                                  return next;
+                                });
+                                setFollowCounts((prev) => ({
+                                  ...prev,
+                                  following: nowFollowing
+                                    ? prev.following + 1
+                                    : prev.following - 1,
+                                }));
+                              }}
+                              variant="compact"
+                            />
                           )}
                         </motion.div>
                       ))}

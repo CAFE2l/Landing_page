@@ -1,11 +1,18 @@
-import { useState, useEffect, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Link, useNavigate } from "react-router-dom"
-import { User, Settings, Bookmark, FileText, LogOut, Shield, ChevronDown, MessageCircle } from "lucide-react"
-import { useAuth } from "../../contexts/AuthContext"
-import { getInitials } from "../../lib/utils"
-import { loadCurrentUser, saveCurrentUser } from "../../data/feedbackStore"
-import { supabase } from "../../lib/supabase/client"
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  User,
+  Settings,
+  Bookmark,
+  FileText,
+  LogOut,
+  Shield,
+  ChevronDown,
+  MessageCircle,
+} from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { useUserProfile } from "../../hooks/useUserProfile";
 
 const dropdownItems = [
   { label: "My Profile", href: "/dashboard/profile", icon: User },
@@ -13,82 +20,52 @@ const dropdownItems = [
   { label: "My Posts", href: "/dashboard/posts", icon: FileText },
   { label: "Saved Posts", href: "/dashboard/saved", icon: Bookmark },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
-]
+];
 
-const adminItem = { label: "Admin Panel", href: "/admin", icon: Shield }
+const adminItem = { label: "Admin Panel", href: "/admin", icon: Shield };
 
 export default function UserMenu() {
-  const { user, loading, isAdmin, signOut } = useAuth()
-  const [open, setOpen] = useState(false)
-  const [profileName, setProfileName] = useState("")
-  const [profileAvatar, setProfileAvatar] = useState("")
-  const menuRef = useRef<HTMLDivElement>(null)
-  const navigate = useNavigate()
+  const { user, loading: authLoading, isAdmin, signOut } = useAuth();
+  const { profile, loading: profileLoading } = useUserProfile();
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false)
+        setOpen(false);
       }
-    }
-    document.addEventListener("mousedown", handleClick)
-    return () => document.removeEventListener("mousedown", handleClick)
-  }, [])
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false)
-    }
-    document.addEventListener("keydown", handleKey)
-    return () => document.removeEventListener("keydown", handleKey)
-  }, [])
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, []);
 
-  useEffect(() => {
-    if (!user?.id) return
-    const refreshProfile = () => {
-    const stored = loadCurrentUser()
-    setProfileName(stored?.name || user.email?.split("@")[0] || "User")
-    setProfileAvatar(stored?.photoUrl || "")
-
-    if (!supabase) return
-    supabase
-      .from("profiles")
-      .select("full_name, avatar_url")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!data) return
-        setProfileName(data.full_name || user.email?.split("@")[0] || "User")
-        setProfileAvatar(data.avatar_url || "")
-        // Sync DB data back to localStorage
-        const current = loadCurrentUser()
-        if (current) {
-          saveCurrentUser({ ...current, name: data.full_name || current.name, photoUrl: data.avatar_url || current.photoUrl })
-        }
-      })
-    }
-    refreshProfile()
-    window.addEventListener("cafe-profile-updated", refreshProfile)
-    return () => window.removeEventListener("cafe-profile-updated", refreshProfile)
-  }, [user?.id, user?.email])
-
-  const name = profileName || user?.email?.split("@")[0] || "User"
-  const avatarUrl = profileAvatar
-  const initials = getInitials(name)
+  const name = profile?.full_name || user?.email?.split("@")[0] || "User";
+  const avatarUrl = profile?.avatar_url;
+  const initials = profile?.initials || "";
 
   const handleLogout = async () => {
-    setOpen(false)
-    await signOut()
-    navigate("/")
-  }
+    setOpen(false);
+    await signOut();
+    navigate("/");
+  };
 
-  if (loading) {
+  if (authLoading || (user && profileLoading && !profile)) {
     return (
       <div className="flex items-center gap-3">
         <div className="h-9 w-9 rounded-full bg-white/10 animate-pulse" />
         <div className="h-4 w-24 bg-white/10 rounded animate-pulse hidden sm:block" />
       </div>
-    )
+    );
   }
 
   if (!user) {
@@ -107,7 +84,7 @@ export default function UserMenu() {
           Sign Up
         </Link>
       </div>
-    )
+    );
   }
 
   return (
@@ -183,5 +160,5 @@ export default function UserMenu() {
         )}
       </AnimatePresence>
     </div>
-  )
+  );
 }

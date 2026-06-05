@@ -107,7 +107,7 @@ export default function Sidebar() {
           )}
         >
           <ExternalLink size={18} className="shrink-0" />
-          {!collapsed && <span>Ver Site</span>}
+          {!collapsed && <span>View Site</span>}
         </a>
         <button
           onClick={handleLogout}
