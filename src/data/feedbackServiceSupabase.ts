@@ -5,6 +5,7 @@ import type {
   FeedbackAdminReply,
   FeedbackMedia,
   FeedbackVoteType,
+  ReactionType,
   FeedbackStatus,
   ServiceCategory,
 } from "./feedbackStore";
@@ -13,6 +14,7 @@ const POSTS_TABLE = "feedback_posts";
 const MEDIA_TABLE = "feedback_media";
 const COMMENTS_TABLE = "feedback_comments";
 const VOTES_TABLE = "feedback_votes";
+const REACTIONS_TABLE = "feedback_reactions";
 const SAVED_TABLE = "saved_feedbacks";
 const PROFILES_TABLE = "profiles";
 const FOLLOWS_TABLE = "follows";
@@ -582,6 +584,44 @@ export async function getUserHelpfulVote(
   userId: string,
 ): Promise<boolean> {
   return (await getUserFeedbackVote(postId, userId)) === "up";
+}
+
+// ========== Reactions (new: feedback_reactions) ==========
+
+export async function toggleReaction(
+  feedbackId: string,
+  reactionType: ReactionType,
+): Promise<ReactionType | null> {
+  if (!supabase || !supabaseConfigured) return null;
+  const { data, error } = await supabase.rpc("toggle_feedback_reaction", {
+    p_feedback_id: feedbackId,
+    p_reaction_type: reactionType,
+  });
+  if (error) {
+    console.error("toggleReaction RPC failed", error);
+    return null;
+  }
+  return (data as ReactionType) || null;
+}
+
+export async function fetchUserReactions(
+  feedbackIds: string[],
+  userId: string,
+): Promise<Map<string, ReactionType>> {
+  const result = new Map<string, ReactionType>();
+  if (!supabase || !supabaseConfigured || feedbackIds.length === 0 || !userId) return result;
+
+  const { data, error } = await supabase
+    .from(REACTIONS_TABLE)
+    .select("feedback_id, reaction_type")
+    .in("feedback_id", feedbackIds)
+    .eq("user_id", userId);
+
+  if (error || !data) return result;
+  for (const row of data as { feedback_id: string; reaction_type: ReactionType }[]) {
+    result.set(row.feedback_id, row.reaction_type);
+  }
+  return result;
 }
 
 // ========== Saved Posts ==========

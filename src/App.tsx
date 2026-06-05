@@ -29,6 +29,7 @@ import {
 } from "./data/feedbackStore"
 import { createFeedback, listPublicFeedbacks } from "./data/firestoreStore"
 import { Toaster } from "react-hot-toast"
+import ChatWidget from "./components/chat/ChatWidget"
 
 function App() {
   const [feedbacks, setFeedbacks] = useState<FeedbackEntry[]>(() => loadFeedbacks())
@@ -97,6 +98,7 @@ function App() {
             <Route index element={<AdminSettings />} />
           </Route>
         </Routes>
+        <ChatWidget />
       </BrowserRouter>
     </AuthProvider>
   )

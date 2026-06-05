@@ -153,9 +153,8 @@ export default function PublicProfilePage() {
                 post={post}
                 index={index}
                 onClick={() => undefined}
-                onHelpful={() => undefined}
+                onReaction={() => undefined}
                 onComment={() => undefined}
-                helpful={false}
               />
             ))}
           </div>

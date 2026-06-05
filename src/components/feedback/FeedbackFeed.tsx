@@ -1,7 +1,7 @@
 import { AnimatePresence } from "framer-motion"
-import { Loader2, MessageCircle } from "lucide-react"
+import { MessageCircle } from "lucide-react"
 import FeedbackCard from "./FeedbackCard"
-import type { FeedbackPost, FeedbackVoteType, ServiceCategory } from "../../data/feedbackStore"
+import type { FeedbackPost, ReactionType, ServiceCategory } from "../../data/feedbackStore"
 
 interface FeedbackFeedProps {
   posts: FeedbackPost[]
@@ -9,10 +9,8 @@ interface FeedbackFeedProps {
   sort: "recent" | "rating" | "helpful" | "media" | "verified"
   onSortChange: (sort: "recent" | "rating" | "helpful" | "media" | "verified") => void
   onPostClick: (post: FeedbackPost) => void
-  onHelpful: (postId: string) => void
-  helpfulPosts: Set<string>
-  onVote?: (postId: string, voteType: FeedbackVoteType) => void
-  votes?: Map<string, FeedbackVoteType>
+  onReaction: (postId: string, reactionType: ReactionType) => void
+  userReactions?: Map<string, ReactionType>
   onSave?: (postId: string) => void
   savedPosts?: Set<string>
   onCommentClick: (post: FeedbackPost) => void
@@ -29,24 +27,58 @@ const sortTabs = [
   { key: "verified" as const, label: "Verified" },
 ]
 
+function SkeletonCard() {
+  return (
+    <div className="animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-11 w-11 rounded-full bg-white/[0.06]" />
+          <div className="space-y-2">
+            <div className="h-3 w-24 rounded bg-white/[0.06]" />
+            <div className="h-2 w-32 rounded bg-white/[0.04]" />
+          </div>
+        </div>
+        <div className="hidden gap-1 sm:flex">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <div key={n} className="h-3.5 w-3.5 rounded bg-white/[0.04]" />
+          ))}
+        </div>
+      </div>
+      <div className="mb-2 h-4 w-3/4 rounded bg-white/[0.06]" />
+      <div className="mb-1 h-3 w-full rounded bg-white/[0.04]" />
+      <div className="mb-1 h-3 w-5/6 rounded bg-white/[0.04]" />
+      <div className="mb-4 h-3 w-2/3 rounded bg-white/[0.04]" />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[1, 2, 3, 4].map((n) => (
+          <div key={n} className="aspect-video rounded-xl bg-white/[0.04]" />
+        ))}
+      </div>
+      <div className="mt-4 flex items-center gap-3 border-t border-white/[0.06] pt-3">
+        <div className="h-8 w-24 rounded-lg bg-white/[0.04]" />
+        <div className="h-8 w-20 rounded-lg bg-white/[0.04]" />
+      </div>
+    </div>
+  )
+}
+
 export default function FeedbackFeed({
-  posts, loading, sort, onSortChange, onPostClick, onHelpful,
-  helpfulPosts, onVote, votes, onSave, savedPosts, onCommentClick, category, rating, search,
+  posts, loading, sort, onSortChange, onPostClick, onReaction,
+  userReactions, onSave, savedPosts, onCommentClick, category, rating, search,
 }: FeedbackFeedProps) {
   const isEmpty = !loading && posts.length === 0
 
   return (
     <div className="min-w-0 flex-1">
       {/* Sort Tabs */}
-      <div className="flex gap-1 mb-5 overflow-x-auto pb-1 scrollbar-none">
+      <div className="mb-5 flex gap-1 overflow-x-auto pb-1 scrollbar-none">
         {sortTabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => onSortChange(tab.key)}
-            className={`relative px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
+            className={`relative whitespace-nowrap rounded-xl px-4 py-2 text-xs font-medium transition-all ${
               sort === tab.key
-                ? "bg-[#4F6EF7]/10 text-[#4F6EF7] border border-[#4F6EF7]/20"
-                : "text-[#6B6B80] hover:text-[#F0F0F5] hover:bg-white/[0.04] border border-transparent"
+                ? "border border-[#4F6EF7]/20 bg-[#4F6EF7]/10 text-[#4F6EF7]"
+                : "border border-transparent text-[#6B6B80] hover:bg-white/[0.04] hover:text-[#F0F0F5]"
             }`}
           >
             {tab.label}
@@ -56,8 +88,10 @@ export default function FeedbackFeed({
 
       {/* Feed */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 size={24} className="animate-spin text-[#4F6EF7]" />
+        <div className="space-y-4">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </div>
       ) : isEmpty ? (
         <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.02] p-10 text-center">
@@ -65,7 +99,7 @@ export default function FeedbackFeed({
             <MessageCircle size={24} />
           </div>
           <h2 className="mb-3 text-lg font-bold text-[#F0F0F5]">No feedback yet</h2>
-          <p className="mx-auto max-w-md text-sm text-[#6B6B80] leading-relaxed">
+          <p className="mx-auto max-w-md text-sm leading-relaxed text-[#6B6B80]">
             {search
               ? "No feedback matches your search. Try different terms."
               : category || rating > 0
@@ -82,12 +116,10 @@ export default function FeedbackFeed({
                 post={post}
                 index={i}
                 onClick={() => onPostClick(post)}
-                onHelpful={() => onHelpful(post.id)}
-                onVote={onVote ? (voteType) => onVote(post.id, voteType) : undefined}
+                onReaction={(rt) => onReaction(post.id, rt)}
                 onSave={onSave ? () => onSave(post.id) : undefined}
                 onComment={() => onCommentClick(post)}
-                helpful={helpfulPosts.has(post.id)}
-                vote={votes?.get(post.id) || null}
+                userReaction={userReactions?.get(post.id) || null}
                 saved={savedPosts?.has(post.id) || false}
               />
             ))}

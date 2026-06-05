@@ -87,16 +87,15 @@ export default function SavedPostsPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           {posts.map((post, index) => (
             <FeedbackCard
-              key={post.id}
-              post={post}
-              index={index}
-              onClick={() => setSelectedPost(post)}
-              onHelpful={() => undefined}
-              onComment={() => setSelectedPost(post)}
-              onSave={() => handleRemoveSaved(post.id)}
-              helpful={false}
-              saved={savedIds.has(post.id)}
-            />
+                key={post.id}
+                post={post}
+                index={index}
+                onClick={() => setSelectedPost(post)}
+                onReaction={() => undefined}
+                onComment={() => setSelectedPost(post)}
+                onSave={() => handleRemoveSaved(post.id)}
+                saved={savedIds.has(post.id)}
+              />
           ))}
         </div>
       )}
@@ -105,8 +104,7 @@ export default function SavedPostsPage() {
         post={selectedPost}
         open={!!selectedPost}
         onClose={() => setSelectedPost(null)}
-        onHelpful={() => undefined}
-        helpful={false}
+        onReaction={() => undefined}
       />
     </PageShell>
   );

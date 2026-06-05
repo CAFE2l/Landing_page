@@ -10,12 +10,12 @@ import FeedbackDetail from "../components/feedback/FeedbackDetail";
 import FeedbackForm, {
   type FeedbackFormData,
 } from "../components/feedback/FeedbackForm";
-import type { FeedbackPost, ServiceCategory } from "../data/feedbackStore";
+import type { FeedbackPost, ServiceCategory, ReactionType } from "../data/feedbackStore";
 import {
   searchFeedbackPosts,
   createFeedbackPost,
-  toggleFeedbackVote,
-  getUserFeedbackVote,
+  toggleReaction,
+  fetchUserReactions,
   getUserSavedPostIds,
   removeSavedFeedbackPost,
   saveFeedbackPost,
@@ -48,7 +48,7 @@ export default function FeedbackPage() {
   const [rating, setRating] = useState(0);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [votes, setVotes] = useState<Map<string, "up" | "down">>(new Map());
+  const [userReactions, setUserReactions] = useState<Map<string, ReactionType>>(new Map());
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [selectedPost, setSelectedPost] = useState<FeedbackPost | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -68,16 +68,13 @@ export default function FeedbackPage() {
   }, [loadPosts]);
 
   useEffect(() => {
-    if (uid) {
-      const fetchVotes = async () => {
-        const nextVotes = new Map<string, "up" | "down">();
-        for (const p of posts) {
-          const vote = await getUserFeedbackVote(p.id, uid);
-          if (vote) nextVotes.set(p.id, vote);
-        }
-        setVotes(nextVotes);
-      };
-      fetchVotes();
+    if (uid && posts.length > 0) {
+      fetchUserReactions(
+        posts.map((p) => p.id),
+        uid,
+      ).then(setUserReactions);
+    } else if (!uid) {
+      queueMicrotask(() => setUserReactions(new Map()));
     }
   }, [posts, uid]);
 
@@ -98,21 +95,21 @@ export default function FeedbackPage() {
     };
   }, [searchInput]);
 
-  const applyVoteState = (
+  const applyReactionState = (
     postId: string,
-    previousVote: "up" | "down" | undefined,
-    nextVote: "up" | "down" | null,
+    previousReaction: ReactionType | undefined,
+    nextReaction: ReactionType | null,
   ) => {
     const updatePost = (p: FeedbackPost): FeedbackPost => {
       if (p.id !== postId) return p;
-      const helpfulDelta =
-        (nextVote === "up" ? 1 : 0) - (previousVote === "up" ? 1 : 0);
-      const downvoteDelta =
-        (nextVote === "down" ? 1 : 0) - (previousVote === "down" ? 1 : 0);
+      const likeDelta =
+        (nextReaction === "like" ? 1 : 0) - (previousReaction === "like" ? 1 : 0);
+      const dislikeDelta =
+        (nextReaction === "dislike" ? 1 : 0) - (previousReaction === "dislike" ? 1 : 0);
       return {
         ...p,
-        helpfulCount: Math.max(0, p.helpfulCount + helpfulDelta),
-        downvoteCount: Math.max(0, (p.downvoteCount || 0) + downvoteDelta),
+        helpfulCount: Math.max(0, p.helpfulCount + likeDelta),
+        downvoteCount: Math.max(0, (p.downvoteCount || 0) + dislikeDelta),
       };
     };
 
@@ -120,21 +117,21 @@ export default function FeedbackPage() {
     setSelectedPost((prev) => (prev ? updatePost(prev) : prev));
   };
 
-  const handleVote = async (postId: string, voteType: "up" | "down") => {
+  const handleReaction = async (postId: string, reactionType: ReactionType) => {
     const uid = supabaseUser?.id || userProfile?.uid || userProfile?.id;
     if (!uid) {
-      toast.error("Login to vote");
+      toast.error("Login to react");
       return;
     }
-    const previousVote = votes.get(postId);
-    const result = await toggleFeedbackVote(postId, uid, voteType);
-    setVotes((prev) => {
+    const previousReaction = userReactions.get(postId);
+    const result = await toggleReaction(postId, reactionType);
+    setUserReactions((prev) => {
       const next = new Map(prev);
       if (result) next.set(postId, result);
       else next.delete(postId);
       return next;
     });
-    applyVoteState(postId, previousVote, result);
+    applyReactionState(postId, previousReaction, result);
   };
 
   const handleSave = async (postId: string) => {
@@ -274,18 +271,10 @@ export default function FeedbackPage() {
           sort={sort}
           onSortChange={setSort}
           onPostClick={setSelectedPost}
-          onHelpful={(postId) => handleVote(postId, "up")}
-          onVote={handleVote}
-          votes={votes}
+          onReaction={handleReaction}
+          userReactions={userReactions}
           onSave={handleSave}
           savedPosts={savedPosts}
-          helpfulPosts={
-            new Set(
-              [...votes.entries()]
-                .filter(([, vote]) => vote === "up")
-                .map(([postId]) => postId),
-            )
-          }
           onCommentClick={setSelectedPost}
           category={category}
           rating={rating}
@@ -298,10 +287,8 @@ export default function FeedbackPage() {
         post={selectedPost}
         open={!!selectedPost}
         onClose={() => setSelectedPost(null)}
-        onHelpful={(postId) => handleVote(postId, "up")}
-        onVote={handleVote}
-        vote={selectedPost ? votes.get(selectedPost.id) || null : null}
-        helpful={selectedPost ? votes.get(selectedPost.id) === "up" : false}
+        onReaction={handleReaction}
+        userReaction={selectedPost ? userReactions.get(selectedPost.id) || null : null}
       />
 
       {/* Feedback Form */}

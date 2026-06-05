@@ -94,6 +94,7 @@ export interface FeedbackPost {
 }
 
 export type FeedbackVoteType = "up" | "down"
+export type ReactionType = "like" | "dislike"
 
 export interface FeedbackComment {
   id: string
@@ -143,4 +144,45 @@ export const clearCurrentUser = () => {
   if (typeof window !== "undefined") {
     window.localStorage.removeItem(SESSION_KEY)
   }
+}
+
+// ========== Chat Types ==========
+
+export type MessageType = "text" | "image" | "sticker" | "emoji"
+
+export interface ChatMessage {
+  id: string
+  conversationId: string
+  senderId: string
+  receiverId: string | null
+  content: string
+  messageType: MessageType
+  mediaUrl: string | null
+  readAt: string | null
+  createdAt: string
+}
+
+export interface ChatConversation {
+  id: string
+  participantA: string
+  participantB: string
+  lastMessage: string | null
+  lastMessageAt: string
+  updatedAt: string
+  createdAt: string
+  otherUser: {
+    id: string
+    name: string
+    avatarUrl: string | null
+    username: string | null
+  }
+  unreadCount: number
+}
+
+export interface UserSticker {
+  id: string
+  userId: string
+  imageUrl: string
+  name: string | null
+  createdAt: string
 }
