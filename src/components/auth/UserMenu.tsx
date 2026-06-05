@@ -4,6 +4,8 @@ import { Link, useNavigate } from "react-router-dom"
 import { User, Settings, Bookmark, FileText, LogOut, Shield, ChevronDown, MessageCircle } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
 import { getInitials } from "../../lib/utils"
+import { loadCurrentUser, saveCurrentUser } from "../../data/feedbackStore"
+import { supabase } from "../../lib/supabase/client"
 
 const dropdownItems = [
   { label: "My Profile", href: "/dashboard/profile", icon: User },
@@ -18,6 +20,8 @@ const adminItem = { label: "Admin Panel", href: "/admin", icon: Shield }
 export default function UserMenu() {
   const { user, loading, isAdmin, signOut } = useAuth()
   const [open, setOpen] = useState(false)
+  const [profileName, setProfileName] = useState("")
+  const [profileAvatar, setProfileAvatar] = useState("")
   const menuRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
 
@@ -39,8 +43,37 @@ export default function UserMenu() {
     return () => document.removeEventListener("keydown", handleKey)
   }, [])
 
-  const name = user?.user_metadata?.name || user?.email?.split("@")[0] || "User"
-  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.photoUrl
+  useEffect(() => {
+    if (!user?.id) return
+    const refreshProfile = () => {
+    const stored = loadCurrentUser()
+    setProfileName(stored?.name || user.email?.split("@")[0] || "User")
+    setProfileAvatar(stored?.photoUrl || "")
+
+    if (!supabase) return
+    supabase
+      .from("profiles")
+      .select("full_name, avatar_url")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return
+        setProfileName(data.full_name || user.email?.split("@")[0] || "User")
+        setProfileAvatar(data.avatar_url || "")
+        // Sync DB data back to localStorage
+        const current = loadCurrentUser()
+        if (current) {
+          saveCurrentUser({ ...current, name: data.full_name || current.name, photoUrl: data.avatar_url || current.photoUrl })
+        }
+      })
+    }
+    refreshProfile()
+    window.addEventListener("cafe-profile-updated", refreshProfile)
+    return () => window.removeEventListener("cafe-profile-updated", refreshProfile)
+  }, [user?.id, user?.email])
+
+  const name = profileName || user?.email?.split("@")[0] || "User"
+  const avatarUrl = profileAvatar
   const initials = getInitials(name)
 
   const handleLogout = async () => {

@@ -87,15 +87,13 @@ export function AvatarUpload({ currentAvatarUrl, onUploadComplete }: AvatarUploa
         onClick={() => inputRef.current?.click()}
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
-        className="relative flex h-24 w-24 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-[#4f6ef7]/45 bg-gradient-to-br from-[#2563eb] to-[#8b5cf6] p-[3px] transition-all duration-300 hover:scale-[1.04] hover:border-[#a78bfa] hover:shadow-[0_0_34px_rgba(79,110,247,0.35)]"
+        className="relative flex h-24 w-24 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-white/[0.04] shadow-lg transition-all duration-300 hover:scale-[1.04] hover:bg-white/[0.07] hover:shadow-[0_16px_34px_rgba(0,0,0,0.35)]"
       >
-        <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-[#0a0a0f]">
-          {displayUrl ? (
-            <img src={displayUrl} alt="Avatar" className="h-full w-full object-cover" />
-          ) : (
-            <Camera size={28} className="text-[#6b6b80]" />
-          )}
-        </div>
+        {displayUrl ? (
+          <img src={displayUrl} alt="Avatar" className="h-full w-full object-cover" />
+        ) : (
+          <Camera size={28} className="text-[#6b6b80]" />
+        )}
         {uploading && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/60">
             <div className="text-center">

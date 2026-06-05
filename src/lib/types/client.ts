@@ -7,6 +7,7 @@ export interface Client {
   avatarUrl?: string
   role: "client" | "admin"
   projectsCount: number
+  servicesCount?: number
   feedbackCount: number
   lastActivity?: string
   createdAt: string

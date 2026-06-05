@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react"
 import { Outlet, Navigate, useLocation } from "react-router-dom"
 import { Toaster } from "react-hot-toast"
 import Sidebar from "./Sidebar"
@@ -6,6 +7,7 @@ import { useAdminStore } from "../../lib/store/adminStore"
 import ConfirmModal from "./ConfirmModal"
 import { useAuth } from "../../contexts/AuthContext"
 import { loadCurrentUser } from "../../data/feedbackStore"
+import { supabase } from "../../lib/supabase/client"
 
 const pageTitles: Record<string, string> = {
   "/admin/dashboard": "Dashboard",
@@ -22,17 +24,45 @@ export default function AdminShell() {
   const hideConfirm = useAdminStore((s) => s.hideConfirm)
   const location = useLocation()
   const title = pageTitles[location.pathname] || "Admin"
-  const { isAdmin: supabaseAdmin } = useAuth()
+  const { user: supabaseUser, isAdmin: supabaseAdmin, loading: authLoading } = useAuth()
+  const [profile, setProfile] = useState<{ avatar_url?: string; full_name?: string; email?: string } | null>(null)
 
-  const user = loadCurrentUser()
+  useEffect(() => {
+    if (!supabaseUser?.id) return
+    supabase
+      .from("profiles")
+      .select("avatar_url, full_name, email")
+      .eq("id", supabaseUser.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setProfile(data as { avatar_url?: string; full_name?: string; email?: string })
+      })
+  }, [supabaseUser?.id])
+
+  const storedUser = loadCurrentUser()
+  const user = storedUser || (supabaseUser ? {
+    uid: supabaseUser.id,
+    name: profile?.full_name || supabaseUser.user_metadata?.name || supabaseUser.email?.split("@")[0] || "Admin",
+    email: profile?.email || supabaseUser.email || "",
+    role: supabaseAdmin ? "admin" as const : "client" as const,
+    photoUrl: profile?.avatar_url || supabaseUser.user_metadata?.avatar_url || supabaseUser.user_metadata?.photoUrl || "",
+  } : null)
   const isAdmin = user?.role === "admin" || supabaseAdmin
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#020408]">
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[#4f6ef7] border-t-transparent" />
+      </div>
+    )
+  }
 
   if (!user || !isAdmin) {
     return <Navigate to="/admin/login" replace />
   }
 
   return (
-    <div className="min-h-screen bg-admin-gradient text-[#f0f0f5]">
+    <div className="min-h-screen bg-[#0a0a0f] text-[#f0f0f5]">
       <Sidebar />
       <Topbar title={title} user={user} />
       <main

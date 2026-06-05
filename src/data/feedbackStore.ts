@@ -13,6 +13,9 @@ export interface UserProfile {
   photoUrl?: string
   phone?: string
   countryCode?: string
+  location?: string
+  locationCountryCode?: string
+  bio?: string
   createdAt?: string
 }
 

@@ -285,13 +285,13 @@ export default function FeedbackDetail({ post, open, onClose, onHelpful, helpful
                 <h3 className="mb-4 text-sm font-semibold text-[#F0F0F5]">Comments ({comments.length})</h3>
 
                 <form onSubmit={handleComment} className="mb-6 flex gap-3">
-                  <div className="feedback-input-ring group relative flex-1 rounded-2xl p-px">
+                  <div className="flex-1 rounded-xl border border-white/10 bg-white/5 transition-colors duration-200 focus-within:border-blue-500/40">
                     <input
                       type="text"
                       value={commentText}
                       onChange={(e) => setCommentText(e.target.value)}
                       placeholder="Compartilhe sua resposta sobre este feedback..."
-                      className="relative w-full rounded-2xl border border-white/[0.08] bg-[rgba(255,255,255,0.03)] px-4 py-3 text-sm text-[#F0F0F5] placeholder-[#77778F] outline-none backdrop-blur-md transition-all group-focus-within:border-transparent"
+                      className="w-full rounded-xl bg-transparent px-4 py-3 text-sm text-[#F0F0F5] placeholder-[#77778F] outline-none"
                     />
                   </div>
                   <motion.button

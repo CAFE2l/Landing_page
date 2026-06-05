@@ -1,6 +1,8 @@
 import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase, supabaseConfigured } from "../lib/supabase/client"
+import { ensureProfileFromAuthUser } from "../lib/supabaseProfile"
+import { isAdminEmail } from "../lib/adminUsers"
 
 export default function AuthCallback() {
   const navigate = useNavigate()
@@ -11,10 +13,12 @@ export default function AuthCallback() {
       return
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
+        await ensureProfileFromAuthUser(session.user)
+        window.dispatchEvent(new Event("cafe-profile-updated"))
         const role = session.user.user_metadata?.role || session.user.app_metadata?.role
-        if (role === "admin") {
+        if (role === "admin" || isAdminEmail(session.user.email)) {
           navigate("/admin/dashboard")
         } else {
           navigate("/")

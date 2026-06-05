@@ -6,6 +6,7 @@ import toast from "react-hot-toast"
 
 import { loadCurrentUser, saveCurrentUser } from "../../data/feedbackStore"
 import { supabase, supabaseConfigured } from "../../lib/supabase/client"
+import { isAdminEmail } from "../../lib/adminUsers"
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("")
@@ -23,7 +24,7 @@ export default function AdminLogin() {
     if (supabase && supabaseConfigured) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         const role = session?.user?.app_metadata?.role || session?.user?.user_metadata?.role
-        if (role === "admin") {
+        if (role === "admin" || isAdminEmail(session?.user?.email)) {
           navigate("/admin/dashboard", { replace: true })
         }
       })
@@ -53,7 +54,10 @@ export default function AdminLogin() {
       if (!data.user) throw new Error("Could not sign in.")
 
       const meta = data.user.user_metadata || {}
-      const role = meta.role || "client"
+      const role =
+        data.user.app_metadata?.role === "admin" || meta.role === "admin" || isAdminEmail(data.user.email)
+          ? "admin"
+          : "client"
 
       if (role !== "admin") {
         await supabase.auth.signOut()

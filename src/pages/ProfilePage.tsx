@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -11,6 +11,7 @@ import {
   Lock,
   Loader2,
   Save,
+  Search,
   Shield,
   User,
 } from "lucide-react";
@@ -24,8 +25,8 @@ import {
   type UserProfile,
 } from "../data/feedbackStore";
 import {
+  updatePublicProfile,
   updateProfileMetadata,
-  upsertPublicUser,
 } from "../lib/supabaseProfile";
 import { supabase } from "../lib/supabase/client";
 
@@ -41,6 +42,9 @@ interface ProfileForm {
   email: string;
   countryCode: string;
   phone: string;
+  location: string;
+  locationCountryCode: string;
+  bio: string;
 }
 
 const cardClass =
@@ -89,6 +93,52 @@ const countryCodes = [
   { country: "Turkey", code: "+90" },
   { country: "Israel", code: "+972" },
 ];
+
+const countries = [
+  { name: "Brazil", code: "BR", flag: "🇧🇷" },
+  { name: "United States", code: "US", flag: "🇺🇸" },
+  { name: "Portugal", code: "PT", flag: "🇵🇹" },
+  { name: "Argentina", code: "AR", flag: "🇦🇷" },
+  { name: "Canada", code: "CA", flag: "🇨🇦" },
+  { name: "United Kingdom", code: "GB", flag: "🇬🇧" },
+  { name: "Spain", code: "ES", flag: "🇪🇸" },
+  { name: "France", code: "FR", flag: "🇫🇷" },
+  { name: "Germany", code: "DE", flag: "🇩🇪" },
+  { name: "Italy", code: "IT", flag: "🇮🇹" },
+  { name: "Netherlands", code: "NL", flag: "🇳🇱" },
+  { name: "Ireland", code: "IE", flag: "🇮🇪" },
+  { name: "Mexico", code: "MX", flag: "🇲🇽" },
+  { name: "Chile", code: "CL", flag: "🇨🇱" },
+  { name: "Colombia", code: "CO", flag: "🇨🇴" },
+  { name: "Peru", code: "PE", flag: "🇵🇪" },
+  { name: "Uruguay", code: "UY", flag: "🇺🇾" },
+  { name: "Paraguay", code: "PY", flag: "🇵🇾" },
+  { name: "Japan", code: "JP", flag: "🇯🇵" },
+  { name: "South Korea", code: "KR", flag: "🇰🇷" },
+  { name: "China", code: "CN", flag: "🇨🇳" },
+  { name: "India", code: "IN", flag: "🇮🇳" },
+  { name: "Australia", code: "AU", flag: "🇦🇺" },
+  { name: "New Zealand", code: "NZ", flag: "🇳🇿" },
+  { name: "South Africa", code: "ZA", flag: "🇿🇦" },
+  { name: "Nigeria", code: "NG", flag: "🇳🇬" },
+  { name: "Kenya", code: "KE", flag: "🇰🇪" },
+  { name: "United Arab Emirates", code: "AE", flag: "🇦🇪" },
+  { name: "Saudi Arabia", code: "SA", flag: "🇸🇦" },
+  { name: "Turkey", code: "TR", flag: "🇹🇷" },
+  { name: "Israel", code: "IL", flag: "🇮🇱" },
+  { name: "Morocco", code: "MA", flag: "🇲🇦" },
+  { name: "Egypt", code: "EG", flag: "🇪🇬" },
+  { name: "Poland", code: "PL", flag: "🇵🇱" },
+  { name: "Sweden", code: "SE", flag: "🇸🇪" },
+  { name: "Norway", code: "NO", flag: "🇳🇴" },
+  { name: "Denmark", code: "DK", flag: "🇩🇰" },
+  { name: "Finland", code: "FI", flag: "🇫🇮" },
+  { name: "Switzerland", code: "CH", flag: "🇨🇭" },
+  { name: "Belgium", code: "BE", flag: "🇧🇪" },
+];
+
+const getCountryFlag = (countryName?: string, code?: string) =>
+  countries.find((country) => country.code === code || country.name === countryName)?.flag || "";
 
 const phoneFormats: Record<
   string,
@@ -380,24 +430,120 @@ function ReadOnlyRow({ label, value }: { label: string; value?: string }) {
   );
 }
 
+function CountrySelector({
+  value,
+  code,
+  onSelect,
+}: {
+  value: string;
+  code: string;
+  onSelect: (country: { name: string; code: string; flag: string }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, []);
+
+  const filtered = countries.filter((country) =>
+    `${country.name} ${country.code}`
+      .toLowerCase()
+      .includes(query.toLowerCase()),
+  );
+
+  return (
+    <div ref={rootRef} className="relative">
+      <div className="relative">
+        <Search
+          size={16}
+          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+        />
+        <input
+          value={query}
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          placeholder="Search your country..."
+          className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 pl-10 text-sm text-white outline-none placeholder:text-white/30 focus:border-blue-500/50"
+        />
+      </div>
+
+      {open && (
+        <div className="absolute z-50 mt-2 max-h-60 w-full overflow-y-auto rounded-xl border border-white/[0.08] bg-[#0d0d14]/95 shadow-[0_16px_48px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+          {filtered.length === 0 ? (
+            <div className="px-4 py-3 text-sm text-white/35">No countries found</div>
+          ) : (
+            filtered.map((country) => {
+              const selected = country.code === code || country.name === value;
+              return (
+                <button
+                  type="button"
+                  key={country.code}
+                  onClick={() => {
+                    onSelect(country);
+                    setQuery(country.name);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/[0.05] ${
+                    selected ? "bg-blue-500/10 text-blue-400" : "text-white/70"
+                  }`}
+                >
+                  <span>{country.flag}</span>
+                  <span>{country.name}</span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProfileCompletionCard({
   avatarUrl,
   fullName,
   email,
   phone,
+  location,
+  bio,
 }: {
   avatarUrl?: string;
   fullName?: string;
   email?: string;
   phone?: string;
+  location?: string;
+  bio?: string;
 }) {
   const items = [
     { label: "Avatar", complete: Boolean(avatarUrl) },
     { label: "Name", complete: Boolean(fullName) },
     { label: "Email", complete: Boolean(email) },
     { label: "Phone", complete: Boolean(phone) },
-    { label: "Bio", complete: false },
-    { label: "Location", complete: false },
+    { label: "Bio", complete: Boolean(bio) },
+    { label: "Location", complete: Boolean(location) },
   ];
   const percent = Math.round(
     (items.filter((item) => item.complete).length / items.length) * 100,
@@ -542,6 +688,8 @@ export default function ProfilePage({
   onSubmitFeedback,
 }: ProfilePageProps) {
   const location = useLocation();
+  const storedUser = loadCurrentUser();
+  const profileUser = user || storedUser;
   const [activeTab, setActiveTab] = useState<ActiveTab>(() =>
     location.pathname.includes("settings") ||
     new URLSearchParams(location.search).get("tab") === "settings"
@@ -554,7 +702,7 @@ export default function ProfilePage({
     title: "Profile updated",
     subtitle: "Your changes were saved.",
   });
-  const [avatarUrl, setAvatarUrl] = useState(user?.photoUrl || "");
+  const [avatarUrl, setAvatarUrl] = useState(profileUser?.photoUrl || "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -563,19 +711,22 @@ export default function ProfilePage({
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [form, setForm] = useState<ProfileForm>(() => {
-    const stored = loadCurrentUser();
-    const initialCode = stored?.countryCode || user?.countryCode || "+1";
-    const initialPhone = stored?.phone || user?.phone || "";
+    const stored = storedUser;
+    const initialCode = stored?.countryCode || profileUser?.countryCode || "+1";
+    const initialPhone = stored?.phone || profileUser?.phone || "";
     return {
-      fullName: user?.name || stored?.name || "",
-      email: user?.email || stored?.email || "",
+      fullName: profileUser?.name || stored?.name || "",
+      email: profileUser?.email || stored?.email || "",
       countryCode: initialCode,
       phone: initialPhone ? maskPhone(initialPhone, initialCode) : "",
+      location: profileUser?.location || stored?.location || profileUser?.country || stored?.country || "",
+      locationCountryCode: profileUser?.locationCountryCode || stored?.locationCountryCode || "",
+      bio: profileUser?.bio || stored?.bio || "",
     };
   });
   const [savedForm, setSavedForm] = useState(form);
 
-  const displayName = savedForm.fullName || user?.name || "Client";
+  const displayName = savedForm.fullName || profileUser?.name || "Client";
   const passwordStrength = useMemo(
     () => getPasswordStrength(newPassword),
     [newPassword],
@@ -588,7 +739,7 @@ export default function ProfilePage({
     return () => window.clearTimeout(timeout);
   }, [showToast]);
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!profileUser) return <Navigate to="/login" replace />;
   // keep onSubmitFeedback reachable (some routes still pass it)
   void onSubmitFeedback;
 
@@ -610,19 +761,26 @@ export default function ProfilePage({
       name: form.fullName,
       phone: rawPhone,
       countryCode: form.countryCode,
+      bio: form.bio,
     };
 
     await updateProfileMetadata(payload);
 
     const updated: UserProfile = {
-      ...user!,
-      uid: user!.uid,
+      ...profileUser,
+      uid: profileUser.uid,
       name: form.fullName,
+      photoUrl: avatarUrl || profileUser.photoUrl,
       phone: rawPhone,
       countryCode: form.countryCode,
+      location: form.location,
+      country: form.location,
+      locationCountryCode: form.locationCountryCode,
+      bio: form.bio,
     };
     saveCurrentUser(updated);
-    upsertPublicUser(updated);
+    await updatePublicProfile(updated);
+    window.dispatchEvent(new Event("cafe-profile-updated"));
 
     notify("Profile updated", "Your changes were saved.");
   };
@@ -658,7 +816,7 @@ export default function ProfilePage({
       setPasswordLoading(true);
       // Re-authenticate with current password to validate ownership
       const { error: signError } = await supabase.auth.signInWithPassword({
-        email: user.email || "",
+        email: profileUser.email || "",
         password: currentPassword,
       });
       if (signError) {
@@ -728,22 +886,18 @@ export default function ProfilePage({
                 onUploadComplete={async (url) => {
                   setAvatarUrl(url);
                   const updated: UserProfile = {
-                    ...user!,
-                    uid: user!.uid,
-                    photoUrl: url,
+                    ...profileUser,
+                    uid: profileUser.uid,
+                  photoUrl: url,
+                    location: savedForm.location,
+                    locationCountryCode: savedForm.locationCountryCode,
+                    bio: savedForm.bio,
                   };
                   saveCurrentUser(updated);
-                  await updateProfileMetadata({
-                    avatar_url: url,
-                    photoUrl: url,
-                  });
-                  upsertPublicUser(updated);
+                  await updateProfileMetadata({ photoUrl: url });
+                  await updatePublicProfile(updated);
+                  window.dispatchEvent(new Event("cafe-profile-updated"));
                 }}
-              />
-              <motion.span
-                className="absolute bottom-1 right-[calc(50%-52px)] h-4 w-4 rounded-full border-2 border-[#0a0a0f] bg-[#22c55e] shadow-[0_0_18px_rgba(34,197,94,0.75)]"
-                animate={{ scale: [1, 1.4, 1] }}
-                transition={{ repeat: Infinity, duration: 2.5 }}
               />
             </div>
 
@@ -761,10 +915,10 @@ export default function ProfilePage({
               {displayName}
             </h1>
             <p className="mt-1 truncate text-center text-sm text-white/45">
-              {user.email}
+              {profileUser.email}
             </p>
             <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-sm font-semibold text-[#b7c2ff] shadow-[0_6px_22px_rgba(59,130,246,0.12)]">
-              <span className="h-2 w-2 rounded-full bg-[#22c55e]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
               Client Account
             </div>
           </div>
@@ -921,13 +1075,22 @@ export default function ProfilePage({
                             : ""
                         }
                       />
-                      <ReadOnlyRow label="Location" value={user.country} />
-                      <ReadOnlyRow label="Bio / About" value="" />
+                      <ReadOnlyRow
+                        label="Location"
+                        value={
+                          savedForm.location
+                            ? `${getCountryFlag(savedForm.location, savedForm.locationCountryCode)} ${savedForm.location}`.trim()
+                            : ""
+                        }
+                      />
+                      <ReadOnlyRow label="Bio / About" value={savedForm.bio} />
                       <ProfileCompletionCard
                         avatarUrl={avatarUrl}
                         fullName={savedForm.fullName}
                         email={savedForm.email}
                         phone={savedForm.phone}
+                        location={savedForm.location}
+                        bio={savedForm.bio}
                       />
                     </motion.div>
                   ) : (
@@ -1002,6 +1165,49 @@ export default function ProfilePage({
                                 className="w-full rounded-xl border border-[#1a2d4a] bg-[#060d14] px-4 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-[#475569] focus:border-[#2563eb] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
                               />
                             </div>
+                          </motion.label>
+                        </div>
+                        <div className="md:col-span-2">
+                          <motion.label
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.16 }}
+                            className="block"
+                          >
+                            <span className="mb-2 block font-mono text-xs uppercase tracking-wider text-[#475569]">
+                              Location
+                            </span>
+                            <CountrySelector
+                              value={form.location}
+                              code={form.locationCountryCode}
+                              onSelect={(country) => {
+                                updateField("location", country.name);
+                                updateField("locationCountryCode", country.code);
+                              }}
+                            />
+                          </motion.label>
+                        </div>
+                        <div className="md:col-span-2">
+                          <motion.label
+                            initial={{ opacity: 0, x: -12 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.2 }}
+                            className="block"
+                          >
+                            <span className="mb-2 block font-mono text-xs uppercase tracking-wider text-[#475569]">
+                              Bio / About
+                            </span>
+                            <textarea
+                              value={form.bio}
+                              onChange={(event) => updateField("bio", event.target.value.slice(0, 300))}
+                              placeholder="Tell clients a bit about yourself..."
+                              rows={3}
+                              maxLength={300}
+                              className="w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-white/30 focus:border-blue-500/50"
+                            />
+                            <span className="mt-1 block text-right text-xs text-white/30">
+                              {form.bio.length}/300
+                            </span>
                           </motion.label>
                         </div>
                       </div>

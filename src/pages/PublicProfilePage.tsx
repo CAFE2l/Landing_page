@@ -26,7 +26,7 @@ export default function PublicProfilePage() {
 
   useEffect(() => {
     if (!userId) return;
-    setLoading(true);
+    queueMicrotask(() => setLoading(true));
     fetchPublicProfile(userId)
       .then(setProfile)
       .finally(() => setLoading(false));

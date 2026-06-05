@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react"
 import { BrowserRouter, Route, Routes } from "react-router-dom"
 import { AuthProvider } from "./contexts/AuthContext"
-import AdminPage from "./pages/AdminPage"
 import AuthPage from "./pages/AuthPage"
 import AuthCallback from "./pages/AuthCallback"
 import FeedbackPage from "./pages/FeedbackPage"
@@ -78,7 +77,9 @@ function App() {
           <Route path="/profile/:userId" element={<PublicProfilePage />} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage user={user} onSubmitFeedback={addFeedback} /></ProtectedRoute>} />
           <Route path="/perfil" element={<ProtectedRoute><ProfilePage user={user} onSubmitFeedback={addFeedback} /></ProtectedRoute>} />
-          <Route path="/admin" element={<AdminRoute><AdminPage user={user} /></AdminRoute>} />
+          <Route path="/admin" element={<AdminRoute><AdminShell /></AdminRoute>}>
+            <Route index element={<AdminDashboard />} />
+          </Route>
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminRoute><AdminShell /></AdminRoute>}>
             <Route index element={<AdminDashboard />} />

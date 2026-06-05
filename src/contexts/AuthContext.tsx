@@ -2,7 +2,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import type { Session, User } from "@supabase/supabase-js"
 import { supabase, supabaseConfigured } from "../lib/supabase/client"
-import { clearCurrentUser, saveCurrentUser } from "../data/feedbackStore"
+import { clearCurrentUser } from "../data/feedbackStore"
+import { isAdminEmail } from "../lib/adminUsers"
+import { ensureProfileFromAuthUser } from "../lib/supabaseProfile"
 
 interface AuthContextType {
   session: Session | null
@@ -20,24 +22,11 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 })
 
-function syncSessionToStorage(session: Session | null) {
+async function syncSessionToStorage(session: Session | null) {
   if (!session?.user) {
     return
   }
-
-  const meta = session.user.user_metadata || {}
-  saveCurrentUser({
-    uid: session.user.id,
-    name: meta.name || session.user.email?.split("@")[0] || "User",
-    email: session.user.email || "",
-    role: meta.role || "client",
-    username: meta.username || undefined,
-    company: meta.company || undefined,
-    country: meta.country || undefined,
-    photoUrl: meta.avatar_url || meta.photoUrl || undefined,
-    phone: meta.phone || undefined,
-    countryCode: meta.countryCode || undefined,
-  })
+  await ensureProfileFromAuthUser(session.user)
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -51,16 +40,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
-      syncSessionToStorage(session)
+      await syncSessionToStorage(session)
       setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setSession(session)
-        syncSessionToStorage(session)
+        await syncSessionToStorage(session)
         setLoading(false)
       }
     )
@@ -69,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const user = session?.user ?? null
-  const isAdmin = user?.app_metadata?.role === "admin" || user?.user_metadata?.role === "admin"
+  const isAdmin = user?.app_metadata?.role === "admin" || user?.user_metadata?.role === "admin" || isAdminEmail(user?.email)
 
   const signOut = async () => {
     if (!supabase || !supabaseConfigured) return

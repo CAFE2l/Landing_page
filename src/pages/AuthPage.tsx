@@ -7,7 +7,7 @@ import Navbar from "../components/landing/Navbar"
 import { saveCurrentUser, type UserProfile } from "../data/feedbackStore"
 import { checkUsernameAvailability, normalizeUsername } from "../data/firestoreStore"
 import { supabase, supabaseConfigured } from "../lib/supabase/client"
-import { upsertPublicUser } from "../lib/supabaseProfile"
+import { ensureProfileFromAuthUser, updatePublicProfile, upsertPublicUser } from "../lib/supabaseProfile"
 
 interface AuthPageProps {
   mode: "login" | "signup"
@@ -83,10 +83,11 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
     setUsernameError("")
   }
 
-  const finishAuth = async (user: UserProfile) => {
+  const finishAuth = async (user: UserProfile, forceProfileUpdate = false) => {
     saveCurrentUser(user)
     onAuth(user)
-    upsertPublicUser(user)
+    if (forceProfileUpdate) await updatePublicProfile(user)
+    else upsertPublicUser(user)
     // Always redirect to site root after login
     navigate("/")
   }
@@ -165,7 +166,7 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
           company: meta.company,
           country: meta.country,
         }
-        await finishAuth(profile)
+        await finishAuth(profile, true)
         return
       }
 
@@ -177,17 +178,7 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
       if (error) throw error
       if (!data.user) throw new Error("Could not sign in.")
 
-      const meta = data.user.user_metadata || {}
-      const profile: UserProfile = {
-        uid: data.user.id,
-        name: meta.name || data.user.email?.split("@")[0] || "User",
-        email: data.user.email || normalizedEmail,
-        role: meta.role || "client",
-        username: meta.username || undefined,
-        company: meta.company || undefined,
-        country: meta.country || undefined,
-        photoUrl: meta.avatar_url || meta.photoUrl || undefined,
-      }
+      const profile = await ensureProfileFromAuthUser(data.user)
       await finishAuth(profile)
     } catch (error) {
       setAuthError(getSupabaseErrorMessage(error))

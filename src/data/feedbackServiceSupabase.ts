@@ -301,6 +301,39 @@ export async function deleteFeedbackPost(id: string): Promise<void> {
 
 // ========== Comments ==========
 
+async function applyProfileAuthorsToComments(comments: FeedbackComment[]): Promise<FeedbackComment[]> {
+  if (!supabase || !supabaseConfigured || comments.length === 0) return comments;
+  const ids = [...new Set(comments.map((c) => c.userId).filter(Boolean))];
+  if (ids.length === 0) return comments;
+
+  const { data, error } = await supabase
+    .from(PROFILES_TABLE)
+    .select("id, full_name, avatar_url, username")
+    .in("id", ids);
+
+  if (error || !data) return comments;
+
+  const profiles = new Map(
+    (data as Record<string, unknown>[]).map((profile) => [
+      profile.id as string,
+      profile,
+    ]),
+  );
+
+  return comments.map((comment) => {
+    const profile = profiles.get(comment.userId);
+    if (!profile) return comment;
+    return {
+      ...comment,
+      userName:
+        (profile.full_name as string) ||
+        (profile.username as string) ||
+        comment.userName,
+      userAvatar: (profile.avatar_url as string) || comment.userAvatar,
+    };
+  });
+}
+
 export async function fetchFeedbackComments(
   postId: string,
 ): Promise<FeedbackComment[]> {
@@ -311,7 +344,8 @@ export async function fetchFeedbackComments(
     .eq("post_id", postId)
     .order("created_at", { ascending: true });
   if (error) return [];
-  return (data || []).map(mapComment);
+  const comments = (data || []).map(mapComment);
+  return applyProfileAuthorsToComments(comments);
 }
 
 export async function addFeedbackComment(
@@ -325,7 +359,6 @@ export async function addFeedbackComment(
       post_id: postId,
       user_id: comment.userId,
       user_name: comment.userName,
-      user_avatar: comment.userAvatar,
       body: comment.content,
       status: comment.status || "visible",
       created_at: new Date().toISOString(),

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
-import { LayoutDashboard, MessageSquare, Users, BarChart3, Settings, LogOut } from "lucide-react"
+import { ExternalLink, LayoutDashboard, MessageSquare, Users, BarChart3, Settings, LogOut } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { useAdminStore } from "../../lib/store/adminStore"
 import { useAuth } from "../../contexts/AuthContext"
@@ -42,7 +42,7 @@ export default function Sidebar() {
       initial={false}
       animate={{ width: collapsed ? 64 : 240 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="fixed left-0 top-0 z-30 flex h-screen flex-col border-r border-white/[0.08] bg-[#050508] overflow-hidden"
+      className="fixed left-0 top-0 z-30 flex h-screen flex-col border-r border-white/5 bg-[#0a0a0f] overflow-hidden"
     >
       <div className="flex h-16 items-center gap-3 px-4 shrink-0">
         <img src="/favicon.png" alt="CAFÉ" className="h-7 w-7 rounded-lg" />
@@ -53,7 +53,7 @@ export default function Sidebar() {
             exit={{ opacity: 0 }}
             className="flex flex-col"
           >
-            <span className="text-sm font-bold text-[#f0f0f5]">CAFÉ</span>
+            <span className="bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-sm font-bold text-transparent">CAFÉ</span>
             <span className="text-[10px] font-semibold text-[#4f6ef7]">ADMIN</span>
           </motion.div>
         )}
@@ -72,25 +72,18 @@ export default function Sidebar() {
             >
               <div
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-200",
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-150",
                   isActive
-                    ? "bg-white/[0.06] text-[#f0f0f5]"
-                    : "text-[#6b6b80] hover:bg-white/[0.03] hover:text-[#f0f0f5]",
+                    ? "bg-white/[0.08] text-white border-l-2 border-blue-500 rounded-none pl-[10px]"
+                    : "text-white/50 hover:bg-white/5 hover:text-white",
                 )}
               >
-                {isActive && (
-                  <motion.div
-                    layoutId="sidebar-active"
-                    className="absolute inset-0 rounded-lg border border-white/[0.08] bg-white/[0.04]"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  />
-                )}
-                <Icon size={18} className="relative z-10 shrink-0" />
+                <Icon size={18} className="shrink-0" />
                 {!collapsed && (
-                  <span className="relative z-10">{item.label}</span>
+                  <span>{item.label}</span>
                 )}
                 {showBadge && (
-                  <span className={`relative z-10 ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#4f6ef7] px-1.5 text-[10px] font-bold text-white ${collapsed ? "absolute -right-1 -top-1" : ""}`}>
+                  <span className={`ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#4f6ef7] px-1.5 text-[10px] font-bold text-white ${collapsed ? "absolute -right-1 -top-1" : ""}`}>
                     {pendingCount > 99 ? "99+" : pendingCount}
                   </span>
                 )}
@@ -100,10 +93,22 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-white/[0.08] px-3 py-4">
+      <div className="border-t border-white/5 px-3 py-4 space-y-1">
+        <a
+          href="/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 text-white/50 hover:bg-white/5 hover:text-white",
+            collapsed && "justify-center px-0",
+          )}
+        >
+          <ExternalLink size={18} className="shrink-0" />
+          {!collapsed && <span>Ver Site</span>}
+        </a>
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[#6b6b80] transition-colors hover:bg-white/[0.03] hover:text-red-400"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/50 transition-colors duration-150 hover:bg-white/5 hover:text-red-400"
         >
           <LogOut size={18} className="shrink-0" />
           {!collapsed && <span>Logout</span>}

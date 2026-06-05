@@ -32,7 +32,7 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!user?.id) {
-      setUnreadMessages(0)
+      queueMicrotask(() => setUnreadMessages(0))
       return
     }
     const refresh = () => getUnreadMessageCount(user.id).then(setUnreadMessages).catch(() => setUnreadMessages(0))

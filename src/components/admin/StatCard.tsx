@@ -30,11 +30,12 @@ export default function StatCard({ label, value, icon: Icon, trend, trendLabel, 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.08, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl p-5 group hover:bg-white/[0.06] transition-all duration-300"
+      whileHover={{ y: -2 }}
+      className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.03] p-5 backdrop-blur-sm transition-all duration-300 hover:border-white/[0.14] hover:bg-white/[0.045] hover:shadow-[0_18px_50px_rgba(79,110,247,0.12)]"
     >
       <div className="flex items-start justify-between mb-4">
         <div
-          className="flex h-9 w-9 items-center justify-center rounded-xl"
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.07] bg-white/[0.04]"
           style={{ backgroundColor: `${accentColor}15`, color: accentColor }}
         >
           <Icon size={18} />
