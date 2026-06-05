@@ -24,6 +24,6 @@ client_secret_*.json
 *.njsproj
 *.sln
 *.sw?
-
+supabase/*
 # Stakpak session files
 .stakpak/session*
