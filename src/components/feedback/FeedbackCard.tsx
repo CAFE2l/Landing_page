@@ -16,6 +16,8 @@ import { Link } from "react-router-dom";
 import type { FeedbackPost, ReactionType } from "../../data/feedbackStore";
 import MediaModal from "./MediaModal";
 import { useUserProfile } from "../../hooks/useUserProfile";
+import { getUserDisplayName } from "../../lib/utils";
+import UserAvatar from "../ui/UserAvatar";
 
 interface FeedbackCardProps {
   post: FeedbackPost;
@@ -48,9 +50,8 @@ export default function FeedbackCard({
   const displayRating = Math.round(post.rating);
   const [mediaIndex, setMediaIndex] = useState<number | null>(null);
 
-  const userName = profile?.full_name || post.userName;
-  const userAvatar = profile?.avatar_url || post.userAvatar;
-  const initials = profile?.initials || post.userName[0]?.toUpperCase() || "U";
+  const userName = profile ? getUserDisplayName(profile) : (post.userName || "Unknown user");
+  const userForAvatar = profile || { name: post.userName, avatarUrl: post.userAvatar };
 
   return (
     <>
@@ -79,17 +80,9 @@ export default function FeedbackCard({
               <Link
                 to={`/profile/${post.userId}`}
                 onClick={(e) => e.stopPropagation()}
-                className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4F6EF7]/10 text-sm font-bold text-[#4F6EF7] ring-1 ring-white/[0.06] transition-all duration-300 hover:ring-2 hover:ring-[#4F6EF7]/45 hover:shadow-[0_0_20px_rgba(79,110,247,0.2)]"
+                className="transition-all duration-300 hover:opacity-80"
               >
-                {userAvatar ? (
-                  <img
-                    src={userAvatar}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  initials
-                )}
+                <UserAvatar user={userForAvatar} size="md" />
               </Link>
               <div>
                 <div className="flex items-center gap-1.5">
@@ -266,7 +259,7 @@ export default function FeedbackCard({
                 aria-label="Like"
                 className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-300 ${
                   userReaction === "like"
-                    ? "bg-gradient-to-br from-[#4F6EF7]/20 to-[#4F6EF7]/10 text-[#7C8CFF] shadow-[0_0_12px_rgba(79,110,247,0.15)]"
+                    ? "bg-gradient-to-br from-[#22C55E]/20 to-[#22C55E]/10 text-[#22C55E] shadow-[0_0_12px_rgba(34,197,94,0.15)]"
                     : "text-[#6B6B80] hover:bg-white/[0.06] hover:text-[#F0F0F5]"
                 } disabled:cursor-wait disabled:opacity-70`}
               >
@@ -289,7 +282,7 @@ export default function FeedbackCard({
                 aria-label="Dislike"
                 className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-300 ${
                   userReaction === "dislike"
-                    ? "bg-gradient-to-br from-[#8B5CF6]/20 to-[#8B5CF6]/10 text-[#C4B5FD] shadow-[0_0_12px_rgba(139,92,246,0.15)]"
+                    ? "bg-gradient-to-br from-[#EF4444]/20 to-[#EF4444]/10 text-[#EF4444] shadow-[0_0_12px_rgba(239,68,68,0.15)]"
                     : "text-[#6B6B80] hover:bg-white/[0.06] hover:text-[#F0F0F5]"
                 } disabled:cursor-wait disabled:opacity-70`}
               >

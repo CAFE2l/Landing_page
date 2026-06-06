@@ -23,7 +23,8 @@ import {
 import toast from "react-hot-toast";
 import type { Client, ClientNote, ClientStatus } from "../../lib/types/client";
 import { formatPhoneDisplay } from "../../components/ui/PhoneInput";
-import { getInitials, formatDate, timeAgo } from "../../lib/utils";
+import { formatDate, timeAgo } from "../../lib/utils";
+import UserAvatar from "../../components/ui/UserAvatar";
 import { useAuth } from "../../contexts/AuthContext";
 import { getSupabaseClient } from "../../data/adminServiceSupabase";
 import {
@@ -521,17 +522,7 @@ function ClientRow({
       className="grid grid-cols-[2fr_1.3fr_1fr_0.6fr_0.6fr_0.6fr_0.6fr_0.8fr_1fr] gap-4 border-b border-white/5 px-5 py-3.5 transition-colors last:border-0 hover:bg-white/[0.04] items-center"
     >
       <div className="flex items-center gap-3 min-w-0">
-        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#4f6ef7] to-[#8b5cf6] text-xs font-bold text-white">
-          {client.avatarUrl ? (
-            <img
-              src={client.avatarUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            getInitials(client.name)
-          )}
-        </div>
+        <UserAvatar user={client} size="md" ring={false} />
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <p className="truncate text-sm font-medium text-[#f0f0f5]">
@@ -613,17 +604,7 @@ function ClientCard({
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#4f6ef7] to-[#8b5cf6] text-sm font-bold text-white">
-            {client.avatarUrl ? (
-              <img
-                src={client.avatarUrl}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              getInitials(client.name)
-            )}
-          </div>
+          <UserAvatar user={client} size="md" ring={false} />
           <div>
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium text-[#f0f0f5]">

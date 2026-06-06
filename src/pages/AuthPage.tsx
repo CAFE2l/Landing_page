@@ -57,12 +57,14 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
   const [emailLoading, setEmailLoading] = useState(false);
   const isSignup = mode === "signup";
 
-  const finishAuth = async (user: UserProfile, forceProfileUpdate = false) => {
+  const finishAuth = async (user: UserProfile, isNewSignup = false) => {
     saveCurrentUser(user);
     if (onAuth) onAuth(user);
-    if (forceProfileUpdate) await updatePublicProfile(user);
-    else upsertPublicUser(user);
-    // Always redirect to site root after login
+    if (isNewSignup) {
+      await upsertPublicUser(user);
+    } else {
+      await updatePublicProfile(user);
+    }
     navigate("/");
   };
 
@@ -96,7 +98,7 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
         }
 
         const meta = {
-          name: name.trim() || "Client",
+          name: name.trim() || normalizedEmail.split("@")[0],
           company: company.trim() || undefined,
           country: country.trim(),
           role: "client",
@@ -114,6 +116,7 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
         const profile: UserProfile = {
           uid: data.user.id,
           name: meta.name,
+          fullName: meta.name,
           email: normalizedEmail,
           role: meta.role as "client",
           company: meta.company,
@@ -132,7 +135,7 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
       if (!data.user) throw new Error("Could not sign in.");
 
       const profile = await ensureProfileFromAuthUser(data.user);
-      await finishAuth(profile);
+      await finishAuth(profile, false);
     } catch (error) {
       setAuthError(getSupabaseErrorMessage(error));
     } finally {

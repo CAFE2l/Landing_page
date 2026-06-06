@@ -142,7 +142,7 @@ async function applyProfileAuthors(posts: FeedbackPost[]): Promise<FeedbackPost[
 
   const { data, error } = await supabase
     .from(PROFILES_TABLE)
-    .select("id, full_name, avatar_url, username")
+    .select("id, full_name, avatar_url, username, email")
     .in("id", ids);
 
   if (error || !data) return posts;
@@ -162,6 +162,7 @@ async function applyProfileAuthors(posts: FeedbackPost[]): Promise<FeedbackPost[
       userName:
         (profile.full_name as string) ||
         (profile.username as string) ||
+        (profile.email as string)?.split("@")[0] ||
         post.userName,
       userAvatar: (profile.avatar_url as string) || post.userAvatar,
     };
@@ -335,7 +336,7 @@ async function applyProfileAuthorsToComments(comments: FeedbackComment[]): Promi
 
   const { data, error } = await supabase
     .from(PROFILES_TABLE)
-    .select("id, full_name, avatar_url, username")
+    .select("id, full_name, avatar_url, username, email")
     .in("id", ids);
 
   if (error || !data) return comments;
@@ -355,6 +356,7 @@ async function applyProfileAuthorsToComments(comments: FeedbackComment[]): Promi
       userName:
         (profile.full_name as string) ||
         (profile.username as string) ||
+        (profile.email as string)?.split("@")[0] ||
         comment.userName,
       userAvatar: (profile.avatar_url as string) || comment.userAvatar,
     };
@@ -1024,6 +1026,17 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfileD
   };
 }
 
+export async function fetchPublicProfileByUsername(username: string): Promise<PublicProfileData | null> {
+  if (!supabase || !supabaseConfigured) return null;
+  const { data: profile } = await supabase
+    .from(PROFILES_TABLE)
+    .select("id")
+    .eq("username", username)
+    .maybeSingle();
+  if (!profile) return null;
+  return fetchPublicProfile((profile as { id: string }).id);
+}
+
 export async function isFollowingProfile(currentUserId: string, profileId: string): Promise<boolean> {
   if (!supabase || !supabaseConfigured) return false;
   if (!canQuerySocialFollows()) return false;
@@ -1116,7 +1129,7 @@ export async function fetchConversations(userId: string): Promise<ConversationSu
     return {
       id: row.id as string,
       otherUserId,
-      otherName: (profile?.full_name as string) || (profile?.username as string) || "User",
+      otherName: (profile?.full_name as string) || (profile?.username as string) || "Unknown user",
       otherAvatar: (profile?.avatar_url as string) || undefined,
       lastMessage: (last?.content as string) || "",
       lastMessageAt: ((last?.created_at as string) || row.last_message_at) as string,

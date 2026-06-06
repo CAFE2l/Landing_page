@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useUserProfile } from "../../hooks/useUserProfile";
+import UserAvatar from "../ui/UserAvatar";
 
 const dropdownItems = [
   { label: "My Profile", href: "/dashboard/profile", icon: User },
@@ -49,9 +50,7 @@ export default function UserMenu() {
     return () => document.removeEventListener("keydown", handleKey);
   }, []);
 
-  const name = profile?.full_name || user?.email?.split("@")[0] || "User";
-  const avatarUrl = profile?.avatar_url;
-  const initials = profile?.initials || "";
+  const name = profile?.full_name || user?.email?.split("@")[0] || "Unknown user";
 
   const handleLogout = async () => {
     setOpen(false);
@@ -93,17 +92,7 @@ export default function UserMenu() {
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2.5 group"
       >
-        {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={name}
-            className="h-9 w-9 rounded-full object-cover ring-2 ring-white/10 group-hover:ring-[#3b82f6]/50 transition-all"
-          />
-        ) : (
-          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#2563eb] to-[#1d4ed8] flex items-center justify-center text-sm font-bold text-white ring-2 ring-white/10 group-hover:ring-[#3b82f6]/50 transition-all">
-            {initials}
-          </div>
-        )}
+        <UserAvatar user={profile} size="md" className="ring-2 ring-white/10 group-hover:ring-[#3b82f6]/50" />
         <span className="hidden sm:block text-sm font-medium text-zinc-300 group-hover:text-white transition-colors max-w-[120px] truncate">
           {name}
         </span>

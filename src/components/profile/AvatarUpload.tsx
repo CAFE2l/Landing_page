@@ -33,8 +33,8 @@ export function AvatarUpload({
         setError("Only image files are allowed");
         return;
       }
-      if (file.size > 10 * 1024 * 1024) {
-        setError("Image must be smaller than 10MB");
+      if (file.size > 15 * 1024 * 1024) {
+        setError("Image must be smaller than 15MB");
         return;
       }
 
@@ -81,7 +81,11 @@ export function AvatarUpload({
 
         const localUser = loadCurrentUser();
         if (localUser && isOwnProfile) {
-          saveCurrentUser({ ...localUser, photoUrl: result.secure_url });
+          saveCurrentUser({
+            ...localUser,
+            photoUrl: result.secure_url,
+            avatarUrl: result.secure_url,
+          });
         }
 
         window.dispatchEvent(new Event("cafe-profile-updated"));
@@ -153,7 +157,7 @@ export function AvatarUpload({
       )}
 
       <p className="text-[10px] text-white/30">
-        Click or drag to upload · Max 10MB
+        Click or drag to upload · Max 15MB
       </p>
     </div>
   );

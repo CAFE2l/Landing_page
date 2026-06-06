@@ -11,7 +11,7 @@ interface StickerPanelProps {
 }
 
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"]
-const MAX_SIZE = 2 * 1024 * 1024
+const MAX_SIZE = 5 * 1024 * 1024
 
 export default function StickerPanel({ onSelect, onClose }: StickerPanelProps) {
   const { user } = useAuth()
@@ -46,7 +46,7 @@ export default function StickerPanel({ onSelect, onClose }: StickerPanelProps) {
     }
 
     if (file.size > MAX_SIZE) {
-      toast.error("Image must be under 2MB")
+      toast.error("Image must be under 5MB")
       return
     }
 

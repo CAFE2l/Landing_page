@@ -2,7 +2,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Star, PenLine } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getInitials } from "../lib/utils";
+import { getUserDisplayName } from "../lib/utils";
+import UserAvatar from "../components/ui/UserAvatar";
+import { useUserProfile } from "../hooks/useUserProfile";
 import PageShell from "./PageShell";
 import FeedbackFeed from "../components/feedback/FeedbackFeed";
 import FeedbackSidebar from "../components/feedback/FeedbackSidebar";
@@ -39,6 +41,7 @@ export default function FeedbackPage() {
       })
     : null;
   const uid = supabaseUser?.id || userProfile?.uid || userProfile?.id;
+  const { profile: loggedProfile } = useUserProfile(uid);
 
   const [posts, setPosts] = useState<FeedbackPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -244,12 +247,14 @@ export default function FeedbackPage() {
     }
     setSubmitting(true);
 
+    const displayName = getUserDisplayName(loggedProfile || userProfile);
+    const displayAvatar = getUserAvatar(loggedProfile || userProfile) || "";
+
     try {
       const id = await createFeedbackPost({
         userId: uid,
-        userName:
-          userProfile?.name || userProfile?.email?.split("@")[0] || "User",
-        userAvatar: userProfile?.photoUrl || "",
+        userName: displayName,
+        userAvatar: displayAvatar,
         serviceCategory: data.serviceCategory,
         projectTitle: data.projectTitle,
         projectUrl: data.projectUrl,
@@ -295,19 +300,7 @@ export default function FeedbackPage() {
     >
       {/* CTA Bar */}
       <div className="mb-6 flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 sm:p-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#4F6EF7]/10 text-sm font-bold text-[#4F6EF7] overflow-hidden">
-          {userProfile?.photoUrl ? (
-            <img
-              src={userProfile.photoUrl}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          ) : userProfile?.name ? (
-            getInitials(userProfile.name)
-          ) : (
-            "CS"
-          )}
-        </div>
+        <UserAvatar user={loggedProfile || userProfile} size="md" />
         <button
           onClick={() => (uid ? setShowForm(true) : setShowLoginPrompt(true))}
           className="flex-1 rounded-xl border border-white/[0.08] bg-black/20 px-4 py-2.5 text-left text-sm text-[#6B6B80] transition-colors hover:border-[#4F6EF7]/30 hover:text-[#F0F0F5]"

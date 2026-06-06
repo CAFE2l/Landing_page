@@ -56,19 +56,11 @@ function SkeletonCard() {
 }
 
 import { useUserProfile } from "../../hooks/useUserProfile";
+import UserAvatar from "../../components/ui/UserAvatar";
 
 function RecentFeedbackItem({ item, index }: { item: any; index: number }) {
   const { profile } = useUserProfile(item.userId);
   const name = profile?.full_name || item.userName;
-  const avatarUrl = profile?.avatar_url || item.userAvatar;
-  const initials =
-    profile?.initials ||
-    item.userName
-      .split(" ")
-      .map((n: string) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
 
   return (
     <motion.div
@@ -78,13 +70,7 @@ function RecentFeedbackItem({ item, index }: { item: any; index: number }) {
       transition={{ delay: index * 0.04 }}
       className="flex items-center gap-4 border-b border-white/[0.04] px-5 py-3.5 transition-colors last:border-0 hover:bg-white/[0.02]"
     >
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#4f6ef7] to-[#8b5cf6] text-xs font-bold text-white">
-        {avatarUrl ? (
-          <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          initials
-        )}
-      </div>
+      <UserAvatar user={profile || { name: item.userName, avatarUrl: item.userAvatar }} size="sm" ring={false} />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-[#f0f0f5]">{name}</p>
         <p className="truncate text-xs text-[#6b6b80]">{item.title}</p>

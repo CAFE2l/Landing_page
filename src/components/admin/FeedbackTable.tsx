@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Check, X, Trash2, Eye, ChevronDown, MessageSquare, Image as ImageIcon } from "lucide-react"
 import type { FeedbackEntry } from "../../lib/types"
 import StatusBadge from "./StatusBadge"
-import { getInitials, formatDate } from "../../lib/utils"
+import { formatDate } from "../../lib/utils"
+import UserAvatar from "../ui/UserAvatar"
 import { cn } from "../../lib/utils"
 import { useAdminStore } from "../../lib/store/adminStore"
 
@@ -103,9 +104,7 @@ export default function FeedbackTable({ feedbacks, onApprove, onReject, onDelete
                     />
                   </div>
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-8 w-8 shrink-0 rounded-full bg-gradient-to-br from-[#4f6ef7] to-[#6b85ff] flex items-center justify-center text-xs font-bold text-white">
-                      {getInitials(feedback.userName)}
-                    </div>
+                    <UserAvatar user={{ name: feedback.userName }} size="sm" ring={false} />
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-[#f0f0f5] truncate">{feedback.userName}</p>
                       {feedback.userEmail && <p className="text-xs text-[#6b6b80] truncate">{feedback.userEmail}</p>}

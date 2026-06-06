@@ -110,6 +110,16 @@ function App() {
             }
           />
           <Route
+            path="/dashboard/messages/:conversationId"
+            element={
+              <ProtectedRoute>
+                <ChatErrorBoundary>
+                  <MessagesPage />
+                </ChatErrorBoundary>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/dashboard/orders"
             element={
               <ProtectedRoute>
@@ -120,6 +130,7 @@ function App() {
           <Route path="/hire/:serviceSlug" element={<HirePage />} />
           <Route path="/checkout/:orderId" element={<CheckoutPage />} />
           <Route path="/profile/:userId" element={<PublicProfilePage />} />
+          <Route path="/u/:username" element={<PublicProfilePage />} />
           <Route
             path="/profile"
             element={

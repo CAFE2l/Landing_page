@@ -11,18 +11,23 @@ function profileFromRow(user: User, row: Record<string, unknown>): UserProfile {
       ? "admin"
       : "client";
 
+  const fullName = (row.full_name as string) || null;
+  const username = (row.username as string) || null;
+  const emailPrefix = (row.email as string)?.split("@")[0] || user.email?.split("@")[0] || null;
+  const name = fullName || username || emailPrefix || "Unknown user";
+  const avatarUrl = (row.avatar_url as string) || null;
+
   return {
     uid: user.id,
-    name:
-      (row.full_name as string) ||
-      user.email?.split("@")[0] ||
-      "User",
+    name,
+    fullName: fullName || undefined,
+    avatarUrl: avatarUrl || undefined,
     email: (row.email as string) || user.email || "",
     role,
-    username: (row.username as string) || undefined,
+    username: username || undefined,
     company: (row.company as string) || undefined,
     country: (row.location_country as string) || undefined,
-    photoUrl: (row.avatar_url as string) || undefined,
+    photoUrl: avatarUrl || undefined,
     phone: (row.phone as string) || user.user_metadata?.phone || undefined,
     countryCode: (row.country_code as string) || user.user_metadata?.countryCode || undefined,
     location: (row.location_country as string) || undefined,
@@ -33,9 +38,12 @@ function profileFromRow(user: User, row: Record<string, unknown>): UserProfile {
 
 export async function ensureProfileFromAuthUser(user: User): Promise<UserProfile> {
   if (!supabase || !supabaseConfigured) {
+    const emailPrefix = user.email?.split("@")[0] || null;
     return {
       uid: user.id,
-      name: user.email?.split("@")[0] || "User",
+      name: emailPrefix || "Unknown user",
+      fullName: undefined,
+      avatarUrl: undefined,
       email: user.email || "",
       role: isAdminEmail(user.email) ? "admin" : "client",
     };
@@ -98,6 +106,7 @@ export async function ensureProfileFromAuthUser(user: User): Promise<UserProfile
   }
 
   const meta = user.user_metadata || {};
+  const emailPrefix = user.email?.split("@")[0] || null;
   const seeded = {
     id: user.id,
     email: user.email || null,
@@ -106,8 +115,8 @@ export async function ensureProfileFromAuthUser(user: User): Promise<UserProfile
       meta.name ||
       meta.full_name ||
       meta.display_name ||
-      user.email?.split("@")[0] ||
-      "User",
+      emailPrefix ||
+      null,
     avatar_url: meta.avatar_url || meta.picture || meta.photoUrl || null,
     updated_at: new Date().toISOString(),
   };
@@ -135,17 +144,19 @@ export async function updateProfileMetadata(updates: Record<string, unknown>) {
 
 export async function upsertPublicUser(profile: UserProfile) {
   if (!supabase || !supabaseConfigured) return;
+  const displayName = profile.fullName || profile.name || "Unknown user";
+  const avatar = profile.avatarUrl || profile.photoUrl || null;
   try {
     await supabase.from("users").upsert(
       {
         id: profile.uid,
-        name: profile.name,
+        name: displayName,
         email: profile.email,
         username: profile.username || null,
         role: profile.role,
         company: profile.company || null,
         country: profile.country || null,
-        photo_url: profile.photoUrl || null,
+        photo_url: avatar,
         phone: profile.phone || null,
         country_code: profile.countryCode || null,
         updated_at: new Date().toISOString(),
@@ -161,14 +172,14 @@ export async function upsertPublicUser(profile: UserProfile) {
     if (!existing) {
       await supabase.from("profiles").insert({
           id: profile.uid,
-          full_name: profile.name,
+          full_name: displayName,
           username: profile.username || null,
           email: profile.email || null,
           role: profile.role || "client",
           company: profile.company || null,
           phone: profile.phone || null,
           country_code: profile.countryCode || null,
-          avatar_url: profile.photoUrl || null,
+          avatar_url: avatar,
           bio: profile.bio || null,
           location_country: profile.location || profile.country || null,
           location_country_code: profile.locationCountryCode || null,
@@ -183,17 +194,19 @@ export async function upsertPublicUser(profile: UserProfile) {
 
 export async function updatePublicProfile(profile: UserProfile) {
   if (!supabase || !supabaseConfigured || !profile.uid) return;
+  const displayName = profile.fullName || profile.name || "Unknown user";
+  const avatar = profile.avatarUrl || profile.photoUrl || null;
   await supabase
     .from("profiles")
     .update({
-      full_name: profile.name,
+      full_name: displayName,
       username: profile.username || null,
       email: profile.email || null,
       role: profile.role || "client",
       company: profile.company || null,
       phone: profile.phone || null,
       country_code: profile.countryCode || null,
-      avatar_url: profile.photoUrl || null,
+      avatar_url: avatar,
       bio: profile.bio || null,
       location_country: profile.location || profile.country || null,
       location_country_code: profile.locationCountryCode || null,
@@ -206,12 +219,14 @@ export async function updatePublicProfile(profile: UserProfile) {
 
 export async function syncFeedbackAuthor(profile: UserProfile) {
   if (!supabase || !supabaseConfigured || !profile.uid) return;
+  const displayName = profile.fullName || profile.name || "Unknown user";
+  const avatar = profile.avatarUrl || profile.photoUrl || null;
   try {
     await supabase
       .from("feedback_posts")
       .update({
-        user_name: profile.name,
-        user_avatar: profile.photoUrl || "",
+        user_name: displayName,
+        user_avatar: avatar || "",
         updated_at: new Date().toISOString(),
       })
       .eq("user_id", profile.uid);
@@ -219,8 +234,8 @@ export async function syncFeedbackAuthor(profile: UserProfile) {
     await supabase
       .from("feedback_comments")
       .update({
-        user_name: profile.name,
-        user_avatar: profile.photoUrl || "",
+        user_name: displayName,
+        user_avatar: avatar || "",
       })
       .eq("user_id", profile.uid);
   } catch {

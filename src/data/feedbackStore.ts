@@ -8,6 +8,9 @@ export interface UserProfile {
   email: string
   role: UserRole
   username?: string
+  fullName?: string
+  displayName?: string
+  avatarUrl?: string
   company?: string
   country?: string
   photoUrl?: string
@@ -119,7 +122,7 @@ export const getInitials = (name: string) =>
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
-    .join("") || "CS"
+    .join("") || "?"
 
 export const loadFeedbacks = (): FeedbackEntry[] => {
   return []

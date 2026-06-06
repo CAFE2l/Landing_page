@@ -38,7 +38,37 @@ export function getInitials(name: string) {
     .filter(Boolean)
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase())
-    .join("") || "CS"
+    .join("") || "?"
+}
+
+export function getUserDisplayName(user: {
+  fullName?: string | null
+  displayName?: string | null
+  username?: string | null
+  name?: string | null
+  email?: string | null
+  full_name?: string | null
+} | null | undefined): string {
+  if (!user) return "Unknown user"
+  return (
+    user.fullName ||
+    user.full_name ||
+    user.displayName ||
+    user.name ||
+    user.username ||
+    user.email?.split("@")[0] ||
+    "Unknown user"
+  )
+}
+
+export function getUserAvatar(user: {
+  avatarUrl?: string | null
+  avatar_url?: string | null
+  photoUrl?: string | null
+  photoURL?: string | null
+} | null | undefined): string | null {
+  if (!user) return null
+  return user.avatarUrl || user.avatar_url || user.photoUrl || user.photoURL || null
 }
 
 const WA_PHONE = "5541996713782"

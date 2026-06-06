@@ -25,6 +25,7 @@ import {
 } from "../../data/feedbackStore";
 import { uploadFeedbackMedia } from "../../lib/cloudinary";
 import { useUserProfile } from "../../hooks/useUserProfile";
+import UserAvatar from "../ui/UserAvatar";
 import { cn } from "../../lib/utils";
 
 interface FeedbackFormProps {
@@ -326,19 +327,7 @@ export default function FeedbackForm({
                   >
                     {/* User Identity Preview */}
                     <div className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-                      <div className="h-10 w-10 overflow-hidden rounded-full border border-white/[0.1] bg-gradient-to-br from-[#4F6EF7]/20 to-[#6B85FF]/20">
-                        {profile?.avatar_url ? (
-                          <img
-                            src={profile.avatar_url}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-sm font-bold text-[#4F6EF7]">
-                            {profile?.initials}
-                          </div>
-                        )}
-                      </div>
+                      <UserAvatar user={profile} size="md" className="border border-white/[0.1]" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-white">
                           {profile?.full_name}

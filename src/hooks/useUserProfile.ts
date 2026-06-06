@@ -32,7 +32,7 @@ export interface UserProfileData {
 
 export function useUserProfile(userId?: string) {
   const { user: authUser } = useAuth();
-  const targetUserId = userId || authUser?.id;
+  const targetUserId = userId !== undefined ? (userId || null) : (authUser?.id || null);
   const reactId = useId();
   const channelInstanceId = useRef(reactId.replace(/[^a-zA-Z0-9_-]/g, ""));
   const channelSequence = useRef(0);
@@ -77,8 +77,8 @@ export function useUserProfile(userId?: string) {
       if (profileRes.error) throw profileRes.error;
       const profiles = profileRes.data;
 
-      // Priority for name: profiles.full_name > profiles.username > auth.user_metadata.full_name/name > email prefix
-      let displayName = "User";
+      const emailPrefix = profiles?.email?.split("@")[0] || authUser?.email?.split("@")[0];
+      let displayName = emailPrefix || "Unknown user";
       if (profiles?.full_name) {
         displayName = profiles.full_name;
       } else if (profiles?.username) {
@@ -88,10 +88,9 @@ export function useUserProfile(userId?: string) {
         displayName =
           meta.full_name ||
           meta.name ||
-          authUser.email?.split("@")[0] ||
-          "User";
-      } else if (profiles?.email) {
-        displayName = profiles.email.split("@")[0];
+          meta.display_name ||
+          emailPrefix ||
+          "Unknown user";
       }
 
       // Priority for avatar: profiles.avatar_url > auth.user_metadata.avatar_url > initials

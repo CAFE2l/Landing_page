@@ -4,6 +4,8 @@ import ChatMessageBubble from "./ChatMessageBubble"
 import MessageComposer from "./MessageComposer"
 import { fetchMessages, markMessagesAsRead, subscribeToMessages } from "../../lib/chatService"
 import type { ChatMessage, ChatConversation } from "../../data/feedbackStore"
+import { getUserDisplayName } from "../../lib/utils"
+import UserAvatar from "../ui/UserAvatar"
 
 interface ChatConversationProps {
   conversation: ChatConversation
@@ -71,21 +73,17 @@ export default function ChatConversation({ conversation, currentUserId, onBack }
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
           </button>
         )}
-        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4F6EF7]/10 text-sm font-bold text-[#4F6EF7]">
-          {conversation.otherUser.avatarUrl ? (
-            <img src={conversation.otherUser.avatarUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            conversation.otherUser.name[0]?.toUpperCase() || "U"
-          )}
-        </div>
+        <UserAvatar user={conversation.otherUser} size="md" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-white truncate">
-            {conversation.otherUser.name}
+            {getUserDisplayName(conversation.otherUser)}
           </p>
           <p className="text-[11px] text-[#6B6B80] truncate">
             {conversation.otherUser.username
               ? `@${conversation.otherUser.username}`
-              : "User"}
+              : conversation.otherUser.name
+                ? conversation.otherUser.name
+                : ""}
           </p>
         </div>
       </div>

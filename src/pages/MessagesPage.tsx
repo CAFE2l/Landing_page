@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react"
-import { useSearchParams, Link } from "react-router-dom"
+import { useSearchParams, useParams, Link } from "react-router-dom"
 import {
-  MessageCircle, Loader2, Search, UserPlus, Hash,
+  MessageCircle, Loader2, Search, Hash,
   Send, X, Camera, ChevronLeft, Heart, MessageSquare,
   ExternalLink, Plus, AlertCircle, RefreshCw,
   FileText, Download, Film, ImageIcon, Music,
@@ -23,10 +23,12 @@ import {
 } from "../lib/socialFollowsHealth"
 import MessageComposer from "../components/chat/MessageComposer"
 import FollowButton from "../components/ui/FollowButton"
+import { getUserDisplayName } from "../lib/utils"
+import UserAvatar from "../components/ui/UserAvatar"
 import type { ChatConversation as ChatConv, ChatMessage, SocialPost } from "../data/feedbackStore"
 import toast from "react-hot-toast"
 
-type Tab = "conversations" | "status" | "following"
+type Tab = "conversations" | "status"
 
 export default function MessagesPage() {
   const { user: supabaseUser } = useAuth()
@@ -36,6 +38,7 @@ export default function MessagesPage() {
   const uid = supabaseUser?.id || userProfile?.uid || userProfile?.id
 
   const [searchParams, setSearchParams] = useSearchParams()
+  const { conversationId: urlConversationId } = useParams()
   const [tab, setTab] = useState<Tab>("conversations")
   const [conversations, setConversations] = useState<ChatConv[]>([])
   const [convLoading, setConvLoading] = useState(true)
@@ -98,7 +101,7 @@ export default function MessagesPage() {
 
   // ========== URL param auto-select ==========
   useEffect(() => {
-    const convId = searchParams.get("conversationId")
+    const convId = searchParams.get("conversationId") || urlConversationId
     if (!convId || conversations.length === 0 || activeConv) return
     const found = conversations.find((c) => c.id === convId)
     if (found) {
@@ -106,7 +109,7 @@ export default function MessagesPage() {
       setMobileView("chat")
       setSearchParams({}, { replace: true })
     }
-  }, [searchParams, conversations])
+  }, [searchParams, urlConversationId, conversations])
 
   // ========== Load messages for active conversation ==========
   const loadMessages = useCallback(async () => {
@@ -179,7 +182,6 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (tab === "status") loadPosts("all")
-    else if (tab === "following") loadPosts("following")
   }, [tab, loadPosts])
 
   // ========== Create post ==========
@@ -264,7 +266,7 @@ export default function MessagesPage() {
       markSocialFollowsError("count drawer following", followingRes.error)
       setDrawerProfile({
         id: userId,
-        name: (row.full_name as string) || (row.username as string) || "User",
+        name: (row.full_name as string) || (row.username as string) || (row.email as string)?.split("@")[0] || "Unknown user",
         avatarUrl: (row.avatar_url as string) || null,
         username: (row.username as string) || null,
         bio: (row.bio as string) || null,
@@ -315,7 +317,6 @@ export default function MessagesPage() {
         {([
           { key: "conversations" as Tab, label: "Conversations", icon: MessageCircle },
           { key: "status" as Tab, label: "Status", icon: Hash },
-          { key: "following" as Tab, label: "Following", icon: UserPlus },
         ]).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -398,17 +399,13 @@ export default function MessagesPage() {
                         : "hover:bg-white/[0.03] border-l-2 border-transparent"
                     }`}
                   >
-                    <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#4F6EF7]/20 to-[#8B5CF6]/10 text-sm font-bold text-[#4F6EF7] ring-1 ring-white/[0.06]">
-                      {conv.otherUser.avatarUrl ? (
-                        <img src={conv.otherUser.avatarUrl} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        conv.otherUser.name[0]?.toUpperCase() || "U"
-                      )}
+                    <div className="relative shrink-0">
+                      <UserAvatar user={conv.otherUser} size="md" className="ring-1 ring-white/[0.06]" />
                       <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#0A0A0F] bg-[#22C55E]" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-white truncate">{conv.otherUser.name}</p>
+                        <p className="text-sm font-semibold text-white truncate">{getUserDisplayName(conv.otherUser)}</p>
                         <p className="text-[10px] text-[#4A4A5A] shrink-0 ml-2">
                           {new Date(conv.lastMessageAt).toLocaleDateString("en-US", { day: "numeric", month: "short" })}
                         </p>
@@ -430,25 +427,20 @@ export default function MessagesPage() {
         </>
       )}
 
-      {(tab === "status" || tab === "following") && (
+      {tab === "status" && (
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/[0.08]">
           {/* Create post input */}
           <div className="border-b border-white/[0.06] p-3">
             <div className="flex gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4F6EF7]/10 text-sm font-bold text-[#4F6EF7]">
-                {userProfile?.photoUrl ? (
-                  <img src={userProfile.photoUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  userProfile?.name?.[0]?.toUpperCase() || "U"
-                )}
-              </div>
+              <UserAvatar user={userProfile} size="md" />
               <div className="flex-1">
                 <textarea
-                  value={postInput}
-                  onChange={(e) => setPostInput(e.target.value)}
-                  placeholder="Share an update..."
+                  value={newPostContent}
+                  onChange={(e) => setNewPostContent(e.target.value)}
+                  placeholder="What's on your mind?"
                   rows={2}
-                  className="w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-[#4A4A5A] outline-none focus:border-[#4F6EF7]/30 transition-all"
+                  className="w-full resize-none bg-transparent text-sm text-white placeholder:text-[#4A4A5A] outline-none"
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleCreatePost() } }}
                 />
                 {postMediaUrl && (
                   <div className="mt-2 flex items-center gap-2 rounded-lg bg-white/[0.04] p-2">
@@ -493,17 +485,13 @@ export default function MessagesPage() {
           ) : postError ? (
             <div className="flex flex-col items-center justify-center py-20 text-center px-4">
               <p className="text-sm text-red-400">{postError}</p>
-              <button onClick={() => loadPosts(tab === "following" ? "following" : "all")} className="mt-3 text-xs text-[#4F6EF7] hover:underline">Retry</button>
+              <button onClick={() => loadPosts("all")} className="mt-3 text-xs text-[#4F6EF7] hover:underline">Retry</button>
             </div>
           ) : posts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center px-4">
               <Hash size={32} className="text-[#4A4A5A] mb-3" />
-              <p className="text-sm text-[#6B6B80]">
-                {tab === "following" ? "No posts from people you follow" : "No posts yet"}
-              </p>
-              <p className="text-xs text-[#4A4A5A] mt-1">
-                {tab === "following" ? "Follow users to see their updates here" : "Be the first to publish"}
-              </p>
+              <p className="text-sm text-[#6B6B80]">No posts yet</p>
+              <p className="text-xs text-[#4A4A5A] mt-1">Be the first to publish</p>
             </div>
           ) : (
             <div className="divide-y divide-white/[0.04]">
@@ -511,18 +499,12 @@ export default function MessagesPage() {
                 <div key={post.id} className="p-3 hover:bg-white/[0.01] transition-colors">
                   <div className="flex gap-3">
                     <button onClick={() => openProfile(post.userId)} className="shrink-0">
-                      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[#4F6EF7]/10 text-sm font-bold text-[#4F6EF7]">
-                        {post.user?.avatarUrl ? (
-                          <img src={post.user.avatarUrl} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          post.user?.name?.[0]?.toUpperCase() || "U"
-                        )}
-                      </div>
+                      <UserAvatar user={post.user} size="md" />
                     </button>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <button onClick={() => openProfile(post.userId)} className="text-sm font-semibold text-white hover:text-[#4F6EF7] transition-colors">
-                          {post.user?.name || "User"}
+                          {getUserDisplayName(post.user)}
                         </button>
                         {post.user?.username && (
                           <span className="text-[11px] text-[#4A4A5A]">@{post.user.username}</span>
@@ -590,15 +572,9 @@ export default function MessagesPage() {
                           >
                             {post.comments.map((comment) => (
                               <div key={comment.id} className="flex gap-2 pl-2">
-                                <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4F6EF7]/10 text-[8px] font-bold text-[#4F6EF7]">
-                                  {comment.user?.avatarUrl ? (
-                                    <img src={comment.user.avatarUrl} alt="" className="h-full w-full object-cover" />
-                                  ) : (
-                                    comment.user?.name?.[0]?.toUpperCase() || "U"
-                                  )}
-                                </div>
+                                <UserAvatar user={comment.user} size="sm" />
                                 <div className="flex-1">
-                                  <span className="text-[11px] font-semibold text-white">{comment.user?.name}</span>
+                                  <span className="text-[11px] font-semibold text-white">{getUserDisplayName(comment.user)}</span>
                                   <span className="text-[11px] text-[#A0A0B5] ml-1">{comment.content}</span>
                                 </div>
                               </div>
@@ -655,18 +631,14 @@ export default function MessagesPage() {
           <ChevronLeft size={18} />
         </button>
         <button onClick={() => openProfile(activeConv.otherUser.id)} className="shrink-0">
-          <div className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#4F6EF7]/20 to-[#8B5CF6]/10 text-sm font-bold text-[#4F6EF7] ring-1 ring-white/[0.06]">
-            {activeConv.otherUser.avatarUrl ? (
-              <img src={activeConv.otherUser.avatarUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              activeConv.otherUser.name[0]?.toUpperCase() || "U"
-            )}
+          <div className="relative">
+            <UserAvatar user={activeConv.otherUser} size="md" className="ring-1 ring-white/[0.06]" />
             <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#0A0A0F] bg-[#22C55E]" />
           </div>
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold text-white truncate">{activeConv.otherUser.name}</p>
+            <p className="text-sm font-semibold text-white truncate">{getUserDisplayName(activeConv.otherUser)}</p>
             <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
             <span className="text-[10px] text-[#22C55E]">Online</span>
           </div>

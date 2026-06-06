@@ -15,7 +15,8 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn, getInitials, timeAgo } from "../../lib/utils";
+import { cn, timeAgo } from "../../lib/utils";
+import UserAvatar from "../ui/UserAvatar";
 import { supabase } from "../../lib/supabase/client";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAdminStore } from "../../lib/store/adminStore";
@@ -198,7 +199,6 @@ export default function Topbar({ title, userId }: TopbarProps) {
 
   const name = profile?.full_name || "Admin";
   const avatarUrl = profile?.avatar_url;
-  const initials = profile?.initials || "A";
   const hasAnyResult =
     results.clients.length > 0 || results.feedbacks.length > 0;
 
@@ -295,19 +295,7 @@ export default function Topbar({ title, userId }: TopbarProps) {
                           }}
                           className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-white/70 transition-colors hover:bg-white/5"
                         >
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4f6ef7]/20 text-[9px] font-bold text-[#9BA7FF]">
-                            {client.avatar_url ? (
-                              <img
-                                src={client.avatar_url}
-                                alt=""
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              getInitials(
-                                client.full_name || client.email || "C",
-                              )
-                            )}
-                          </div>
+                          <UserAvatar user={client} size="sm" className="h-7 w-7" ring={false} />
                           <div className="min-w-0 flex-1 text-left">
                             <div className="truncate text-white">
                               {client.full_name || client.email}
@@ -446,17 +434,7 @@ export default function Topbar({ title, userId }: TopbarProps) {
           onClick={() => setProfileOpen(!profileOpen)}
           className="flex items-center gap-2 rounded-lg border border-white/8 bg-white/5 px-3 py-1.5 text-sm text-[#f0f0f5] transition-colors hover:bg-white/[0.08]"
         >
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt=""
-              className="h-6 w-6 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#4f6ef7] to-[#6b85ff] text-[10px] font-bold text-white">
-              {initials}
-            </div>
-          )}
+          <UserAvatar user={profile} size="sm" className="h-6 w-6" ring={false} />
           <span className="hidden md:inline">{name}</span>
           <ChevronDown
             size={14}
@@ -475,17 +453,7 @@ export default function Topbar({ title, userId }: TopbarProps) {
             >
               <div className="border-b border-white/[0.06] px-4 py-3">
                 <div className="flex items-center gap-3">
-                  {avatarUrl ? (
-                    <img
-                      src={avatarUrl}
-                      alt=""
-                      className="h-9 w-9 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#4f6ef7] to-[#6b85ff] text-xs font-bold text-white">
-                      {initials}
-                    </div>
-                  )}
+                  <UserAvatar user={profile} size="md" className="h-9 w-9" ring={false} />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-white">
                       {name}

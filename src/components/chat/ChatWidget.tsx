@@ -7,6 +7,8 @@ import { fetchConversations, markMessagesAsRead, subscribeToConversationUpdates 
 import { useChatStore } from "../../lib/store/chatStore"
 import ChatConversation from "./ChatConversation"
 import type { ChatConversation as ChatConv } from "../../data/feedbackStore"
+import { getUserDisplayName } from "../../lib/utils"
+import UserAvatar from "../ui/UserAvatar"
 
 type ViewState = "closed" | "compact" | "expanded"
 
@@ -223,16 +225,10 @@ export default function ChatWidget() {
                           onClick={() => handleSelectConversation(conv)}
                           className="flex w-full items-center gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors text-left"
                         >
-                          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4F6EF7]/10 text-sm font-bold text-[#4F6EF7]">
-                            {conv.otherUser.avatarUrl ? (
-                              <img src={conv.otherUser.avatarUrl} alt="" className="h-full w-full object-cover" />
-                            ) : (
-                              conv.otherUser.name[0]?.toUpperCase() || "U"
-                            )}
-                          </div>
+                          <UserAvatar user={conv.otherUser} size="md" />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium text-white truncate">{conv.otherUser.name}</p>
+                              <p className="text-sm font-medium text-white truncate">{getUserDisplayName(conv.otherUser)}</p>
                               <p className="text-[10px] text-[#4A4A5A] shrink-0 ml-2">
                                 {new Date(conv.lastMessageAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                               </p>
@@ -344,16 +340,10 @@ export default function ChatWidget() {
                               : "hover:bg-white/[0.03] border-l-2 border-transparent"
                           }`}
                         >
-                          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4F6EF7]/10 text-sm font-bold text-[#4F6EF7]">
-                            {conv.otherUser.avatarUrl ? (
-                              <img src={conv.otherUser.avatarUrl} alt="" className="h-full w-full object-cover" />
-                            ) : (
-                              conv.otherUser.name[0]?.toUpperCase() || "U"
-                            )}
-                          </div>
+                          <UserAvatar user={conv.otherUser} size="md" />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium text-white truncate">{conv.otherUser.name}</p>
+                              <p className="text-sm font-medium text-white truncate">{getUserDisplayName(conv.otherUser)}</p>
                               <p className="text-[10px] text-[#4A4A5A] shrink-0 ml-2">
                                 {new Date(conv.lastMessageAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                               </p>

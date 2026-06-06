@@ -201,6 +201,10 @@ export async function toggleFollow(
     .from(FOLLOWS_TABLE)
     .insert({ follower_id: followerId, following_id: followingId })
 
+  if (error?.code === "23505") {
+    return true
+  }
+
   markSocialFollowsError("insert", error)
   return !error
 }
@@ -293,7 +297,7 @@ export async function fetchFollowersList(
   if (!profiles) return []
   return (profiles as Record<string, unknown>[]).map((r) => ({
     id: r.id as string,
-    name: (r.full_name as string) || (r.username as string) || "User",
+    name: (r.full_name as string) || (r.username as string) || (r.email as string)?.split("@")[0] || "Unknown user",
     username: (r.username as string) || null,
     avatarUrl: (r.avatar_url as string) || null,
     bio: (r.bio as string) || null,
@@ -319,13 +323,13 @@ export async function fetchFollowingList(
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, full_name, username, avatar_url, bio")
+    .select("id, full_name, username, avatar_url, bio, email")
     .in("id", followingIds)
 
   if (!profiles) return []
   return (profiles as Record<string, unknown>[]).map((r) => ({
     id: r.id as string,
-    name: (r.full_name as string) || (r.username as string) || "User",
+    name: (r.full_name as string) || (r.username as string) || (r.email as string)?.split("@")[0] || "Unknown user",
     username: (r.username as string) || null,
     avatarUrl: (r.avatar_url as string) || null,
     bio: (r.bio as string) || null,
@@ -406,7 +410,7 @@ async function fetchProfiles(
     for (const row of data as Record<string, unknown>[]) {
       map.set(row.id as string, {
         id: row.id as string,
-        name: (row.full_name as string) || (row.username as string) || "User",
+        name: (row.full_name as string) || (row.username as string) || "Unknown user",
         avatarUrl: (row.avatar_url as string) || null,
         username: (row.username as string) || null,
       })

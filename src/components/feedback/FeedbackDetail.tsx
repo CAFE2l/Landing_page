@@ -22,6 +22,8 @@ import toast from "react-hot-toast"
 import MediaModal from "./MediaModal"
 import { uploadFeedbackMedia } from "../../lib/cloudinary"
 import { useUserProfile } from "../../hooks/useUserProfile"
+import { getUserDisplayName, getUserAvatar } from "../../lib/utils"
+import UserAvatar from "../ui/UserAvatar"
 
 interface FeedbackDetailProps {
   post: FeedbackPost | null
@@ -82,7 +84,9 @@ export default function FeedbackDetail({
   const userProfile = currentUser ? (currentUser as unknown as { uid?: string; id: string; name?: string; email?: string; photoUrl?: string }) : null
   const uid = supabaseUser?.id || userProfile?.uid || userProfile?.id
   const { profile: loggedProfile } = useUserProfile(uid)
+  const { profile: postAuthorProfile } = useUserProfile(post?.userId)
   const postId = post?.id
+  const postAuthorForAvatar = postAuthorProfile || (post ? { name: post.userName, avatarUrl: post.userAvatar } : null)
 
   useEffect(() => {
     if (open && postId) {
@@ -149,8 +153,8 @@ export default function FeedbackDetail({
       }
     }
 
-    const displayName = loggedProfile?.full_name || userProfile?.name || userProfile?.email?.split("@")[0] || "User"
-    const avatarUrl = loggedProfile?.avatar_url || userProfile?.photoUrl || ""
+    const displayName = getUserDisplayName(loggedProfile) || getUserDisplayName(userProfile) || "Unknown user"
+    const avatarUrl = getUserAvatar(loggedProfile) || getUserAvatar(userProfile) || ""
     const comment: Omit<FeedbackComment, "id" | "postId" | "createdAt"> = {
       userId: uid,
       userName: displayName,
@@ -223,19 +227,14 @@ export default function FeedbackDetail({
               <div className="overflow-y-auto scroll-smooth p-5 sm:p-8">
                 <motion.div variants={contentVariants} className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex items-center gap-3">
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/[0.1] bg-gradient-to-br from-[#4F6EF7]/20 to-[#8B5CF6]/10 text-base font-bold text-[#AEB7FF] ring-1 ring-transparent transition-shadow hover:shadow-[0_0_28px_rgba(79,110,247,0.35)] hover:ring-[#4F6EF7]/30"
-                    >
-                      {post.userAvatar ? (
-                        <img src={post.userAvatar} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        post.userName[0]?.toUpperCase()
-                      )}
-                    </motion.div>
+                    <UserAvatar
+                      user={postAuthorForAvatar}
+                      size="lg"
+                      className="border border-white/[0.1]"
+                    />
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-base font-semibold text-[#F0F0F5]">{post.userName}</span>
+                        <span className="text-base font-semibold text-[#F0F0F5]">{postAuthorProfile ? getUserDisplayName(postAuthorProfile) : (post.userName || "Unknown user")}</span>
                         {post.isVerifiedClient && <BadgeCheck size={16} className="text-[#7C8CFF]" />}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#8E8EA3]">
@@ -346,7 +345,7 @@ export default function FeedbackDetail({
                       disabled={reactionLoading}
                       className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all ${
                         userReaction === "like"
-                          ? "bg-gradient-to-br from-[#2563EB]/30 to-[#8B5CF6]/25 text-white"
+                          ? "bg-gradient-to-br from-[#22C55E]/30 to-[#16A34A]/25 text-white"
                           : "text-[#8E8EA3] hover:bg-white/[0.06] hover:text-white"
                       } disabled:cursor-wait disabled:opacity-70`}
                       aria-label="Like feedback"
@@ -364,7 +363,7 @@ export default function FeedbackDetail({
                       disabled={reactionLoading}
                       className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all ${
                         userReaction === "dislike"
-                          ? "bg-gradient-to-br from-[#8B5CF6]/30 to-[#2563EB]/20 text-white"
+                          ? "bg-gradient-to-br from-[#EF4444]/30 to-[#DC2626]/25 text-white"
                           : "text-[#8E8EA3] hover:bg-white/[0.06] hover:text-white"
                       } disabled:cursor-wait disabled:opacity-70`}
                       aria-label="Dislike feedback"
@@ -468,9 +467,10 @@ export default function FeedbackDetail({
                             {deletingCommentId === comment.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                           </button>
                         )}
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4F6EF7]/10 text-xs font-bold text-[#9BA7FF]">
-                          {comment.userAvatar ? <img src={comment.userAvatar} alt="" className="h-full w-full object-cover" /> : comment.userName[0]?.toUpperCase()}
-                        </div>
+                        <UserAvatar
+                          user={{ name: comment.userName, avatarUrl: comment.userAvatar }}
+                          size="sm"
+                        />
                         <div className="min-w-0 flex-1 pr-8">
                           <div className="mb-1 flex items-center gap-2">
                             <span className="text-xs font-semibold text-[#F0F0F5]">{comment.userName}</span>

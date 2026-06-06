@@ -4,7 +4,8 @@ import { X, Check, Trash2, Image as ImageIcon } from "lucide-react"
 import { useAdminStore } from "../../lib/store/adminStore"
 import type { FeedbackEntry } from "../../lib/types"
 import StatusBadge from "./StatusBadge"
-import { getInitials, formatDate } from "../../lib/utils"
+import { formatDate } from "../../lib/utils"
+import UserAvatar from "../ui/UserAvatar"
 
 interface FeedbackDrawerProps {
   feedback: FeedbackEntry | null
@@ -64,9 +65,7 @@ export default function FeedbackDrawer({ feedback, onApprove, onReject, onDelete
 
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
               <div className="flex items-start gap-4">
-                <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-[#4f6ef7] to-[#6b85ff] flex items-center justify-center text-sm font-bold text-white">
-                  {getInitials(feedback.userName)}
-                </div>
+                <UserAvatar user={{ name: feedback.userName }} size="md" ring={false} />
                 <div className="flex-1 min-w-0">
                   <p className="text-base font-semibold text-[#f0f0f5]">{feedback.userName}</p>
                   {feedback.userEmail && <p className="text-sm text-[#6b6b80]">{feedback.userEmail}</p>}

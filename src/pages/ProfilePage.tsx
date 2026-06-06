@@ -504,7 +504,7 @@ export default function ProfilePage() {
     }
   };
 
-  const displayName = profile?.full_name || "User";
+  const displayName = profile?.full_name || profile?.email?.split("@")[0] || "Unknown user";
   const avatarUrl = profile?.avatar_url || "";
   const passwordStrength = useMemo(
     () => getPasswordStrength(newPassword),
@@ -678,7 +678,9 @@ export default function ProfilePage() {
                   await updatePublicProfile({
                     uid: profile.id,
                     name: profile.full_name,
+                    fullName: profile.full_name,
                     photoUrl: url,
+                    avatarUrl: url,
                     email: profile.email,
                     role: profile.role,
                     bio: profile.bio,

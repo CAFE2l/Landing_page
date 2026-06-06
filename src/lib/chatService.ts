@@ -111,7 +111,7 @@ export async function fetchConversations(userId: string): Promise<ChatConversati
       createdAt: row.created_at as string,
       otherUser: {
         id: otherId,
-        name: (profile?.full_name as string) || (profile?.username as string) || "User",
+        name: (profile?.full_name as string) || (profile?.username as string) || "Unknown user",
         avatarUrl: (profile?.avatar_url as string) || null,
         username: (profile?.username as string) || null,
       },

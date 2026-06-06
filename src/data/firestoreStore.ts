@@ -83,7 +83,7 @@ const mapFeedback = (snapshot: QueryDocumentSnapshot<DocumentData>): FeedbackEnt
     role: readString(data, "role", "Client"),
     company: readString(data, "company", "CAFÉ SERVICES Client"),
     flag: readString(data, "flag", "Global"),
-    initials: readString(data, "initials", "CS"),
+    initials: readString(data, "initials", "?"),
     rating: readNumber(data, "rating", 5),
     project: readString(data, "project") || undefined,
     result: readString(data, "result") || undefined,

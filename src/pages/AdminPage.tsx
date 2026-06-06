@@ -33,7 +33,8 @@ import {
   updateUserRole,
   type FeedbackStatus,
 } from "../data/firestoreStore"
-import { getInitials, type FeedbackEntry, type UserProfile, type UserRole } from "../data/feedbackStore"
+import { type FeedbackEntry, type UserProfile, type UserRole } from "../data/feedbackStore"
+import UserAvatar from "../components/ui/UserAvatar"
 
 interface AdminPageProps {
   user: UserProfile | null
@@ -86,14 +87,9 @@ function CountUp({ value }: { value: number }) {
   return <span>{count}</span>
 }
 
-function Avatar({ user, name, photoUrl, size = "h-9 w-9" }: { user?: UserProfile; name?: string; photoUrl?: string; size?: string }) {
-  const displayName = user?.name || name || "Admin"
-  const src = user?.photoUrl || photoUrl
-  return (
-    <div className={`flex ${size} shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#2563eb] to-[#0ea5e9] text-xs font-bold text-white`}>
-      {src ? <img src={src} alt={displayName} className="h-full w-full object-cover" /> : getInitials(displayName)}
-    </div>
-  )
+function Avatar({ user, name, photoUrl }: { user?: UserProfile; name?: string; photoUrl?: string }) {
+  const avatarUser = user || (name ? { name, avatarUrl: photoUrl } : undefined)
+  return <UserAvatar user={avatarUser} size="md" ring={false} />
 }
 
 function RoleBadge({ role }: { role: UserRole }) {

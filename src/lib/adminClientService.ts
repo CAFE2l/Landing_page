@@ -103,7 +103,7 @@ export async function fetchEnhancedClients(): Promise<Client[]> {
 
     return {
       id,
-      name: (row.full_name as string) || (row.username as string) || (row.email as string) || "Client",
+      name: (row.full_name as string) || (row.username as string) || (row.email as string)?.split("@")[0] || "Unknown client",
       email: (row.email as string) || "",
       company: (row.company as string) || undefined,
       avatarUrl: (row.avatar_url as string) || undefined,

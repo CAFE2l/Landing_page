@@ -9,13 +9,15 @@ import FollowButton from "../components/ui/FollowButton";
 import { useAuth } from "../contexts/AuthContext";
 import {
   fetchPublicProfile,
+  fetchPublicProfileByUsername,
   getOrCreateConversation,
   type PublicProfileData,
 } from "../data/feedbackServiceSupabase";
 import { deleteClient } from "../lib/adminClientService";
 
 export default function PublicProfilePage() {
-  const { userId } = useParams();
+  const { userId, username } = useParams();
+  const resolvedUserId = userId || username;
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<PublicProfileData | null>(null);
@@ -25,27 +27,28 @@ export default function PublicProfilePage() {
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  const isOwnProfile = !!user?.id && user.id === userId;
+  const isOwnProfile = !!user?.id && user.id === resolvedUserId;
 
   useEffect(() => {
-    if (!userId) return;
+    if (!resolvedUserId) return;
     queueMicrotask(() => setLoading(true));
-    fetchPublicProfile(userId)
-      .then(setProfile)
-      .finally(() => setLoading(false));
-  }, [userId]);
+    const fetchFn = username
+      ? fetchPublicProfileByUsername(resolvedUserId)
+      : fetchPublicProfile(resolvedUserId);
+    fetchFn.then(setProfile).finally(() => setLoading(false));
+  }, [resolvedUserId, username]);
 
   useEffect(() => {
-    if (!user?.id || !userId || user.id === userId) return;
+    if (!user?.id || !resolvedUserId || user.id === resolvedUserId) return;
     import("../lib/socialService").then(({ isFollowing }) =>
-      isFollowing(user.id!, userId!).then(setFollowing),
+      isFollowing(user.id!, resolvedUserId!).then(setFollowing),
     );
-  }, [user?.id, userId]);
+  }, [user?.id, resolvedUserId]);
 
   const handleDeleteUser = async () => {
-    if (!userId || !profile) return
+    if (!resolvedUserId || !profile) return
     setDeleting(true)
-    const ok = await deleteClient(userId)
+    const ok = await deleteClient(resolvedUserId)
     setDeleting(false)
     if (ok) {
       toast.success(`${profile.name} deleted`)
@@ -75,11 +78,11 @@ export default function PublicProfilePage() {
   };
 
   const handleMessage = async () => {
-    if (!user?.id || !userId) {
+    if (!user?.id || !resolvedUserId) {
       toast.error("Login to send a message");
       return;
     }
-    const conversationId = await getOrCreateConversation(user.id, userId);
+    const conversationId = await getOrCreateConversation(user.id, resolvedUserId);
     if (conversationId) navigate(`/dashboard/messages/${conversationId}`);
   };
 
@@ -131,10 +134,10 @@ export default function PublicProfilePage() {
                   </Link>
                 ) : (
                   <>
-                    {user?.id && userId && (
+                    {user?.id && resolvedUserId && (
                       <FollowButton
                         currentUserId={user.id}
-                        targetUserId={userId}
+                        targetUserId={resolvedUserId}
                         targetUserName={profile?.name}
                         initialFollowing={following}
                         onStateChange={handleFollowStateChange}
@@ -242,7 +245,7 @@ export default function PublicProfilePage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-white/40">Email</span>
-                  <span className="text-white/70">{profile ? profile.posts[0]?.userName || userId : userId}</span>
+                  <span className="text-white/70">{profile ? profile.posts[0]?.userName || resolvedUserId : resolvedUserId}</span>
                 </div>
               </div>
 

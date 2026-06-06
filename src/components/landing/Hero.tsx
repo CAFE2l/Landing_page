@@ -71,26 +71,26 @@ function AnimatedNumber({ end, suffix = "" }: { end: number; suffix?: string }) 
 }
 
 const statLabels = [
-  { key: "clients", label: "Clients" },
+  { key: "users", label: "Users" },
   { key: "projects", label: "Projects delivered" },
   { key: "countries", label: "Countries" },
 ] as const
 
 export default function Hero() {
   const reduceMotion = useReducedMotion()
-  const [stats, setStats] = useState({ clients: 0, projects: 0, countries: 0 })
+  const [stats, setStats] = useState({ users: 0, projects: 0, countries: 0 })
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     const fetch = async () => {
-      const [clients, projects, countries] = await Promise.all([
+      const [users, projects, countries] = await Promise.all([
         countUsers(),
         countProjects(),
         countCountries(),
       ])
       if (cancelled) return
-      setStats({ clients, projects, countries })
+      setStats({ users, projects, countries })
       setLoaded(true)
     }
     fetch()

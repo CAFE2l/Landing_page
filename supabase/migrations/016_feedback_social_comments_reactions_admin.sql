@@ -126,11 +126,11 @@ begin
 
     if p_reaction_type = 'like' then
       update public.feedback_posts
-      set helpful_count = helpful_count + 1
+      set helpful_count = public.feedback_posts.helpful_count + 1
       where id = p_feedback_id;
     else
       update public.feedback_posts
-      set downvote_count = downvote_count + 1
+      set downvote_count = public.feedback_posts.downvote_count + 1
       where id = p_feedback_id;
     end if;
 
@@ -142,11 +142,11 @@ begin
 
     if p_reaction_type = 'like' then
       update public.feedback_posts
-      set helpful_count = greatest(0, helpful_count - 1)
+      set helpful_count = greatest(0, public.feedback_posts.helpful_count - 1)
       where id = p_feedback_id;
     else
       update public.feedback_posts
-      set downvote_count = greatest(0, downvote_count - 1)
+      set downvote_count = greatest(0, public.feedback_posts.downvote_count - 1)
       where id = p_feedback_id;
     end if;
 
@@ -160,13 +160,13 @@ begin
 
     if p_reaction_type = 'like' then
       update public.feedback_posts
-      set helpful_count = helpful_count + 1,
-          downvote_count = greatest(0, downvote_count - 1)
+      set helpful_count = public.feedback_posts.helpful_count + 1,
+          downvote_count = greatest(0, public.feedback_posts.downvote_count - 1)
       where id = p_feedback_id;
     else
       update public.feedback_posts
-      set downvote_count = downvote_count + 1,
-          helpful_count = greatest(0, helpful_count - 1)
+      set downvote_count = public.feedback_posts.downvote_count + 1,
+          helpful_count = greatest(0, public.feedback_posts.helpful_count - 1)
       where id = p_feedback_id;
     end if;
 

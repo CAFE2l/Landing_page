@@ -239,7 +239,7 @@ export async function fetchAdminClients(): Promise<Client[]> {
   return rows.map((row) => ({
     id: String(row.id),
     uid: String(row.id),
-    name: String(row.full_name || row.username || row.email || "Client"),
+    name: String(row.full_name || row.username || row.email?.split("@")[0] || "Unknown client"),
     email: String(row.email || ""),
     company: row.company ? String(row.company) : undefined,
     avatarUrl: row.avatar_url ? String(row.avatar_url) : undefined,
