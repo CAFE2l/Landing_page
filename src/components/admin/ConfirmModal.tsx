@@ -7,9 +7,10 @@ interface ConfirmModalProps {
   onConfirm: () => void
   onCancel: () => void
   variant?: "danger" | "default"
+  confirmLabel?: string
 }
 
-export default function ConfirmModal({ title, message, onConfirm, onCancel, variant = "default" }: ConfirmModalProps) {
+export default function ConfirmModal({ title, message, onConfirm, onCancel, variant = "default", confirmLabel }: ConfirmModalProps) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -53,7 +54,7 @@ export default function ConfirmModal({ title, message, onConfirm, onCancel, vari
                 : "bg-[#4f6ef7]/10 text-[#4f6ef7] hover:bg-[#4f6ef7]/20"
             }`}
           >
-            Confirm
+            {confirmLabel ?? "Confirm"}
           </button>
         </div>
       </motion.div>

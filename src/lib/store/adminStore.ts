@@ -9,11 +9,20 @@ interface AdminFilters {
   dateRange: [Date | null, Date | null]
 }
 
+interface ConfirmModalState {
+  open: boolean
+  title: string
+  message: string
+  confirmLabel?: string
+  variant?: "default" | "danger"
+  onConfirm: () => void
+}
+
 interface UIState {
   sidebarCollapsed: boolean
   feedbackDrawerOpen: boolean
   selectedFeedbackId: string | null
-  confirmModal: { open: boolean; title: string; message: string; onConfirm: () => void } | null
+  confirmModal: ConfirmModalState | null
 }
 
 interface AdminStore {
@@ -24,7 +33,7 @@ interface AdminStore {
   toggleSidebar: () => void
   openFeedbackDrawer: (id: string) => void
   closeFeedbackDrawer: () => void
-  showConfirm: (title: string, message: string, onConfirm: () => void) => void
+  showConfirm: (title: string, message: string, onConfirm: () => void, variant?: "default" | "danger", confirmLabel?: string) => void
   hideConfirm: () => void
 }
 
@@ -49,6 +58,6 @@ export const useAdminStore = create<AdminStore>((set) => ({
   toggleSidebar: () => set((s) => ({ ui: { ...s.ui, sidebarCollapsed: !s.ui.sidebarCollapsed } })),
   openFeedbackDrawer: (id) => set((s) => ({ ui: { ...s.ui, feedbackDrawerOpen: true, selectedFeedbackId: id } })),
   closeFeedbackDrawer: () => set((s) => ({ ui: { ...s.ui, feedbackDrawerOpen: false, selectedFeedbackId: null } })),
-  showConfirm: (title, message, onConfirm) => set((s) => ({ ui: { ...s.ui, confirmModal: { open: true, title, message, onConfirm } } })),
+  showConfirm: (title, message, onConfirm, variant = "default", confirmLabel) => set((s) => ({ ui: { ...s.ui, confirmModal: { open: true, title, message, onConfirm, variant, confirmLabel } } })),
   hideConfirm: () => set((s) => ({ ui: { ...s.ui, confirmModal: null } })),
 }))

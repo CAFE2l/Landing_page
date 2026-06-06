@@ -176,6 +176,25 @@ export interface ChatMessage {
   deliveredAt: string | null
   readAt: string | null
   createdAt: string
+  replyTo: string | null
+  forwardedFrom: string | null
+  editedAt: string | null
+  deletedAt: string | null
+  groupId: string | null
+  replyPreview?: {
+    id: string
+    content: string
+    senderId: string
+    senderName: string
+    messageType: MessageType
+  } | null
+  forwardedPreview?: {
+    id: string
+    content: string
+    senderId: string
+    senderName: string
+    messageType: MessageType
+  } | null
 }
 
 export interface ChatConversation {
@@ -193,6 +212,49 @@ export interface ChatConversation {
     username: string | null
   }
   unreadCount: number
+}
+
+export interface Group {
+  id: string
+  name: string
+  description: string | null
+  avatarUrl: string | null
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+  lastMessage: {
+    id: string
+    content: string
+    messageType: string
+    mediaUrl: string | null
+    caption: string | null
+    senderId: string
+    createdAt: string
+  } | null
+  unreadCount: number
+  members: GroupMember[]
+}
+
+export interface GroupMember {
+  id: string
+  userId: string
+  name: string
+  avatarUrl: string | null
+  role: "admin" | "member"
+  joinedAt: string
+}
+
+export interface GroupConversation {
+  id: string
+  name: string
+  description: string | null
+  avatarUrl: string | null
+  createdBy: string
+  members: GroupMember[]
+  lastMessage: string | null
+  lastMessageAt: string
+  unreadCount: number
+  isGroup: true
 }
 
 export interface UserSticker {

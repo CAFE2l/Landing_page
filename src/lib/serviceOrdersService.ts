@@ -247,10 +247,24 @@ async function notifyNewOrder(order: ServiceOrder, serviceName: string, upfrontA
     type: "new_service_order",
     title: "New order received",
     message: `${displayName} — ${serviceName} — Payment Pending ($${upfrontAmount} upfront)`,
-    payload: { orderId: order.id, status: "waiting_upfront_payment" },
   })
 
-  await createWebsiteBotMessage(order)
+  const { data: adminProfile } = await supabase!
+    .from("profiles")
+    .select("id")
+    .eq("email", "gutiajs@gmail.com")
+    .maybeSingle()
+
+  if (adminProfile?.id) {
+    await supabase!.rpc("notify_payment_bot", {
+      p_order_id: order.id,
+      p_display_name: displayName,
+      p_service_name: serviceName,
+      p_amount: upfrontAmount,
+      p_method: "new_order",
+      p_admin_id: adminProfile.id,
+    })
+  }
 }
 
 export async function requestPaymentLink(orderId: string, method: string): Promise<boolean> {
@@ -277,17 +291,31 @@ export async function confirmPayment(
   const order = await fetchServiceOrder(orderId)
   if (!order) return false
 
+  const displayName = getOrderDisplayName(order)
+
   await createNotification({
     type: "payment_confirmation",
-    title: method === "paypal" ? "PayPal Payment Approved" : "Payment Method Requested",
-    message: `${getOrderDisplayName(order)} ${method === "paypal" ? "approved payment via PayPal" : `requested ${method} payment`} for order ${order.id.slice(0, 8)}`,
+    title: "Payment Notified",
+    message: `${displayName} sent payment via ${method} for order ${order.id.slice(0, 8)}`,
     payload: { orderId, method, status: order.paymentStatus, amount: order.upfrontAmount },
   })
 
-  if (method === "paypal") {
-    await sendBotPaymentNotification(order, "approved_via_paypal")
-  } else {
-    await sendBotPaymentNotification(order, `requested_${method}`)
+  // Get the real admin user ID to send the bot message to
+  const { data: adminProfile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", "gutiajs@gmail.com")
+    .maybeSingle()
+
+  if (adminProfile?.id) {
+    await supabase.rpc("notify_payment_bot", {
+      p_order_id: order.id,
+      p_display_name: displayName,
+      p_service_name: order.serviceName,
+      p_amount: order.upfrontAmount,
+      p_method: method,
+      p_admin_id: adminProfile.id,
+    })
   }
 
   return true
@@ -560,13 +588,13 @@ export async function createNotification(input: {
 }): Promise<void> {
   if (!supabase || !supabaseConfigured) return
 
-  await supabase.from("notifications").insert({
+  const { error: notifError } = await supabase.from("notifications").insert({
     type: input.type,
     title: input.title,
     message: input.message || null,
-    payload: input.payload ? JSON.parse(JSON.stringify(input.payload)) : null,
     is_read: false,
   })
+  if (notifError) console.error("createNotification error:", notifError)
 }
 
 export async function fetchNotifications(limit = 10): Promise<Notification[]> {

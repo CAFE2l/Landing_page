@@ -22,6 +22,11 @@ export default function ChatConversation({ conversation, currentUserId, onBack }
   const bottomRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
 
+  const BOT_ID = "00000000-0000-0000-0000-000000000001"
+  const isBot = conversation.participantA === BOT_ID || conversation.participantB === BOT_ID
+  const botUser = isBot
+    ? { ...conversation.otherUser, avatarUrl: conversation.otherUser.avatarUrl || "/imgs/bot/bot.jpeg" }
+    : conversation.otherUser
   const otherUserId = conversation.participantA === currentUserId
     ? conversation.participantB
     : conversation.participantA
@@ -76,20 +81,25 @@ export default function ChatConversation({ conversation, currentUserId, onBack }
           </button>
         )}
         <div
-          onClick={() => navigate(`/profile/${conversation.otherUser.username || conversation.otherUser.id}`)}
-          className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition"
-          title="View profile"
+          onClick={() => !isBot && navigate(`/profile/${conversation.otherUser.username || conversation.otherUser.id}`)}
+          className={`flex items-center gap-3 flex-1 min-w-0 transition ${!isBot ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}
+          title={isBot ? "CAF\u00c9 Bot" : "View profile"}
         >
-          <UserAvatar user={conversation.otherUser} size="md" />
+          <div className="relative shrink-0">
+            <UserAvatar user={botUser} size="md" />
+            {isBot && (
+              <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[#0A0A0F] bg-[#6D28D9] text-[8px]">🤖</span>
+            )}
+          </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-white truncate">
-              {getUserDisplayName(conversation.otherUser)}
+              {getUserDisplayName(botUser)}
             </p>
             <p className="text-[11px] text-[#6B6B80] truncate">
-              {conversation.otherUser.username
-                ? `@${conversation.otherUser.username}`
-                : conversation.otherUser.name
-                  ? conversation.otherUser.name
+              {botUser.username
+                ? `@${botUser.username}`
+                : botUser.name
+                  ? botUser.name
                   : ""}
             </p>
           </div>
@@ -131,7 +141,7 @@ export default function ChatConversation({ conversation, currentUserId, onBack }
         conversationId={conversation.id}
         currentUserId={currentUserId}
         otherUserId={otherUserId}
-        otherUserName={conversation.otherUser.name}
+        otherUserName={botUser.name}
         onMessageSent={(msg) => setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])}
       />
     </div>

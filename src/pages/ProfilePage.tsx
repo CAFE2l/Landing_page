@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronRight,
@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Lock,
   Loader2,
+  MessageCircle,
   Save,
   Search,
   Shield,
@@ -31,8 +32,8 @@ import {
   fetchFollowersList,
   fetchFollowingList,
   fetchFollowingIds,
-  toggleFollow,
 } from "../lib/socialService";
+import { createOrGetConversation } from "../lib/chatService";
 import { useUserProfile } from "../hooks/useUserProfile";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
@@ -412,6 +413,7 @@ export default function ProfilePage() {
     refresh: refreshProfile,
   } = useUserProfile();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>(() =>
     location.pathname.includes("settings") ||
@@ -470,6 +472,7 @@ export default function ProfilePage() {
   const [socialSearch, setSocialSearch] = useState("");
   const [socialLoading, setSocialLoading] = useState(false);
   const [followingMap, setFollowingMap] = useState<Set<string>>(new Set());
+  const [chattingUserId, setChattingUserId] = useState<string | null>(null);
 
   const openSocialDrawer = async (type: "followers" | "following") => {
     if (!profile?.id) return;
@@ -489,18 +492,40 @@ export default function ProfilePage() {
     }
   };
 
-  const handleToggleFollow = async (targetId: string) => {
-    if (!profile?.id) return;
-    const wasFollowing = followingMap.has(targetId);
-    const ok = await toggleFollow(profile.id, targetId);
-    if (ok !== undefined) {
-      setFollowingMap((prev) => {
-        const next = new Set(prev);
-        if (wasFollowing) next.delete(targetId);
-        else next.add(targetId);
-        return next;
-      });
-      refreshProfile();
+  const handleFollowStateChange = (targetId: string, nowFollowing: boolean) => {
+    setFollowingMap((prev) => {
+      const next = new Set(prev);
+      if (nowFollowing) next.add(targetId);
+      else next.delete(targetId);
+      return next;
+    });
+    refreshProfile();
+  };
+
+  const getSocialProfilePath = (user: { id: string; username: string | null }) =>
+    `/profile/${user.username || user.id}`;
+
+  const openSocialProfile = (user: { id: string; username: string | null }) => {
+    setSocialDrawer(null);
+    navigate(getSocialProfilePath(user));
+  };
+
+  const openSocialChat = async (user: { id: string }) => {
+    if (!authUser?.id) {
+      toast.error("Sign in to start a chat");
+      navigate("/login");
+      return;
+    }
+
+    setChattingUserId(user.id);
+    const convId = await createOrGetConversation(authUser.id, user.id);
+    setChattingUserId(null);
+    setSocialDrawer(null);
+
+    if (convId) {
+      navigate(`/dashboard/messages/${convId}`);
+    } else {
+      navigate("/dashboard/messages");
     }
   };
 
@@ -1376,7 +1401,12 @@ export default function ProfilePage() {
                           animate={{ opacity: 1, y: 0 }}
                           className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/[0.04]"
                         >
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-500/30 to-cyan-500/30 text-sm font-bold text-blue-400">
+                          <button
+                            type="button"
+                            onClick={() => openSocialProfile(user)}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-500/30 to-cyan-500/30 text-sm font-bold text-blue-400"
+                            title={`Open ${user.name}'s profile`}
+                          >
                             {user.avatarUrl ? (
                               <img
                                 src={user.avatarUrl}
@@ -1386,11 +1416,16 @@ export default function ProfilePage() {
                             ) : (
                               user.name.charAt(0).toUpperCase()
                             )}
-                          </div>
+                          </button>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-white">
+                            <button
+                              type="button"
+                              onClick={() => openSocialProfile(user)}
+                              className="truncate text-sm font-medium text-white hover:text-blue-400 transition-colors text-left"
+                              title={`Open ${user.name}'s profile`}
+                            >
                               {user.name}
-                            </p>
+                            </button>
                             {user.username && (
                               <p className="truncate text-xs text-white/40">
                                 @{user.username}
@@ -1402,14 +1437,32 @@ export default function ProfilePage() {
                               </p>
                             )}
                           </div>
-                          {profile?.id && profile.id !== user.id && (
-                            <FollowButton
-                              currentUserId={profile.id}
-                              targetUserId={user.id}
-                              initialFollowing={followingMap.has(user.id)}
-                              onStateChange={() => handleToggleFollow(user.id)}
-                              variant="compact"
-                            />
+                          {authUser && authUser.id !== user.id && (
+                            <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
+                              <FollowButton
+                                currentUserId={authUser.id}
+                                targetUserId={user.id}
+                                initialFollowing={followingMap.has(user.id)}
+                                onStateChange={(nowFollowing) => handleFollowStateChange(user.id, nowFollowing)}
+                                variant="compact"
+                              />
+                              <motion.button
+                                type="button"
+                                whileHover={{ scale: 1.03 }}
+                                whileTap={{ scale: 0.97 }}
+                                onClick={() => openSocialChat(user)}
+                                disabled={chattingUserId === user.id}
+                                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-blue-400/20 bg-blue-500/10 px-2.5 text-xs font-semibold text-blue-300 transition-colors hover:border-blue-400/35 hover:bg-blue-500/20 disabled:cursor-wait disabled:opacity-60"
+                                title={`Chat with ${user.name}`}
+                              >
+                                {chattingUserId === user.id ? (
+                                  <Loader2 size={13} className="animate-spin" />
+                                ) : (
+                                  <MessageCircle size={13} />
+                                )}
+                                <span>Chat</span>
+                              </motion.button>
+                            </div>
                           )}
                         </motion.div>
                       ))}

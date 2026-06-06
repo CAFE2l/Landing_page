@@ -64,6 +64,8 @@ export default function AdminShell() {
         <ConfirmModal
           title={confirmModal.title}
           message={confirmModal.message}
+          variant={confirmModal.variant ?? "default"}
+          confirmLabel={confirmModal.confirmLabel}
           onConfirm={() => {
             confirmModal.onConfirm();
             hideConfirm();

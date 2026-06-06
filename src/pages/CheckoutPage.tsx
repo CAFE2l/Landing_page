@@ -4,8 +4,8 @@ import { useState, useEffect } from "react"
 import { useParams, Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import {
-  Check, Loader2, ArrowLeft, AlertCircle, DollarSign, Calendar, User,
-  MessageSquare, CreditCard, FileText, Send, ExternalLink,
+  Check, ArrowLeft, AlertCircle, DollarSign, Calendar, User,
+  MessageSquare, CreditCard, FileText, Send, Copy, Loader2,
 } from "lucide-react"
 import {
   fetchServiceOrder,
@@ -19,7 +19,6 @@ import { formatPhoneDisplay } from "../components/ui/PhoneInput"
 import TechPremiumBackground from "../components/ui/TechPremiumBackground"
 import { cn } from "../lib/utils"
 import toast from "react-hot-toast"
-import { supabase, supabaseConfigured } from "../lib/supabase/client"
 
 const STEPS = [
   { key: "details", label: "Project Details", icon: FileText },
@@ -86,7 +85,7 @@ export default function CheckoutPage() {
   const { orderId } = useParams<{ orderId: string }>()
   const [order, setOrder] = useState<ServiceOrder | null>(null)
   const [loading, setLoading] = useState(true)
-  const [creatingPayPal, setCreatingPayPal] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!orderId) return
@@ -117,35 +116,13 @@ export default function CheckoutPage() {
     }
   }, [orderId])
 
-  const handlePayPal = async () => {
-    if (!order || !supabase || !supabaseConfigured) return
+  const PAYPAL_EMAIL = "gutiajs@gmail.com"
 
-    setCreatingPayPal(true)
-    try {
-      const { data, error } = await supabase.functions.invoke("create-paypal-order", {
-        body: {
-          orderId: order.id,
-          amount: order.upfrontAmount,
-          description: `${order.serviceName} — ${getOrderDisplayName(order)}`,
-        },
-      })
-
-      if (error || data?.error) {
-        toast.error(data?.error || "Failed to create payment")
-        return
-      }
-
-      if (data?.approvalUrl) {
-        window.open(data.approvalUrl, "_blank")
-        toast.success("PayPal opened in new tab. Complete payment there.")
-      } else {
-        toast.error("No PayPal approval link returned")
-      }
-    } catch (e) {
-      toast.error("Failed to connect to payment service")
-    } finally {
-      setCreatingPayPal(false)
-    }
+  const handleCopyEmail = () => {
+    navigator.clipboard.writeText(PAYPAL_EMAIL)
+    setCopied(true)
+    toast.success("PayPal email copied!")
+    setTimeout(() => setCopied(false), 2000)
   }
 
   if (loading) {
@@ -332,46 +309,47 @@ export default function CheckoutPage() {
             >
               <h3 className="text-lg font-semibold mb-1">Pay with PayPal</h3>
               <p className="text-xs text-zinc-500 mb-4">
-                Secure payment via PayPal. You'll be redirected to complete the payment.
+                Send the payment to the PayPal email below. After paying, click "I've Paid" to notify us.
+              </p>
+
+              <div className="flex items-center gap-2 rounded-xl border border-[#0070BA]/30 bg-[#0070BA]/10 px-4 py-3 mb-3">
+                <span className="text-sm font-bold text-[#0070BA] flex-1">gutiajs@gmail.com</span>
+                <button
+                  onClick={handleCopyEmail}
+                  className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] px-2.5 py-1.5 text-xs text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-all"
+                >
+                  {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+
+              <p className="text-xs text-zinc-500 mb-3">
+                Amount to send: <span className="text-white font-semibold">${order.upfrontAmount} USD</span>
               </p>
 
               <button
-                onClick={handlePayPal}
-                disabled={creatingPayPal}
-                className="w-full inline-flex items-center justify-center gap-3 rounded-xl bg-[#0070BA] hover:bg-[#003087] px-5 py-3.5 text-sm font-semibold text-white transition-all disabled:opacity-50 shadow-lg"
+                onClick={() => {
+                  confirmPayment(order.id, "paypal_manual")
+                  toast.success("Thanks! We'll confirm your payment and start your project soon.")
+                }}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#0070BA] hover:bg-[#003087] px-5 py-3.5 text-sm font-semibold text-white transition-all shadow-lg"
               >
-                {creatingPayPal ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <span className="text-lg font-bold">PayPal</span>
-                )}
-                {creatingPayPal ? "Creating payment..." : `Pay $${order.upfrontAmount} with PayPal`}
+                <Check size={16} />
+                I've Paid — Notify CAFÉ
               </button>
 
               <div className="mt-4 p-3 rounded-xl border border-white/[0.06] bg-white/[0.02]">
                 <p className="text-xs text-zinc-500 font-medium mb-2">💳 Other payment methods</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button
-                    onClick={() => {
-                      toast.success("Request sent! We'll contact you with Wise details.")
-                      confirmPayment(order.id, "request_wise")
-                    }}
-                    className="flex items-center gap-2 rounded-lg border border-white/[0.08] px-3 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all"
-                  >
-                    <ExternalLink size={14} />
-                    Wise
-                  </button>
-                  <button
-                    onClick={() => {
-                      toast.success("Request sent! We'll contact you with payment details.")
-                      confirmPayment(order.id, "request_manual")
-                    }}
-                    className="flex items-center gap-2 rounded-lg border border-white/[0.08] px-3 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all"
-                  >
-                    <Send size={14} />
-                    Manual Invoice
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    toast.success("Request sent! We'll contact you with payment details.")
+                    confirmPayment(order.id, "request_manual")
+                  }}
+                  className="flex items-center gap-2 rounded-lg border border-white/[0.08] px-3 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all w-full"
+                >
+                  <Send size={14} />
+                  Request Manual Invoice
+                </button>
               </div>
             </motion.div>
           )}

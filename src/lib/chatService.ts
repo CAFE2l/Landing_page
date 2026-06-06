@@ -1,5 +1,5 @@
 import { supabase, supabaseConfigured } from "./supabase/client"
-import type { ChatMessage, ChatConversation, UserSticker, MessageType } from "../data/feedbackStore"
+import type { ChatMessage, ChatConversation, UserSticker, MessageType, Group } from "../data/feedbackStore"
 import toast from "react-hot-toast"
 
 // ========== Conversations ==========
@@ -148,6 +148,7 @@ export async function sendMessage(
   mediaSize?: number,
   mediaDuration?: number,
   fileName?: string,
+  replyToMessageId?: string,
 ): Promise<ChatMessage | null> {
   if (!supabase || !supabaseConfigured) return null
 
@@ -168,6 +169,7 @@ export async function sendMessage(
   if (mediaSize !== undefined) payload.media_size = mediaSize
   if (mediaDuration !== undefined) payload.media_duration = mediaDuration
   if (fileName) payload.file_name = fileName
+  if (replyToMessageId) payload.reply_to = replyToMessageId
 
   const { data, error } = await supabase
     .from("messages")
@@ -204,9 +206,10 @@ export async function sendMessage(
 
 export async function markMessagesAsRead(
   conversationId: string,
-  _currentUserId?: string,
+  currentUserId?: string,
 ): Promise<void> {
   if (!supabase || !supabaseConfigured) return
+  void currentUserId
 
   await supabase.rpc("mark_conversation_as_read", {
     p_conversation_id: conversationId,
@@ -326,9 +329,10 @@ export async function uploadChatMedia(
 export async function uploadAudio(
   blob: Blob,
   userId: string,
-  _conversationId: string,
+  conversationId: string,
 ): Promise<{ url: string; mimeType: string; size: number } | null> {
   if (!supabase || !supabaseConfigured) return null
+  void conversationId
 
   const path = `${userId}/audio_${Date.now()}.webm`
 
@@ -362,12 +366,14 @@ export function subscribeToMessages(
   conversationId: string,
   onMessage: (message: ChatMessage) => void,
   onReadUpdate?: (messageId: string) => void,
+  onUpdate?: (message: ChatMessage) => void,
 ) {
   if (!supabase || !supabaseConfigured) return () => {}
   const client = supabase
 
+  // Unique channel name prevents "callbacks after subscribe()" error on re-mount
   const channel = client
-    .channel(`chat:${conversationId}`)
+    .channel(`chat:${conversationId}:${Date.now()}`)
     .on(
       "postgres_changes",
       {
@@ -389,8 +395,11 @@ export function subscribeToMessages(
         filter: `conversation_id=eq.${conversationId}`,
       },
       (payload) => {
-        if (payload.new && (payload.new as Record<string, unknown>).read_at) {
-          onReadUpdate?.((payload.new as Record<string, unknown>).id as string)
+        const updated = mapMessage(payload.new as Record<string, unknown>)
+        if (updated.readAt && !updated.editedAt && !updated.deletedAt) {
+          onReadUpdate?.(updated.id)
+        } else {
+          onUpdate?.(updated)
         }
       },
     )
@@ -436,6 +445,448 @@ export function subscribeToConversationUpdates(
   return () => {
     client.removeChannel(channel)
   }
+}
+
+// ========== Message Actions ==========
+
+export async function editMessage(
+  messageId: string,
+  newContent: string,
+): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+  const now = new Date().toISOString()
+
+  const { error } = await supabase
+    .from("messages")
+    .update({ content: newContent, edited_at: now })
+    .eq("id", messageId)
+    .is("deleted_at", null)
+
+  if (error) {
+    console.error("editMessage failed", error)
+    toast.error("Failed to edit message")
+    return false
+  }
+  return true
+}
+
+export async function softDeleteMessage(
+  messageId: string,
+): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+  const now = new Date().toISOString()
+
+  const { error } = await supabase
+    .from("messages")
+    .update({ deleted_at: now, content: "[deleted]" })
+    .eq("id", messageId)
+
+  if (error) {
+    console.error("softDeleteMessage failed", error)
+    toast.error("Failed to delete message")
+    return false
+  }
+  return true
+}
+
+export async function replyToMessage(
+  conversationId: string,
+  senderId: string,
+  receiverId: string,
+  content: string,
+  replyToMessageId: string,
+): Promise<ChatMessage | null> {
+  if (!supabase || !supabaseConfigured) return null
+
+  const now = new Date().toISOString()
+
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({
+      conversation_id: conversationId,
+      sender_id: senderId,
+      receiver_id: receiverId,
+      content,
+      message_type: "text",
+      reply_to: replyToMessageId,
+      delivered_at: now,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error("replyToMessage failed", error)
+    toast.error("Failed to send reply")
+    return null
+  }
+
+  await supabase
+    .from("conversations")
+    .update({
+      last_message: content,
+      last_message_at: now,
+      updated_at: now,
+    })
+    .eq("id", conversationId)
+
+  return mapMessage(data as Record<string, unknown>)
+}
+
+export async function forwardMessage(
+  message: ChatMessage,
+  targetConversationId: string,
+  newReceiverId: string,
+  senderId: string,
+): Promise<ChatMessage | null> {
+  if (!supabase || !supabaseConfigured) return null
+
+  const now = new Date().toISOString()
+
+  const payload: Record<string, unknown> = {
+    conversation_id: targetConversationId,
+    sender_id: senderId,
+    receiver_id: newReceiverId,
+    content: message.content,
+    message_type: message.messageType,
+    forwarded_from: message.id,
+    delivered_at: now,
+  }
+  if (message.mediaUrl) payload.media_url = message.mediaUrl
+  if (message.caption) payload.caption = message.caption
+  if (message.mediaMimeType) payload.media_mime_type = message.mediaMimeType
+  if (message.mediaSize !== undefined) payload.media_size = message.mediaSize
+  if (message.mediaDuration !== undefined) payload.media_duration = message.mediaDuration
+  if (message.fileName) payload.file_name = message.fileName
+
+  const { data, error } = await supabase
+    .from("messages")
+    .insert(payload)
+    .select()
+    .single()
+
+  if (error) {
+    console.error("forwardMessage failed", error)
+    toast.error("Failed to forward message")
+    return null
+  }
+
+  const typeLabel = message.messageType === "image" ? "📷 Image" :
+    message.messageType === "video" ? "🎥 Video" :
+    message.messageType === "audio" ? "🎙️ Audio" :
+    message.messageType === "sticker" ? "Sticker" :
+    message.messageType === "file" && message.fileName ? `📎 ${message.fileName.slice(0, 40)}` :
+    message.messageType === "emoji" ? "😊 Emoji" :
+    `Forwarded: ${message.content.slice(0, 60)}`
+
+  await supabase
+    .from("conversations")
+    .update({
+      last_message: typeLabel,
+      last_message_at: now,
+      updated_at: now,
+    })
+    .eq("id", targetConversationId)
+
+  return mapMessage(data as Record<string, unknown>)
+}
+
+// ========== Group Chat ==========
+
+export async function createGroup(
+  name: string,
+  description: string | null,
+  memberIds: string[],
+  avatarUrl?: string | null,
+): Promise<string | null> {
+  if (!supabase || !supabaseConfigured) return null
+
+  const { data, error } = await supabase.rpc("create_group", {
+    p_name: name,
+    p_description: description || null,
+    p_avatar_url: avatarUrl || null,
+    p_member_ids: memberIds,
+  })
+
+  if (error) {
+    console.error("createGroup failed", error)
+    toast.error("Failed to create group")
+    return null
+  }
+
+  return data as string
+}
+
+export async function fetchUserGroups(): Promise<Group[]> {
+  if (!supabase || !supabaseConfigured) return []
+
+  const { data, error } = await supabase.rpc("get_user_groups")
+
+  if (error) {
+    console.error("fetchUserGroups failed", error)
+    return []
+  }
+
+  const rows = (data || []) as Record<string, unknown>[]
+  return rows.map(mapGroup)
+}
+
+function mapGroup(row: Record<string, unknown>): Group {
+  const lm = row.last_message as Record<string, unknown> | null
+  const membersRaw = (row.members || []) as Record<string, unknown>[]
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    description: (row.description as string) || null,
+    avatarUrl: (row.avatar_url as string) || null,
+    createdBy: row.created_by as string,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+    lastMessage: lm ? {
+      id: lm.id as string,
+      content: lm.content as string,
+      messageType: lm.message_type as string,
+      mediaUrl: (lm.media_url as string) || null,
+      caption: (lm.caption as string) || null,
+      senderId: lm.sender_id as string,
+      createdAt: lm.created_at as string,
+    } : null,
+    unreadCount: (row.unread_count as number) || 0,
+    members: membersRaw.map((m) => ({
+      id: m.id as string,
+      userId: m.id as string,
+      name: m.name as string,
+      avatarUrl: (m.avatar_url as string) || null,
+      role: (m.role as "admin" | "member") || "member",
+      joinedAt: (m.joined_at as string) || row.created_at as string,
+    })),
+  }
+}
+
+export async function fetchGroupMessages(groupId: string): Promise<ChatMessage[]> {
+  if (!supabase || !supabaseConfigured) return []
+
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("group_id", groupId)
+    .order("created_at", { ascending: true })
+
+  if (error) {
+    console.error("fetchGroupMessages failed", error)
+    return []
+  }
+
+  return ((data || []) as Record<string, unknown>[]).map(mapMessage)
+}
+
+export async function sendGroupMessage(
+  groupId: string,
+  senderId: string,
+  content: string,
+  messageType: MessageType = "text",
+  mediaUrl?: string,
+  caption?: string,
+  mediaMimeType?: string,
+  mediaSize?: number,
+  mediaDuration?: number,
+  fileName?: string,
+  replyToMessageId?: string,
+): Promise<ChatMessage | null> {
+  if (!supabase || !supabaseConfigured) return null
+
+  const now = new Date().toISOString()
+
+  const payload: Record<string, unknown> = {
+    group_id: groupId,
+    sender_id: senderId,
+    content,
+    message_type: messageType,
+    delivered_at: now,
+  }
+
+  if (mediaUrl) payload.media_url = mediaUrl
+  if (caption) payload.caption = caption
+  if (mediaMimeType) payload.media_mime_type = mediaMimeType
+  if (mediaSize !== undefined) payload.media_size = mediaSize
+  if (mediaDuration !== undefined) payload.media_duration = mediaDuration
+  if (fileName) payload.file_name = fileName
+  if (replyToMessageId) payload.reply_to = replyToMessageId
+
+  const { data, error } = await supabase
+    .from("messages")
+    .insert(payload)
+    .select()
+    .single()
+
+  if (error) {
+    console.error("sendGroupMessage failed", error)
+    toast.error("Failed to send message")
+    return null
+  }
+
+  return mapMessage(data as Record<string, unknown>)
+}
+
+export async function updateGroupDetails(
+  groupId: string,
+  updates: { name?: string; description?: string | null; avatarUrl?: string | null },
+): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+
+  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (updates.name !== undefined) payload.name = updates.name
+  if (updates.description !== undefined) payload.description = updates.description
+  if (updates.avatarUrl !== undefined) payload.avatar_url = updates.avatarUrl
+
+  const { error } = await supabase.from("groups").update(payload).eq("id", groupId)
+  if (error) {
+    console.error("updateGroupDetails failed", error)
+    toast.error("Failed to update group")
+    return false
+  }
+  return true
+}
+
+export async function addGroupMembers(groupId: string, userIds: string[]): Promise<boolean> {
+  if (!supabase || !supabaseConfigured || userIds.length === 0) return false
+
+  const rows = [...new Set(userIds)].map((userId) => ({
+    group_id: groupId,
+    user_id: userId,
+    role: "member",
+  }))
+
+  const { error } = await supabase.from("group_members").upsert(rows, { onConflict: "group_id,user_id", ignoreDuplicates: true })
+  if (error) {
+    console.error("addGroupMembers failed", error)
+    toast.error("Failed to add members")
+    return false
+  }
+  return true
+}
+
+export async function removeGroupMember(groupId: string, userId: string): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+
+  const { error } = await supabase
+    .from("group_members")
+    .delete()
+    .eq("group_id", groupId)
+    .eq("user_id", userId)
+
+  if (error) {
+    console.error("removeGroupMember failed", error)
+    toast.error("Failed to remove member")
+    return false
+  }
+  return true
+}
+
+export async function leaveGroup(groupId: string): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+
+  const { error } = await supabase.rpc("leave_group", { p_group_id: groupId })
+  if (error) {
+    console.error("leaveGroup failed", error)
+    toast.error("Failed to leave group")
+    return false
+  }
+  return true
+}
+
+export async function updateGroupMemberRole(
+  groupId: string,
+  userId: string,
+  role: "admin" | "member",
+): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+
+  const { error } = await supabase.rpc("set_group_member_role", {
+    p_group_id: groupId,
+    p_user_id: userId,
+    p_role: role,
+  })
+
+  if (error) {
+    console.error("updateGroupMemberRole failed", error)
+    toast.error("Failed to update member role")
+    return false
+  }
+  return true
+}
+
+export async function deleteGroup(groupId: string): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+
+  const { error } = await supabase.rpc("delete_group_as_admin", { p_group_id: groupId })
+  if (error) {
+    console.error("deleteGroup failed", error)
+    toast.error("Failed to delete group")
+    return false
+  }
+  return true
+}
+
+export function subscribeToGroupMessages(
+  groupId: string,
+  onMessage: (message: ChatMessage) => void,
+  onUpdate?: (message: ChatMessage) => void,
+) {
+  if (!supabase || !supabaseConfigured) return () => {}
+  const client = supabase
+
+  const channel = client
+    .channel(`group:${groupId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `group_id=eq.${groupId}`,
+      },
+      (payload) => {
+        onMessage(mapMessage(payload.new as Record<string, unknown>))
+      },
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "messages",
+        filter: `group_id=eq.${groupId}`,
+      },
+      (payload) => {
+        onUpdate?.(mapMessage(payload.new as Record<string, unknown>))
+      },
+    )
+    .subscribe()
+
+  return () => {
+    client.removeChannel(channel)
+  }
+}
+
+export async function fetchProfilesByIds(userIds: string[]): Promise<Record<string, { name: string; avatarUrl: string | null; username: string | null }>> {
+  if (!supabase || !supabaseConfigured || userIds.length === 0) return {}
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, username, avatar_url")
+    .in("id", userIds)
+
+  if (error || !data) return {}
+
+  const map: Record<string, { name: string; avatarUrl: string | null; username: string | null }> = {}
+  for (const row of data as Record<string, unknown>[]) {
+    map[row.id as string] = {
+      name: (row.full_name as string) || (row.username as string) || "Unknown",
+      avatarUrl: (row.avatar_url as string) || null,
+      username: (row.username as string) || null,
+    }
+  }
+  return map
 }
 
 // ========== Stickers ==========
@@ -541,5 +992,12 @@ function mapMessage(row: Record<string, unknown>): ChatMessage {
     deliveredAt: (row.delivered_at as string) || null,
     readAt: (row.read_at as string) || null,
     createdAt: row.created_at as string,
+    replyTo: (row.reply_to as string) || null,
+    forwardedFrom: (row.forwarded_from as string) || null,
+    editedAt: (row.edited_at as string) || null,
+    deletedAt: (row.deleted_at as string) || null,
+    groupId: (row.group_id as string) || null,
+    replyPreview: (row.reply_preview as ChatMessage["replyPreview"]) || null,
+    forwardedPreview: (row.forwarded_preview as ChatMessage["forwardedPreview"]) || null,
   }
 }

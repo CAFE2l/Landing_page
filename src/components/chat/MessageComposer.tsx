@@ -8,6 +8,7 @@ import AudioRecorder from "./AudioRecorder"
 import {
   getMediaType,
   sendMessage,
+  sendGroupMessage,
   uploadAudio,
   uploadChatMedia,
   validateMediaFile,
@@ -16,18 +17,22 @@ import type { ChatMessage } from "../../data/feedbackStore"
 import toast from "react-hot-toast"
 
 interface MessageComposerProps {
-  conversationId: string
+  conversationId?: string
+  groupId?: string
   currentUserId: string
-  otherUserId: string
+  otherUserId?: string
   otherUserName: string
+  replyToMessageId?: string | null
   onMessageSent: (message: ChatMessage) => void
 }
 
 export default function MessageComposer({
   conversationId,
+  groupId,
   currentUserId,
   otherUserId,
   otherUserName,
+  replyToMessageId,
   onMessageSent,
 }: MessageComposerProps) {
   const [input, setInput] = useState("")
@@ -51,12 +56,30 @@ export default function MessageComposer({
     setShowAudioRecorder(false)
   }
 
+  const sendComposerMessage = (
+    content: string,
+    messageType?: Parameters<typeof sendMessage>[4],
+    mediaUrl?: string,
+    caption?: string,
+    mediaMimeType?: string,
+    mediaSize?: number,
+    mediaDuration?: number,
+    fileName?: string,
+  ) => {
+    if (groupId) {
+      return sendGroupMessage(groupId, currentUserId, content, messageType, mediaUrl, caption, mediaMimeType, mediaSize, mediaDuration, fileName, replyToMessageId || undefined)
+    }
+
+    if (!conversationId || !otherUserId) return Promise.resolve(null)
+    return sendMessage(conversationId, currentUserId, otherUserId, content, messageType, mediaUrl, caption, mediaMimeType, mediaSize, mediaDuration, fileName, replyToMessageId || undefined)
+  }
+
   const handleSend = async () => {
     const text = input.trim()
     if (!text || sending) return
 
     setSending(true)
-    const msg = await sendMessage(conversationId, currentUserId, otherUserId, text)
+    const msg = await sendComposerMessage(text)
     setSending(false)
 
     if (msg) {
@@ -82,7 +105,7 @@ export default function MessageComposer({
   const handleStickerSelect = async (stickerUrl: string) => {
     setShowStickers(false)
     setSending(true)
-    const msg = await sendMessage(conversationId, currentUserId, otherUserId, "", "sticker", stickerUrl)
+    const msg = await sendComposerMessage("", "sticker", stickerUrl)
     setSending(false)
     addMessage(msg)
   }
@@ -149,10 +172,7 @@ export default function MessageComposer({
 
     if (mediaType === "video" || mediaType === "audio") {
       const duration = await getDuration(pendingMedia, mediaType)
-      const msg = await sendMessage(
-        conversationId,
-        currentUserId,
-        otherUserId,
+      const msg = await sendComposerMessage(
         "",
         mediaType,
         result.url,
@@ -166,10 +186,7 @@ export default function MessageComposer({
       setPendingMedia(null)
       addMessage(msg)
     } else {
-      const msg = await sendMessage(
-        conversationId,
-        currentUserId,
-        otherUserId,
+      const msg = await sendComposerMessage(
         "",
         mediaType,
         result.url,
@@ -190,16 +207,13 @@ export default function MessageComposer({
     setSending(true)
     setShowAudioRecorder(false)
 
-    const result = await uploadAudio(blob, currentUserId, conversationId)
+    const result = await uploadAudio(blob, currentUserId, groupId || conversationId || "chat")
     if (!result) {
       setSending(false)
       return
     }
 
-    const msg = await sendMessage(
-      conversationId,
-      currentUserId,
-      otherUserId,
+    const msg = await sendComposerMessage(
       "",
       "audio",
       result.url,
@@ -241,6 +255,7 @@ export default function MessageComposer({
               onClick={() => { closePanels(); mediaFileRef.current?.click() }}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
               title="Attach image or video"
+              aria-label="Attach image or video"
             >
               <Image size={16} />
             </button>
@@ -256,6 +271,7 @@ export default function MessageComposer({
               onClick={() => { closePanels(); docFileRef.current?.click() }}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
               title="Attach file"
+              aria-label="Attach file"
             >
               <FileIcon size={16} />
             </button>
@@ -271,6 +287,7 @@ export default function MessageComposer({
               onClick={() => { setShowStickers(!showStickers); setShowEmoji(false); setShowAudioRecorder(false) }}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
               title="Sticker"
+              aria-label="Open stickers"
             >
               <Sticker size={16} />
             </button>
@@ -279,6 +296,7 @@ export default function MessageComposer({
               onClick={() => { setShowEmoji(!showEmoji); setShowStickers(false); setShowAudioRecorder(false) }}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
               title="Emoji"
+              aria-label="Open emoji picker"
             >
               <Smile size={16} />
             </button>
@@ -287,6 +305,7 @@ export default function MessageComposer({
               onClick={() => { setShowAudioRecorder(!showAudioRecorder); setShowEmoji(false); setShowStickers(false) }}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
               title="Record audio"
+              aria-label="Record audio"
             >
               <Mic size={16} />
             </button>
@@ -299,6 +318,7 @@ export default function MessageComposer({
           disabled={sending || !input.trim() || !!pendingMedia}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white transition-all hover:shadow-[0_0_16px_rgba(37,99,235,0.3)] disabled:cursor-not-allowed disabled:opacity-40"
           title="Send"
+          aria-label="Send message"
         >
           {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
         </button>

@@ -85,12 +85,13 @@ export default function PublicProfilePage() {
 
   const applyReactionState = useCallback(
     (postId: string, previousReaction: ReactionType | undefined, nextReaction: ReactionType | null) => {
+      const likeDelta =
+        (nextReaction === "like" ? 1 : 0) - (previousReaction === "like" ? 1 : 0);
+      const dislikeDelta =
+        (nextReaction === "dislike" ? 1 : 0) - (previousReaction === "dislike" ? 1 : 0);
+
       const updatePost = (p: FeedbackPost): FeedbackPost => {
         if (p.id !== postId) return p;
-        const likeDelta =
-          (nextReaction === "like" ? 1 : 0) - (previousReaction === "like" ? 1 : 0);
-        const dislikeDelta =
-          (nextReaction === "dislike" ? 1 : 0) - (previousReaction === "dislike" ? 1 : 0);
         return {
           ...p,
           helpfulCount: Math.max(0, p.helpfulCount + likeDelta),
@@ -98,9 +99,17 @@ export default function PublicProfilePage() {
         };
       };
 
-      setProfile((prev) =>
-        prev ? { ...prev, posts: prev.posts.map(updatePost) } : prev,
-      );
+      setProfile((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          stats: {
+            ...prev.stats,
+            totalLikesReceived: Math.max(0, prev.stats.totalLikesReceived + likeDelta),
+          },
+          posts: prev.posts.map(updatePost),
+        };
+      });
       setSelectedPost((prev) => (prev ? updatePost(prev) : prev));
     },
     [],
@@ -152,6 +161,9 @@ export default function PublicProfilePage() {
       return next;
     });
 
+    const oldPost = posts.find((p) => p.id === postId);
+    const serverLikeDelta = result.helpfulCount - (oldPost?.helpfulCount ?? 0);
+
     const syncCounters = (p: FeedbackPost): FeedbackPost =>
       p.id === postId
         ? {
@@ -160,9 +172,17 @@ export default function PublicProfilePage() {
             downvoteCount: result.downvoteCount,
           }
         : p;
-    setProfile((prev) =>
-      prev ? { ...prev, posts: prev.posts.map(syncCounters) } : prev,
-    );
+    setProfile((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        stats: {
+          ...prev.stats,
+          totalLikesReceived: Math.max(0, prev.stats.totalLikesReceived + serverLikeDelta),
+        },
+        posts: prev.posts.map(syncCounters),
+      };
+    });
     setSelectedPost((prev) => (prev ? syncCounters(prev) : prev));
   };
 
