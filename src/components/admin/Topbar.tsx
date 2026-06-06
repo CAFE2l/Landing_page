@@ -198,7 +198,6 @@ export default function Topbar({ title, userId }: TopbarProps) {
   };
 
   const name = profile?.full_name || "Admin";
-  const avatarUrl = profile?.avatar_url;
   const hasAnyResult =
     results.clients.length > 0 || results.feedbacks.length > 0;
 

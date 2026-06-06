@@ -17,7 +17,6 @@ interface FollowButtonProps {
 export default function FollowButton({
   currentUserId,
   targetUserId,
-  targetUserName,
   initialFollowing = false,
   onStateChange,
   className = "",
