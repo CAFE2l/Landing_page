@@ -1,19 +1,37 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Edit3, MessageCircle, Users, Trash2, Loader2, Shield } from "lucide-react";
 import toast from "react-hot-toast";
 import PageShell from "./PageShell";
 import FeedbackCard from "../components/feedback/FeedbackCard";
+import FeedbackDetail from "../components/feedback/FeedbackDetail";
 import FollowButton from "../components/ui/FollowButton";
+import UserAvatar from "../components/ui/UserAvatar";
 import { useAuth } from "../contexts/AuthContext";
 import {
   fetchPublicProfile,
   fetchPublicProfileByUsername,
   getOrCreateConversation,
+  toggleReaction,
+  getUserSavedPostIds,
+  saveFeedbackPost,
+  removeSavedFeedbackPost,
+  deleteFeedbackPost,
   type PublicProfileData,
 } from "../data/feedbackServiceSupabase";
+import type { FeedbackPost, ReactionType } from "../data/feedbackStore";
 import { deleteClient } from "../lib/adminClientService";
+
+function extractReactions(posts: FeedbackPost[]): Map<string, ReactionType> {
+  const map = new Map<string, ReactionType>();
+  for (const post of posts) {
+    if (post.currentUserReaction) {
+      map.set(post.id, post.currentUserReaction);
+    }
+  }
+  return map;
+}
 
 export default function PublicProfilePage() {
   const { userId, username } = useParams();
@@ -27,16 +45,28 @@ export default function PublicProfilePage() {
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  const [userReactions, setUserReactions] = useState<Map<string, ReactionType>>(new Map());
+  const [reactionLoading, setReactionLoading] = useState<Set<string>>(new Set());
+  const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
+  const [selectedPost, setSelectedPost] = useState<FeedbackPost | null>(null);
+
   const isOwnProfile = !!user?.id && user.id === resolvedUserId;
+  const uid = user?.id;
+  const posts = profile?.posts || [];
 
   useEffect(() => {
     if (!resolvedUserId) return;
     queueMicrotask(() => setLoading(true));
     const fetchFn = username
-      ? fetchPublicProfileByUsername(resolvedUserId)
-      : fetchPublicProfile(resolvedUserId);
-    fetchFn.then(setProfile).finally(() => setLoading(false));
-  }, [resolvedUserId, username]);
+      ? fetchPublicProfileByUsername(resolvedUserId, uid)
+      : fetchPublicProfile(resolvedUserId, uid);
+    fetchFn.then((data) => {
+      setProfile(data);
+      if (data) {
+        setUserReactions(extractReactions(data.posts));
+      }
+    }).finally(() => setLoading(false));
+  }, [resolvedUserId, username, uid]);
 
   useEffect(() => {
     if (!user?.id || !resolvedUserId || user.id === resolvedUserId) return;
@@ -44,6 +74,160 @@ export default function PublicProfilePage() {
       isFollowing(user.id!, resolvedUserId!).then(setFollowing),
     );
   }, [user?.id, resolvedUserId]);
+
+  useEffect(() => {
+    if (!uid) {
+      setSavedPosts(new Set());
+      return;
+    }
+    getUserSavedPostIds(uid).then(setSavedPosts).catch(() => setSavedPosts(new Set()));
+  }, [uid]);
+
+  const applyReactionState = useCallback(
+    (postId: string, previousReaction: ReactionType | undefined, nextReaction: ReactionType | null) => {
+      const updatePost = (p: FeedbackPost): FeedbackPost => {
+        if (p.id !== postId) return p;
+        const likeDelta =
+          (nextReaction === "like" ? 1 : 0) - (previousReaction === "like" ? 1 : 0);
+        const dislikeDelta =
+          (nextReaction === "dislike" ? 1 : 0) - (previousReaction === "dislike" ? 1 : 0);
+        return {
+          ...p,
+          helpfulCount: Math.max(0, p.helpfulCount + likeDelta),
+          downvoteCount: Math.max(0, (p.downvoteCount || 0) + dislikeDelta),
+        };
+      };
+
+      setProfile((prev) =>
+        prev ? { ...prev, posts: prev.posts.map(updatePost) } : prev,
+      );
+      setSelectedPost((prev) => (prev ? updatePost(prev) : prev));
+    },
+    [],
+  );
+
+  const handleReaction = async (postId: string, reactionType: ReactionType) => {
+    if (!uid) {
+      toast.error("Login required to interact with feedback.");
+      return;
+    }
+    if (reactionLoading.has(postId)) return;
+
+    const previousReaction = userReactions.get(postId);
+    const optimisticReaction = previousReaction === reactionType ? null : reactionType;
+    const previousPosts = posts;
+    const previousSelectedPost = selectedPost;
+    const previousReactions = userReactions;
+
+    setReactionLoading((prev) => new Set(prev).add(postId));
+    setUserReactions((prev) => {
+      const next = new Map(prev);
+      if (optimisticReaction) next.set(postId, optimisticReaction);
+      else next.delete(postId);
+      return next;
+    });
+    applyReactionState(postId, previousReaction, optimisticReaction);
+
+    const result = await toggleReaction(postId, reactionType);
+    setReactionLoading((prev) => {
+      const next = new Set(prev);
+      next.delete(postId);
+      return next;
+    });
+
+    if (!result) {
+      setUserReactions(previousReactions);
+      setProfile((prev) =>
+        prev ? { ...prev, posts: previousPosts } : prev,
+      );
+      setSelectedPost(previousSelectedPost);
+      toast.error("Could not update reaction");
+      return;
+    }
+
+    setUserReactions((prev) => {
+      const next = new Map(prev);
+      if (result.reactionType) next.set(postId, result.reactionType);
+      else next.delete(postId);
+      return next;
+    });
+
+    const syncCounters = (p: FeedbackPost): FeedbackPost =>
+      p.id === postId
+        ? {
+            ...p,
+            helpfulCount: result.helpfulCount,
+            downvoteCount: result.downvoteCount,
+          }
+        : p;
+    setProfile((prev) =>
+      prev ? { ...prev, posts: prev.posts.map(syncCounters) } : prev,
+    );
+    setSelectedPost((prev) => (prev ? syncCounters(prev) : prev));
+  };
+
+  const handleCommentCountChange = (postId: string, delta: number) => {
+    const updatePost = (post: FeedbackPost): FeedbackPost =>
+      post.id === postId
+        ? { ...post, commentCount: Math.max(0, (post.commentCount || 0) + delta) }
+        : post;
+
+    setProfile((prev) =>
+      prev ? { ...prev, posts: prev.posts.map(updatePost) } : prev,
+    );
+    setSelectedPost((prev) => (prev ? updatePost(prev) : prev));
+  };
+
+  const handleSave = async (postId: string) => {
+    if (!uid) {
+      toast.error("Login required to interact with feedback.");
+      return;
+    }
+
+    const wasSaved = savedPosts.has(postId);
+    setSavedPosts((prev) => {
+      const next = new Set(prev);
+      if (wasSaved) next.delete(postId);
+      else next.add(postId);
+      return next;
+    });
+
+    const success = wasSaved
+      ? await removeSavedFeedbackPost(postId, uid)
+      : await saveFeedbackPost(postId, uid);
+
+    if (!success) {
+      setSavedPosts((prev) => {
+        const next = new Set(prev);
+        if (wasSaved) next.add(postId);
+        else next.delete(postId);
+        return next;
+      });
+      toast.error("Could not update saved post");
+      return;
+    }
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    if (!isAdmin) return;
+    if (!confirm("Delete this feedback permanently?")) return;
+    const previousPosts = posts;
+    const previousSelectedPost = selectedPost;
+    setProfile((prev) =>
+      prev ? { ...prev, posts: prev.posts.filter((p) => p.id !== postId) } : prev,
+    );
+    if (selectedPost?.id === postId) setSelectedPost(null);
+    const ok = await deleteFeedbackPost(postId);
+    if (!ok) {
+      setProfile((prev) =>
+        prev ? { ...prev, posts: previousPosts } : prev,
+      );
+      setSelectedPost(previousSelectedPost);
+      toast.error("Could not delete feedback");
+      return;
+    }
+    toast.success("Feedback deleted");
+  };
 
   const handleDeleteUser = async () => {
     if (!resolvedUserId || !profile) return
@@ -109,13 +293,7 @@ export default function PublicProfilePage() {
           >
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-4">
-                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-white/[0.12] bg-[#4F6EF7]/10 text-2xl font-bold text-[#8EA0FF]">
-                  {profile.avatarUrl ? (
-                    <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    profile.name[0]?.toUpperCase()
-                  )}
-                </div>
+                <UserAvatar user={{ name: profile.name, username: profile.username, avatarUrl: profile.avatarUrl }} size="xl" />
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-2xl font-semibold text-white">{profile.name}</h2>
@@ -203,14 +381,33 @@ export default function PublicProfilePage() {
                 key={post.id}
                 post={post}
                 index={index}
-                onClick={() => undefined}
-                onReaction={() => undefined}
-                onComment={() => undefined}
+                onClick={() => uid ? setSelectedPost(post) : toast.error("Login required to interact with feedback.")}
+                onReaction={(reactionType) => handleReaction(post.id, reactionType)}
+                reactionLoading={reactionLoading.has(post.id)}
+                onComment={() => uid ? setSelectedPost(post) : toast.error("Login required to interact with feedback.")}
+                onSave={() => handleSave(post.id)}
+                saved={savedPosts.has(post.id)}
+                userReaction={userReactions.get(post.id) || null}
+                isAdmin={isAdmin}
+                onDelete={isAdmin ? () => handleDeletePost(post.id) : undefined}
               />
             ))}
           </div>
         </div>
       )}
+
+      {/* Detail Modal */}
+      <FeedbackDetail
+        post={selectedPost}
+        open={!!selectedPost}
+        onClose={() => setSelectedPost(null)}
+        onReaction={handleReaction}
+        reactionLoading={selectedPost ? reactionLoading.has(selectedPost.id) : false}
+        userReaction={selectedPost ? userReactions.get(selectedPost.id) || null : null}
+        isAdmin={isAdmin}
+        onCommentCountChange={handleCommentCountChange}
+      />
+
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {showDeleteModal && (

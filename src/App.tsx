@@ -10,6 +10,7 @@ import ProfilePage from "./pages/ProfilePage";
 import SavedPostsPage from "./pages/SavedPostsPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 import MessagesPage from "./pages/MessagesPage";
+import StatusPage from "./pages/StatusPage";
 import AdminShell from "./components/admin/AdminShell";
 import AdminLogin from "./pages/admin/Login";
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -116,6 +117,14 @@ function App() {
                 <ChatErrorBoundary>
                   <MessagesPage />
                 </ChatErrorBoundary>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/status"
+            element={
+              <ProtectedRoute>
+                <StatusPage />
               </ProtectedRoute>
             }
           />

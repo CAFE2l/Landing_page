@@ -49,6 +49,8 @@ export function useUserProfile(userId?: string) {
 
     try {
       setLoading(true);
+      const isOwnProfile = authUser?.id === targetUserId;
+
       const followCounts = canQuerySocialFollows()
         ? [
             supabase
@@ -75,29 +77,76 @@ export function useUserProfile(userId?: string) {
       ]);
 
       if (profileRes.error) throw profileRes.error;
-      const profiles = profileRes.data;
+      let profiles = profileRes.data;
 
-      const emailPrefix = profiles?.email?.split("@")[0] || authUser?.email?.split("@")[0];
+      // If profile exists but has no identifiable data, try server-side sync
+      if (profiles && !profiles.full_name && !profiles.username && !profiles.email && !profiles.avatar_url) {
+        try {
+          const { data: synced } = await supabase.rpc("sync_user_profile", {
+            p_user_id: targetUserId,
+          });
+          if (synced) {
+            profiles = synced as typeof profiles;
+          }
+        } catch (syncErr) {
+          console.warn("sync_user_profile RPC failed, using auth fallback", syncErr);
+        }
+      }
+
+      // Second attempt: if still no data, try auth metadata directly (last resort)
+      if (!profiles?.full_name && !profiles?.username && !profiles?.email) {
+        if (isOwnProfile) {
+          const meta = authUser.user_metadata || {};
+          const authName = meta.full_name || meta.name || meta.display_name || authUser?.email?.split("@")[0];
+          const authAvatar = meta.avatar_url || meta.picture || null;
+          if (authName) {
+            setProfile({
+              id: targetUserId,
+              full_name: authName,
+              username: meta.preferred_username || meta.username || null,
+              email: authUser?.email || "",
+              avatar_url: authAvatar,
+              role: "client",
+              bio: null,
+              phone: null,
+              location: null,
+              locationCountryCode: null,
+              followers_count: 0,
+              following_count: 0,
+              initials: getInitials(authName),
+            });
+            setLoading(false);
+            return;
+          }
+        }
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      // Also sync avatar_url if missing
+      if (!profiles.avatar_url && isOwnProfile) {
+        profiles.avatar_url = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null;
+      }
+
+      const emailPrefix = (profiles.email as string)?.split("@")[0];
       let displayName = emailPrefix || "Unknown user";
-      if (profiles?.full_name) {
-        displayName = profiles.full_name;
-      } else if (profiles?.username) {
-        displayName = profiles.username;
-      } else if (authUser?.id === targetUserId) {
+      if (profiles.full_name) {
+        displayName = profiles.full_name as string;
+      } else if (profiles.username) {
+        displayName = profiles.username as string;
+      } else if (isOwnProfile) {
         const meta = authUser.user_metadata || {};
         displayName =
           meta.full_name ||
           meta.name ||
           meta.display_name ||
-          emailPrefix ||
+          authUser?.email?.split("@")[0] ||
           "Unknown user";
       }
 
-      // Priority for avatar: profiles.avatar_url > auth.user_metadata.avatar_url > initials
-      let avatarUrl = null;
-      if (profiles?.avatar_url) {
-        avatarUrl = profiles.avatar_url;
-      } else if (authUser?.id === targetUserId) {
+      let avatarUrl = (profiles.avatar_url as string) || null;
+      if (!avatarUrl && isOwnProfile) {
         avatarUrl =
           authUser.user_metadata?.avatar_url ||
           authUser.user_metadata?.picture ||
@@ -108,7 +157,7 @@ export function useUserProfile(userId?: string) {
         id: targetUserId,
         full_name: displayName,
         username: profiles?.username || null,
-        email: profiles?.email || authUser?.email || "",
+        email: profiles?.email || (isOwnProfile ? authUser?.email || "" : ""),
         avatar_url: avatarUrl,
         role: profiles?.role || "client",
         bio: profiles?.bio || null,

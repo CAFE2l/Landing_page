@@ -57,7 +57,7 @@ const contentVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 }
 
-const MAX_COMMENT_MEDIA_SIZE = 50 * 1024 * 1024
+const MAX_COMMENT_MEDIA_SIZE = 150 * 1024 * 1024
 const COMMENT_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "video/mp4", "video/webm", "video/quicktime"]
 
 export default function FeedbackDetail({
@@ -115,7 +115,7 @@ export default function FeedbackDetail({
         continue
       }
       if (file.size > MAX_COMMENT_MEDIA_SIZE) {
-        toast.error(`${file.name}: file is too large (max 50MB)`)
+        toast.error(`${file.name}: file is too large (max 150MB)`)
         continue
       }
       valid.push(file)

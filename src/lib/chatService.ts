@@ -41,7 +41,7 @@ export async function fetchConversations(userId: string): Promise<ChatConversati
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, full_name, username, avatar_url")
+    .select("id, full_name, username, avatar_url, email")
     .in("id", otherIds)
 
   const profileMap = new Map(
@@ -111,7 +111,7 @@ export async function fetchConversations(userId: string): Promise<ChatConversati
       createdAt: row.created_at as string,
       otherUser: {
         id: otherId,
-        name: (profile?.full_name as string) || (profile?.username as string) || "Unknown user",
+        name: (profile?.full_name as string) || (profile?.username as string) || (profile?.email as string)?.split("@")[0] || "Unknown user",
         avatarUrl: (profile?.avatar_url as string) || null,
         username: (profile?.username as string) || null,
       },
@@ -259,7 +259,7 @@ const ALLOWED_FILE_TYPES = [
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024
 const MAX_AUDIO_SIZE = 25 * 1024 * 1024
-const MAX_FILE_SIZE = 50 * 1024 * 1024
+const MAX_FILE_SIZE = 150 * 1024 * 1024
 
 export function validateMediaFile(file: File): { valid: boolean; error?: string } {
   if (ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -275,7 +275,7 @@ export function validateMediaFile(file: File): { valid: boolean; error?: string 
     return { valid: true }
   }
   if (ALLOWED_FILE_TYPES.includes(file.type)) {
-    if (file.size > MAX_FILE_SIZE) return { valid: false, error: "File must be under 50MB" }
+    if (file.size > MAX_FILE_SIZE) return { valid: false, error: "File must be under 150MB" }
     return { valid: true }
   }
   return { valid: false, error: "File type not supported. Allowed: images, videos, audio, PDF, DOC, XLS, ZIP, and more." }

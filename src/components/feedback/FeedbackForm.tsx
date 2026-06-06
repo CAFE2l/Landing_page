@@ -57,7 +57,7 @@ interface MediaUploadState {
   error?: string;
 }
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const MAX_FILE_SIZE = 150 * 1024 * 1024;
 const ALLOWED_TYPES = [
   "image/jpeg",
   "image/png",
@@ -131,7 +131,7 @@ export default function FeedbackForm({
 
     for (const f of arr) {
       if (f.size > MAX_FILE_SIZE) {
-        setUploadError(`File too large: ${f.name} (max 50MB)`);
+        setUploadError(`File too large: ${f.name} (max 150MB)`);
         continue;
       }
       if (!ALLOWED_TYPES.includes(f.type)) {
@@ -567,7 +567,7 @@ export default function FeedbackForm({
                           Click to upload or drag & drop
                         </h4>
                         <p className="text-[11px] text-white/30">
-                          JPG, PNG, WebP or MP4 (max. 50MB per file)
+                          JPG, PNG, WebP or MP4 (max. 150MB per file)
                         </p>
                         <button
                           type="button"

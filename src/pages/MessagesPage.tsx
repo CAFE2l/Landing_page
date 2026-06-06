@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react"
-import { useSearchParams, useParams, Link } from "react-router-dom"
+import { useSearchParams, useParams, Link, useNavigate } from "react-router-dom"
 import {
   MessageCircle, Loader2, Search, Hash,
   Send, X, Camera, ChevronLeft, Heart, MessageSquare,
@@ -39,6 +39,7 @@ export default function MessagesPage() {
 
   const [searchParams, setSearchParams] = useSearchParams()
   const { conversationId: urlConversationId } = useParams()
+  const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>("conversations")
   const [conversations, setConversations] = useState<ChatConv[]>([])
   const [convLoading, setConvLoading] = useState(true)
@@ -435,8 +436,8 @@ export default function MessagesPage() {
               <UserAvatar user={userProfile} size="md" />
               <div className="flex-1">
                 <textarea
-                  value={newPostContent}
-                  onChange={(e) => setNewPostContent(e.target.value)}
+                  value={postInput}
+                  onChange={(e) => setPostInput(e.target.value)}
                   placeholder="What's on your mind?"
                   rows={2}
                   className="w-full resize-none bg-transparent text-sm text-white placeholder:text-[#4A4A5A] outline-none"
@@ -630,21 +631,25 @@ export default function MessagesPage() {
         <button onClick={handleBack} className="flex h-9 w-9 items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/[0.06] transition-all md:hidden">
           <ChevronLeft size={18} />
         </button>
-        <button onClick={() => openProfile(activeConv.otherUser.id)} className="shrink-0">
-          <div className="relative">
+        <div
+          onClick={() => navigate(`/profile/${activeConv.otherUser.username || activeConv.otherUser.id}`)}
+          className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition"
+          title="View profile"
+        >
+          <div className="relative shrink-0">
             <UserAvatar user={activeConv.otherUser} size="md" className="ring-1 ring-white/[0.06]" />
             <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#0A0A0F] bg-[#22C55E]" />
           </div>
-        </button>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold text-white truncate">{getUserDisplayName(activeConv.otherUser)}</p>
-            <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
-            <span className="text-[10px] text-[#22C55E]">Online</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-white truncate">{getUserDisplayName(activeConv.otherUser)}</p>
+              <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
+              <span className="text-[10px] text-[#22C55E]">Online</span>
+            </div>
+            {activeConv.otherUser.username && (
+              <p className="text-[11px] text-[#4A4A5A]">@{activeConv.otherUser.username}</p>
+            )}
           </div>
-          {activeConv.otherUser.username && (
-            <p className="text-[11px] text-[#4A4A5A]">@{activeConv.otherUser.username}</p>
-          )}
         </div>
         <button
           onClick={() => openProfile(activeConv.otherUser.id)}

@@ -94,6 +94,7 @@ export interface FeedbackPost {
   adminReply?: FeedbackAdminReply
   improvementSuggestion?: string
   savedAt?: string
+  currentUserReaction?: ReactionType | null
 }
 
 export type FeedbackVoteType = "up" | "down"

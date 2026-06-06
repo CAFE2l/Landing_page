@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Star, PenLine } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getUserDisplayName } from "../lib/utils";
+import { getUserDisplayName, getUserAvatar } from "../lib/utils";
 import UserAvatar from "../components/ui/UserAvatar";
 import { useUserProfile } from "../hooks/useUserProfile";
 import PageShell from "./PageShell";

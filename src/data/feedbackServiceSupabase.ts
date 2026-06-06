@@ -954,7 +954,10 @@ export interface DirectMessage {
   createdAt: string;
 }
 
-export async function fetchPublicProfile(userId: string): Promise<PublicProfileData | null> {
+export async function fetchPublicProfile(
+  userId: string,
+  currentUserId?: string,
+): Promise<PublicProfileData | null> {
   if (!supabase || !supabaseConfigured) return null;
 
   const { data: profile } = await supabase
@@ -970,7 +973,7 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfileD
     .in("status", ["approved", "highlighted"])
     .order("created_at", { ascending: false });
 
-  const posts = await applyProfileAuthors(
+  let posts = await applyProfileAuthors(
     ((postsData || []) as Record<string, unknown>[]).map((row) => {
       const media =
         (row[MEDIA_TABLE] as Record<string, unknown>[] | undefined) || [];
@@ -984,6 +987,17 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfileD
       });
     }),
   );
+
+  if (currentUserId && posts.length > 0) {
+    const reactions = await fetchUserReactions(
+      posts.map((p) => p.id),
+      currentUserId,
+    );
+    posts = posts.map((post) => ({
+      ...post,
+      currentUserReaction: reactions.get(post.id) || null,
+    }));
+  }
 
   const [followersRes, followingRes] = canQuerySocialFollows()
     ? await Promise.all([
@@ -1012,7 +1026,7 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfileD
       posts[0]?.userName ||
       "CAFÉ Services User",
     username: (profileRow.username as string) || undefined,
-    avatarUrl: (profileRow.avatar_url as string) || posts[0]?.userAvatar,
+    avatarUrl: (profileRow.avatar_url as string) || posts[0]?.userAvatar || undefined,
     bio: (profileRow.bio as string) || undefined,
     role: "Client",
     memberSince: posts[posts.length - 1]?.createdAt || (profileRow.updated_at as string),
@@ -1026,7 +1040,10 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfileD
   };
 }
 
-export async function fetchPublicProfileByUsername(username: string): Promise<PublicProfileData | null> {
+export async function fetchPublicProfileByUsername(
+  username: string,
+  currentUserId?: string,
+): Promise<PublicProfileData | null> {
   if (!supabase || !supabaseConfigured) return null;
   const { data: profile } = await supabase
     .from(PROFILES_TABLE)
@@ -1034,7 +1051,7 @@ export async function fetchPublicProfileByUsername(username: string): Promise<Pu
     .eq("username", username)
     .maybeSingle();
   if (!profile) return null;
-  return fetchPublicProfile((profile as { id: string }).id);
+  return fetchPublicProfile((profile as { id: string }).id, currentUserId);
 }
 
 export async function isFollowingProfile(currentUserId: string, profileId: string): Promise<boolean> {
