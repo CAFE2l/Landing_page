@@ -15,6 +15,7 @@ import {
   searchFeedbackPosts,
   createFeedbackPost,
   toggleReaction,
+  deleteFeedbackPost,
   fetchUserReactions,
   getUserSavedPostIds,
   removeSavedFeedbackPost,
@@ -25,7 +26,7 @@ import { loadCurrentUser } from "../data/feedbackStore";
 import toast from "react-hot-toast";
 
 export default function FeedbackPage() {
-  const { user: supabaseUser } = useAuth();
+  const { user: supabaseUser, isAdmin } = useAuth();
   const localUser = loadCurrentUser();
   const currentUser = supabaseUser || localUser;
   const userProfile = currentUser
@@ -49,6 +50,7 @@ export default function FeedbackPage() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [userReactions, setUserReactions] = useState<Map<string, ReactionType>>(new Map());
+  const [reactionLoading, setReactionLoading] = useState<Set<string>>(new Set());
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [selectedPost, setSelectedPost] = useState<FeedbackPost | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -123,15 +125,82 @@ export default function FeedbackPage() {
       toast.error("Login to react");
       return;
     }
+    if (reactionLoading.has(postId)) return;
+
     const previousReaction = userReactions.get(postId);
-    const result = await toggleReaction(postId, reactionType);
+    const optimisticReaction = previousReaction === reactionType ? null : reactionType;
+    const previousPosts = posts;
+    const previousSelectedPost = selectedPost;
+    const previousReactions = userReactions;
+
+    setReactionLoading((prev) => new Set(prev).add(postId));
     setUserReactions((prev) => {
       const next = new Map(prev);
-      if (result) next.set(postId, result);
+      if (optimisticReaction) next.set(postId, optimisticReaction);
       else next.delete(postId);
       return next;
     });
-    applyReactionState(postId, previousReaction, result);
+    applyReactionState(postId, previousReaction, optimisticReaction);
+
+    const result = await toggleReaction(postId, reactionType);
+    setReactionLoading((prev) => {
+      const next = new Set(prev);
+      next.delete(postId);
+      return next;
+    });
+
+    if (!result) {
+      setPosts(previousPosts);
+      setSelectedPost(previousSelectedPost);
+      setUserReactions(previousReactions);
+      toast.error("Could not update reaction");
+      return;
+    }
+
+    setUserReactions((prev) => {
+      const next = new Map(prev);
+      if (result.reactionType) next.set(postId, result.reactionType);
+      else next.delete(postId);
+      return next;
+    });
+
+    const syncCounters = (p: FeedbackPost): FeedbackPost =>
+      p.id === postId
+        ? {
+            ...p,
+            helpfulCount: result.helpfulCount,
+            downvoteCount: result.downvoteCount,
+          }
+        : p;
+    setPosts((prev) => prev.map(syncCounters));
+    setSelectedPost((prev) => (prev ? syncCounters(prev) : prev));
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    if (!isAdmin) return;
+    if (!confirm("Delete this feedback permanently?")) return;
+    const previousPosts = posts;
+    const previousSelectedPost = selectedPost;
+    setPosts((prev) => prev.filter((post) => post.id !== postId));
+    if (selectedPost?.id === postId) setSelectedPost(null);
+    const ok = await deleteFeedbackPost(postId);
+    if (!ok) {
+      setPosts(previousPosts);
+      setSelectedPost(previousSelectedPost);
+      toast.error("Could not delete feedback");
+      return;
+    }
+    toast.success("Feedback deleted");
+  };
+
+  const handleCommentCountChange = (postId: string, delta: number) => {
+    const updatePost = (post: FeedbackPost): FeedbackPost =>
+      post.id === postId
+        ? { ...post, commentCount: Math.max(0, (post.commentCount || 0) + delta) }
+        : post;
+
+    setPosts((prev) => prev.map(updatePost));
+    setSelectedPost((prev) => (prev ? updatePost(prev) : prev));
   };
 
   const handleSave = async (postId: string) => {
@@ -272,10 +341,13 @@ export default function FeedbackPage() {
           onSortChange={setSort}
           onPostClick={setSelectedPost}
           onReaction={handleReaction}
+          reactionLoading={reactionLoading}
           userReactions={userReactions}
           onSave={handleSave}
           savedPosts={savedPosts}
           onCommentClick={setSelectedPost}
+          isAdmin={isAdmin}
+          onDeletePost={handleDeletePost}
           category={category}
           rating={rating}
           search={search}
@@ -288,7 +360,10 @@ export default function FeedbackPage() {
         open={!!selectedPost}
         onClose={() => setSelectedPost(null)}
         onReaction={handleReaction}
+        reactionLoading={selectedPost ? reactionLoading.has(selectedPost.id) : false}
         userReaction={selectedPost ? userReactions.get(selectedPost.id) || null : null}
+        isAdmin={isAdmin}
+        onCommentCountChange={handleCommentCountChange}
       />
 
       {/* Feedback Form */}

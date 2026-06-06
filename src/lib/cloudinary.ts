@@ -49,6 +49,7 @@ export function getAvatarUrl(publicId: string, size = 200): string {
 export async function uploadFeedbackMedia(
   file: File,
   onProgress?: (progress: number) => void,
+  folder = "feedback_media",
 ): Promise<CloudinaryUploadResult> {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
     throw new Error("Cloudinary is not configured.");
@@ -57,7 +58,7 @@ export async function uploadFeedbackMedia(
   const formData = new FormData();
   formData.append("file", file);
   formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-  formData.append("folder", "feedback_media");
+  formData.append("folder", folder);
 
   const resourceType = file.type.startsWith("video/") ? "video" : "image";
 

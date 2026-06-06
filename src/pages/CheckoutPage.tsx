@@ -5,32 +5,27 @@ import { useParams, Link } from "react-router-dom"
 import { motion } from "framer-motion"
 import {
   Check, Loader2, ArrowLeft, AlertCircle, DollarSign, Calendar, User,
-  Clock, MessageSquare, CreditCard, FileText, Send,
+  MessageSquare, CreditCard, FileText, Send, ExternalLink,
 } from "lucide-react"
 import {
   fetchServiceOrder,
-  requestPaymentLink,
   getOrderDisplayName,
   getOrderAvatarUrl,
+  confirmPayment,
 } from "../lib/serviceOrdersService"
 import type { ServiceOrder } from "../lib/types/serviceOrders"
 import { PAYMENT_STATUS_LABELS } from "../lib/types/serviceOrders"
 import { formatPhoneDisplay } from "../components/ui/PhoneInput"
 import TechPremiumBackground from "../components/ui/TechPremiumBackground"
 import { cn } from "../lib/utils"
+import toast from "react-hot-toast"
+import { supabase, supabaseConfigured } from "../lib/supabase/client"
 
 const STEPS = [
   { key: "details", label: "Project Details", icon: FileText },
   { key: "review", label: "Review", icon: Check },
-  { key: "payment", label: "Payment Pending", icon: Clock },
+  { key: "payment", label: "Payment", icon: CreditCard },
   { key: "contact", label: "Admin Contact", icon: MessageSquare },
-] as const
-
-const PAYMENT_METHODS = [
-  { id: "paypal", name: "PayPal", configured: false },
-  { id: "wise", name: "Wise", configured: false },
-  { id: "mercadopago", name: "Mercado Pago", configured: false },
-  { id: "manual", name: "Manual Invoice", configured: true },
 ] as const
 
 function OrderAvatar({ order }: { order: ServiceOrder }) {
@@ -56,7 +51,7 @@ function OrderAvatar({ order }: { order: ServiceOrder }) {
 
 function Stepper({ currentStep }: { currentStep: number }) {
   return (
-    <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="mb-8 grid grid-cols-4 gap-3">
       {STEPS.map((step, index) => {
         const Icon = step.icon
         const active = index <= currentStep
@@ -91,8 +86,7 @@ export default function CheckoutPage() {
   const { orderId } = useParams<{ orderId: string }>()
   const [order, setOrder] = useState<ServiceOrder | null>(null)
   const [loading, setLoading] = useState(true)
-  const [requesting, setRequesting] = useState<string | null>(null)
-  const [submitted] = useState(true)
+  const [creatingPayPal, setCreatingPayPal] = useState(false)
 
   useEffect(() => {
     if (!orderId) return
@@ -103,11 +97,55 @@ export default function CheckoutPage() {
     })
   }, [orderId])
 
-  const handleRequestPaymentLink = async (methodId: string, methodName: string) => {
-    if (!order) return
-    setRequesting(methodId)
-    await requestPaymentLink(order.id, methodName)
-    setRequesting(null)
+  // Check for PayPal return
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("paypal") === "success" && orderId) {
+      toast.success("Payment approved! Processing confirmation...")
+      confirmPayment(orderId, "paypal").then((ok) => {
+        if (ok) {
+          toast.success("Payment confirmed! We'll start your project soon.")
+          fetchServiceOrder(orderId).then(setOrder)
+        }
+      })
+      // Clean URL
+      window.history.replaceState({}, "", `/checkout/${orderId}`)
+    }
+    if (params.get("paypal") === "cancel" && orderId) {
+      toast.error("Payment was cancelled.")
+      window.history.replaceState({}, "", `/checkout/${orderId}`)
+    }
+  }, [orderId])
+
+  const handlePayPal = async () => {
+    if (!order || !supabase || !supabaseConfigured) return
+
+    setCreatingPayPal(true)
+    try {
+      const { data, error } = await supabase.functions.invoke("create-paypal-order", {
+        body: {
+          orderId: order.id,
+          amount: order.upfrontAmount,
+          description: `${order.serviceName} — ${getOrderDisplayName(order)}`,
+        },
+      })
+
+      if (error || data?.error) {
+        toast.error(data?.error || "Failed to create payment")
+        return
+      }
+
+      if (data?.approvalUrl) {
+        window.open(data.approvalUrl, "_blank")
+        toast.success("PayPal opened in new tab. Complete payment there.")
+      } else {
+        toast.error("No PayPal approval link returned")
+      }
+    } catch (e) {
+      toast.error("Failed to connect to payment service")
+    } finally {
+      setCreatingPayPal(false)
+    }
   }
 
   if (loading) {
@@ -145,7 +183,7 @@ export default function CheckoutPage() {
   }
 
   const displayName = getOrderDisplayName(order)
-  const currentStep = order.upfrontPaid ? 3 : submitted ? 2 : 1
+  const currentStep = order.upfrontPaid ? 3 : 2
 
   return (
     <div className="relative min-h-screen text-[#f0f0f5]">
@@ -162,7 +200,21 @@ export default function CheckoutPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <Stepper currentStep={currentStep} />
 
-          {submitted && !order.upfrontPaid && (
+          {order.upfrontPaid ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mb-6 rounded-2xl border border-green-500/20 bg-green-500/10 p-5 text-center shadow-[0_0_30px_rgba(34,197,94,0.08)]"
+            >
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-500/15">
+                <Check size={26} className="text-green-400" />
+              </div>
+              <h1 className="text-2xl font-bold mb-2">Payment Confirmed!</h1>
+              <p className="text-sm text-green-200/80 max-w-md mx-auto">
+                Your upfront payment of ${order.upfrontAmount} has been received. We'll start working on your project shortly.
+              </p>
+            </motion.div>
+          ) : (
             <motion.div
               initial={{ opacity: 0, scale: 0.97 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -172,9 +224,9 @@ export default function CheckoutPage() {
                 <Send size={26} className="text-yellow-400" />
               </div>
               <h1 className="text-2xl font-bold mb-2">Order Submitted</h1>
-              <p className="text-sm text-yellow-200/80 mb-1 font-medium">Payment Pending</p>
+              <p className="text-sm text-yellow-200/80 mb-1 font-medium">Upfront Payment Required</p>
               <p className="text-sm text-zinc-400 max-w-md mx-auto">
-                Your order has been submitted. The upfront payment is still pending. CAFÉ Services will contact you with the payment details.
+                Pay ${order.upfrontAmount} now to start. The remaining ${order.remainingAmount} is due on delivery.
               </p>
             </motion.div>
           )}
@@ -182,11 +234,13 @@ export default function CheckoutPage() {
           <div className="mb-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-400 mb-3">
               <CreditCard size={12} />
-              {PAYMENT_STATUS_LABELS[order.paymentStatus] || "Payment Pending"}
+              {order.upfrontPaid ? "Upfront Paid" : PAYMENT_STATUS_LABELS[order.paymentStatus]}
             </div>
             <h2 className="text-2xl font-bold mb-2">Review Your Order</h2>
             <p className="text-zinc-400 text-sm">
-              We'll contact you with payment instructions. No payment has been processed yet.
+              {order.upfrontPaid
+                ? "Payment confirmed. We'll start your project soon."
+                : "Choose a payment method below to start your project."}
             </p>
           </div>
 
@@ -202,8 +256,13 @@ export default function CheckoutPage() {
                 <h3 className="text-lg font-semibold text-white truncate">{displayName}</h3>
                 <p className="text-sm text-zinc-500 truncate">{order.serviceName}</p>
               </div>
-              <span className="ml-auto shrink-0 rounded-full border border-yellow-500/20 bg-yellow-500/10 px-2.5 py-0.5 text-[10px] font-medium text-yellow-400">
-                {PAYMENT_STATUS_LABELS[order.paymentStatus]}
+              <span className={cn(
+                "ml-auto shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-medium",
+                order.upfrontPaid
+                  ? "border-green-500/20 bg-green-500/10 text-green-400"
+                  : "border-yellow-500/20 bg-yellow-500/10 text-yellow-400",
+              )}>
+                {order.upfrontPaid ? "Upfront Paid" : PAYMENT_STATUS_LABELS[order.paymentStatus]}
               </span>
             </div>
 
@@ -239,12 +298,23 @@ export default function CheckoutPage() {
                 <span className="text-zinc-500">Total Price</span>
                 <span className="text-white font-semibold">${order.totalPrice}</span>
               </div>
-              <div className="flex justify-between items-center py-2 px-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                <span className="text-yellow-400 font-semibold flex items-center gap-2">
+              <div className={cn(
+                "flex justify-between items-center py-2 px-3 rounded-lg border",
+                order.upfrontPaid
+                  ? "bg-green-500/10 border-green-500/20"
+                  : "bg-yellow-500/10 border-yellow-500/20",
+              )}>
+                <span className={cn(
+                  "font-semibold flex items-center gap-2",
+                  order.upfrontPaid ? "text-green-400" : "text-yellow-400",
+                )}>
                   <DollarSign size={15} />
                   Upfront Payment (50%)
                 </span>
-                <span className="text-yellow-400 font-bold text-lg">${order.upfrontAmount}</span>
+                <span className={cn(
+                  "font-bold text-lg",
+                  order.upfrontPaid ? "text-green-400" : "text-yellow-400",
+                )}>${order.upfrontAmount}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-zinc-500">Due on Delivery (50%)</span>
@@ -260,34 +330,48 @@ export default function CheckoutPage() {
               transition={{ delay: 0.2 }}
               className="rounded-2xl border border-white/[0.1] bg-white/[0.04] backdrop-blur-xl p-6 mb-6"
             >
-              <h3 className="text-lg font-semibold mb-1">Payment Methods</h3>
+              <h3 className="text-lg font-semibold mb-1">Pay with PayPal</h3>
               <p className="text-xs text-zinc-500 mb-4">
-                Choose how you'd like to pay. Real payment gateways are coming soon.
+                Secure payment via PayPal. You'll be redirected to complete the payment.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {PAYMENT_METHODS.map((method) => (
+
+              <button
+                onClick={handlePayPal}
+                disabled={creatingPayPal}
+                className="w-full inline-flex items-center justify-center gap-3 rounded-xl bg-[#0070BA] hover:bg-[#003087] px-5 py-3.5 text-sm font-semibold text-white transition-all disabled:opacity-50 shadow-lg"
+              >
+                {creatingPayPal ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <span className="text-lg font-bold">PayPal</span>
+                )}
+                {creatingPayPal ? "Creating payment..." : `Pay $${order.upfrontAmount} with PayPal`}
+              </button>
+
+              <div className="mt-4 p-3 rounded-xl border border-white/[0.06] bg-white/[0.02]">
+                <p className="text-xs text-zinc-500 font-medium mb-2">💳 Other payment methods</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <button
-                    key={method.id}
-                    type="button"
-                    disabled={!!requesting}
-                    onClick={() => handleRequestPaymentLink(method.id, method.name)}
-                    className={cn(
-                      "flex flex-col items-start gap-1 rounded-xl border px-4 py-3 text-left transition-all",
-                      method.configured
-                        ? "border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/15 hover:border-blue-500/40"
-                        : "border-white/[0.08] bg-white/[0.02] hover:border-white/[0.14] hover:bg-white/[0.04]",
-                    )}
+                    onClick={() => {
+                      toast.success("Request sent! We'll contact you with Wise details.")
+                      confirmPayment(order.id, "request_wise")
+                    }}
+                    className="flex items-center gap-2 rounded-lg border border-white/[0.08] px-3 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all"
                   >
-                    <span className="text-sm font-semibold text-white">{method.name}</span>
-                    <span className="text-[10px] text-zinc-500">
-                      {method.configured ? (
-                        requesting === method.id ? "Sending request..." : "Request payment link"
-                      ) : (
-                        "Coming soon"
-                      )}
-                    </span>
+                    <ExternalLink size={14} />
+                    Wise
                   </button>
-                ))}
+                  <button
+                    onClick={() => {
+                      toast.success("Request sent! We'll contact you with payment details.")
+                      confirmPayment(order.id, "request_manual")
+                    }}
+                    className="flex items-center gap-2 rounded-lg border border-white/[0.08] px-3 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all"
+                  >
+                    <Send size={14} />
+                    Manual Invoice
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -309,7 +393,9 @@ export default function CheckoutPage() {
           </div>
 
           <p className="text-xs text-zinc-600 text-center mt-4">
-            Awaiting Payment Instructions — CAFÉ Services will reach out shortly.
+            {order.upfrontPaid
+              ? "We've received your payment. We'll start your project soon!"
+              : "PayPal is processed securely. No payment data is stored on our servers."}
           </p>
         </motion.div>
       </div>

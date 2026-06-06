@@ -2,6 +2,7 @@ import { supabase, supabaseConfigured } from "./supabase/client"
 import type { ServiceOrder, Notification, ProjectStatus, PaymentStatus } from "./types/serviceOrders"
 import type { PhoneFields } from "../components/ui/PhoneInput"
 import { ensureProfileFromAuthUser } from "./supabaseProfile"
+import { isAdminEmail } from "./adminUsers"
 import toast from "react-hot-toast"
 
 type ProfileJoin = { full_name: string | null; avatar_url: string | null } | null
@@ -267,6 +268,199 @@ export async function requestPaymentLink(orderId: string, method: string): Promi
   return true
 }
 
+export async function confirmPayment(
+  orderId: string,
+  method: string,
+): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+
+  const order = await fetchServiceOrder(orderId)
+  if (!order) return false
+
+  await createNotification({
+    type: "payment_confirmation",
+    title: method === "paypal" ? "PayPal Payment Approved" : "Payment Method Requested",
+    message: `${getOrderDisplayName(order)} ${method === "paypal" ? "approved payment via PayPal" : `requested ${method} payment`} for order ${order.id.slice(0, 8)}`,
+    payload: { orderId, method, status: order.paymentStatus, amount: order.upfrontAmount },
+  })
+
+  if (method === "paypal") {
+    await sendBotPaymentNotification(order, "approved_via_paypal")
+  } else {
+    await sendBotPaymentNotification(order, `requested_${method}`)
+  }
+
+  return true
+}
+
+async function sendBotPaymentConfirmation(order: ServiceOrder): Promise<void> {
+  if (!supabase || !supabaseConfigured) return
+
+  const fakeBotUserId = "00000000-0000-0000-0000-000000000001"
+  const adminUserId = "00000000-0000-0000-0000-000000000002"
+  const displayName = getOrderDisplayName(order)
+
+  const botMessage = [
+    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `✅ UPFRONT PAYMENT CONFIRMED`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    ``,
+    `Client: ${displayName}`,
+    `Service: ${order.serviceName}`,
+    `Amount: $${order.upfrontAmount}`,
+    `Order: ${order.id}`,
+    ``,
+    `Status: Ready to start! 🚀`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+  ].join("\n")
+  const preview = `✅ Payment confirmed: ${displayName} — $${order.upfrontAmount} — Ready to start! 🚀`
+
+  const { data: botConv } = await supabase
+    .from("conversations")
+    .select("id")
+    .or(`and(participant_1.eq.${fakeBotUserId},participant_2.eq.${adminUserId}),and(participant_1.eq.${adminUserId},participant_2.eq.${fakeBotUserId})`)
+    .maybeSingle()
+
+  let convId: string
+  if (botConv) {
+    convId = botConv.id as string
+  } else {
+    const { data: newConv } = await supabase
+      .from("conversations")
+      .insert({
+        participant_1: fakeBotUserId,
+        participant_2: adminUserId,
+        last_message: preview.slice(0, 200),
+        last_message_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (!newConv) return
+    convId = (newConv as Record<string, unknown>).id as string
+  }
+
+  await supabase.from("messages").insert({
+    conversation_id: convId,
+    sender_id: fakeBotUserId,
+    receiver_id: adminUserId,
+    content: botMessage,
+    message_type: "text",
+    delivered_at: new Date().toISOString(),
+  })
+
+  await supabase
+    .from("conversations")
+    .update({
+      last_message: preview.slice(0, 200),
+      last_message_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", convId)
+}
+
+async function sendBotPaymentNotification(order: ServiceOrder, event: string): Promise<void> {
+  if (!supabase || !supabaseConfigured) return
+
+  const fakeBotUserId = "00000000-0000-0000-0000-000000000001"
+  const adminUserId = "00000000-0000-0000-0000-000000000002"
+  const displayName = getOrderDisplayName(order)
+
+  const isApproved = event === "approved_via_paypal"
+  const isRequest = event.startsWith("requested_")
+
+  let botMessage: string
+  let preview: string
+
+  if (isApproved) {
+    botMessage = [
+      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `💳 PAYMENT APPROVED VIA PAYPAL`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `Client: ${displayName}`,
+      `Service: ${order.serviceName}`,
+      `Amount: $${order.upfrontAmount}`,
+      `Order: ${order.id}`,
+      ``,
+      `Action needed:`,
+      `1. Verify in PayPal dashboard`,
+      `2. Mark "Upfront Paid" in admin`,
+      `3. Start the project 🚀`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    ].join("\n")
+    preview = `💳 PayPal approved: ${displayName} — $${order.upfrontAmount}`
+  } else if (isRequest) {
+    const methodLabel = event.replace("requested_", "")
+    botMessage = [
+      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `📋 PAYMENT METHOD REQUESTED`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `Client: ${displayName}`,
+      `Service: ${order.serviceName}`,
+      `Method: ${methodLabel.toUpperCase()}`,
+      `Amount: $${order.upfrontAmount}`,
+      `Order: ${order.id}`,
+      ``,
+      `Action needed:`,
+      `  • Send payment instructions to client`,
+      `  • Update order status in admin panel`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    ].join("\n")
+    preview = `📋 Payment requested: ${displayName} — ${methodLabel.toUpperCase()}`
+  } else {
+    return
+  }
+
+  const { data: botConv } = await supabase
+    .from("conversations")
+    .select("id")
+    .or(`and(participant_1.eq.${fakeBotUserId},participant_2.eq.${adminUserId}),and(participant_1.eq.${adminUserId},participant_2.eq.${fakeBotUserId})`)
+    .maybeSingle()
+
+  let convId: string
+  if (botConv) {
+    convId = botConv.id as string
+  } else {
+    const { data: newConv } = await supabase
+      .from("conversations")
+      .insert({
+        participant_1: fakeBotUserId,
+        participant_2: adminUserId,
+        last_message: preview.slice(0, 200),
+        last_message_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (!newConv) return
+    convId = (newConv as Record<string, unknown>).id as string
+  }
+
+  await supabase.from("messages").insert({
+    conversation_id: convId,
+    sender_id: fakeBotUserId,
+    receiver_id: adminUserId,
+    content: botMessage,
+    message_type: "text",
+    delivered_at: new Date().toISOString(),
+  })
+
+  await supabase
+    .from("conversations")
+    .update({
+      last_message: preview.slice(0, 200),
+      last_message_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", convId)
+}
+
 export async function updateServiceOrder(
   id: string,
   updates: Partial<{
@@ -311,6 +505,42 @@ export async function updateServiceOrder(
       message: `Order ${id.slice(0, 8)} → ${updates.projectStatus}`,
       payload: { orderId: id, status: updates.projectStatus },
     })
+
+    // Send bot notification when payment is confirmed
+    if (updates.projectStatus === "paid_upfront") {
+      const order = await fetchServiceOrder(id)
+      if (order) {
+        await sendBotPaymentConfirmation(order)
+      }
+    }
+  }
+
+  return true
+}
+
+export async function deleteServiceOrder(id: string): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  const isAdmin =
+    user?.app_metadata?.role === "admin" ||
+    user?.user_metadata?.role === "admin" ||
+    isAdminEmail(user?.email)
+
+  if (userError || !user || !isAdmin) {
+    toast.error("Only admins can delete orders")
+    return false
+  }
+
+  const { error } = await supabase
+    .from("service_orders")
+    .delete()
+    .eq("id", id)
+
+  if (error) {
+    console.error("deleteServiceOrder failed", error)
+    toast.error("Failed to delete order")
+    return false
   }
 
   return true

@@ -1,26 +1,19 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   Building2,
-  CheckCircle,
   Globe,
-  Loader2,
   LockKeyhole,
   Mail,
   ShieldCheck,
   Sparkles,
   User,
-  XCircle,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import AuthBackground from "../components/auth/AuthBackground";
 import Navbar from "../components/landing/Navbar";
 import { saveCurrentUser, type UserProfile } from "../data/feedbackStore";
-import {
-  checkUsernameAvailability,
-  normalizeUsername,
-} from "../data/firestoreStore";
 import { supabase, supabaseConfigured } from "../lib/supabase/client";
 import {
   ensureProfileFromAuthUser,
@@ -55,65 +48,14 @@ const getSupabaseErrorMessage = (error: unknown) => {
 export default function AuthPage({ mode, onAuth }: AuthPageProps) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
-  const [username, setUsername] = useState("");
   const [company, setCompany] = useState("");
   const [country, setCountry] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
-  const [usernameError, setUsernameError] = useState("");
   const [googleLoading, setGoogleLoading] = useState(false);
   const [emailLoading, setEmailLoading] = useState(false);
-  const [usernameState, setUsernameState] = useState<
-    "idle" | "checking" | "available" | "taken" | "invalid"
-  >("idle");
   const isSignup = mode === "signup";
-
-  useEffect(() => {
-    if (!isSignup) return;
-
-    const normalized = normalizeUsername(username);
-    if (usernameState !== "checking") return;
-
-    const timeout = window.setTimeout(async () => {
-      try {
-        const result = await checkUsernameAvailability(normalized);
-        setUsernameState(
-          result.available
-            ? "available"
-            : result.message === "Invalid format"
-              ? "invalid"
-              : "taken",
-        );
-        setUsernameError(result.message);
-      } catch {
-        setUsernameState("idle");
-        setUsernameError("");
-      }
-    }, 600);
-
-    return () => window.clearTimeout(timeout);
-  }, [isSignup, username, usernameState]);
-
-  const handleUsernameChange = (value: string) => {
-    const normalized = normalizeUsername(value);
-    setUsername(normalized);
-
-    if (!normalized) {
-      setUsernameState("idle");
-      setUsernameError("");
-      return;
-    }
-
-    if (normalized.length < 3) {
-      setUsernameState("invalid");
-      setUsernameError("Invalid format");
-      return;
-    }
-
-    setUsernameState("checking");
-    setUsernameError("");
-  };
 
   const finishAuth = async (user: UserProfile, forceProfileUpdate = false) => {
     saveCurrentUser(user);
@@ -148,36 +90,13 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
       }
 
       if (isSignup) {
-        const normalizedUsername = normalizeUsername(username);
-        if (!normalizedUsername) {
-          setUsernameError("Please choose a username");
-          setUsernameState("invalid");
-          return;
-        }
-
-        if (usernameState === "checking") {
-          setUsernameError("Wait until username checking finishes.");
-          return;
-        }
-
         if (!country.trim()) {
           setAuthError("Country is required.");
           return;
         }
 
-        const usernameCheck =
-          await checkUsernameAvailability(normalizedUsername);
-        if (!usernameCheck.available) {
-          setUsernameError(usernameCheck.message);
-          setUsernameState(
-            usernameCheck.message === "Invalid format" ? "invalid" : "taken",
-          );
-          return;
-        }
-
         const meta = {
           name: name.trim() || "Client",
-          username: normalizedUsername,
           company: company.trim() || undefined,
           country: country.trim(),
           role: "client",
@@ -197,7 +116,6 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
           name: meta.name,
           email: normalizedEmail,
           role: meta.role as "client",
-          username: meta.username,
           company: meta.company,
           country: meta.country,
         };
@@ -369,60 +287,6 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
                       </span>
                     </label>
 
-                    <label className="block">
-                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                        Username
-                      </span>
-                      <span
-                        className={`relative flex items-center gap-3 rounded-xl border bg-black/25 px-4 py-3.5 transition-colors focus-within:bg-[#020408]/70 ${
-                          usernameState === "taken" ||
-                          usernameState === "invalid"
-                            ? "border-red-500/50 focus-within:border-red-500"
-                            : usernameState === "available"
-                              ? "border-green-500/50 focus-within:border-green-500"
-                              : "border-white/[0.08] focus-within:border-[#3b82f6]/50"
-                        }`}
-                      >
-                        <User size={18} className="text-zinc-500" />
-                        <input
-                          value={username}
-                          onChange={(event) =>
-                            handleUsernameChange(event.target.value)
-                          }
-                          className="w-full bg-transparent pr-8 text-sm text-white outline-none placeholder:text-zinc-700"
-                          placeholder="cafe_dev"
-                        />
-                        {usernameState === "checking" && (
-                          <Loader2
-                            size={16}
-                            className="absolute right-4 animate-spin text-[#475569]"
-                          />
-                        )}
-                      </span>
-                      {usernameState === "taken" && (
-                        <span className="mt-2 flex items-center gap-1 text-xs text-red-400">
-                          <XCircle size={12} />
-                          Username already taken
-                        </span>
-                      )}
-                      {usernameState === "invalid" && usernameError && (
-                        <span className="mt-2 flex items-center gap-1 text-xs text-red-400">
-                          <XCircle size={12} />
-                          {usernameError === "Please choose a username"
-                            ? usernameError
-                            : "Invalid format"}
-                        </span>
-                      )}
-                      {usernameState === "available" && (
-                        <span className="mt-2 flex items-center gap-1 text-xs text-green-400">
-                          <CheckCircle size={12} />
-                          Username available
-                        </span>
-                      )}
-                      <span className="mt-2 block font-mono text-xs text-[#475569]">
-                        3-20 characters · letters, numbers, _ . - only
-                      </span>
-                    </label>
                   </>
                 )}
 

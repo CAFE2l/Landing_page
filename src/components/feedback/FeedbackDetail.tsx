@@ -1,19 +1,37 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Star, ThumbsDown, ThumbsUp, BadgeCheck, Link as LinkIcon, Play, Send } from "lucide-react"
-import type { FeedbackPost, FeedbackComment, ReactionType } from "../../data/feedbackStore"
-import { fetchFeedbackComments, addFeedbackComment } from "../../data/feedbackServiceSupabase"
+import {
+  X,
+  Star,
+  ThumbsDown,
+  ThumbsUp,
+  BadgeCheck,
+  Link as LinkIcon,
+  Play,
+  Send,
+  Image as ImageIcon,
+  Paperclip,
+  Trash2,
+  Loader2,
+} from "lucide-react"
+import type { FeedbackPost, FeedbackComment, CommentMedia, ReactionType } from "../../data/feedbackStore"
+import { fetchFeedbackComments, addFeedbackComment, deleteFeedbackComment } from "../../data/feedbackServiceSupabase"
 import { useAuth } from "../../contexts/AuthContext"
 import { loadCurrentUser } from "../../data/feedbackStore"
 import toast from "react-hot-toast"
 import MediaModal from "./MediaModal"
+import { uploadFeedbackMedia } from "../../lib/cloudinary"
+import { useUserProfile } from "../../hooks/useUserProfile"
 
 interface FeedbackDetailProps {
   post: FeedbackPost | null
   open: boolean
   onClose: () => void
   onReaction: (postId: string, reactionType: ReactionType) => void
+  reactionLoading?: boolean
   userReaction?: ReactionType | null
+  isAdmin?: boolean
+  onCommentCountChange?: (postId: string, delta: number) => void
 }
 
 const modalVariants = {
@@ -37,50 +55,140 @@ const contentVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 }
 
-export default function FeedbackDetail({ post, open, onClose, onReaction, userReaction }: FeedbackDetailProps) {
+const MAX_COMMENT_MEDIA_SIZE = 50 * 1024 * 1024
+const COMMENT_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "video/mp4", "video/webm", "video/quicktime"]
+
+export default function FeedbackDetail({
+  post,
+  open,
+  onClose,
+  onReaction,
+  reactionLoading,
+  userReaction,
+  isAdmin,
+  onCommentCountChange,
+}: FeedbackDetailProps) {
   const [comments, setComments] = useState<FeedbackComment[]>([])
   const [commentText, setCommentText] = useState("")
+  const [commentFiles, setCommentFiles] = useState<File[]>([])
+  const [commentPreviews, setCommentPreviews] = useState<string[]>([])
   const [posting, setPosting] = useState(false)
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [loaded, setLoaded] = useState(false)
   const { user: supabaseUser } = useAuth()
   const localUser = loadCurrentUser()
-  const currentUser = localUser || supabaseUser
+  const currentUser = supabaseUser || localUser
   const userProfile = currentUser ? (currentUser as unknown as { uid?: string; id: string; name?: string; email?: string; photoUrl?: string }) : null
+  const uid = supabaseUser?.id || userProfile?.uid || userProfile?.id
+  const { profile: loggedProfile } = useUserProfile(uid)
+  const postId = post?.id
 
   useEffect(() => {
-    if (open && post) {
+    if (open && postId) {
       queueMicrotask(() => setLoaded(false))
-      fetchFeedbackComments(post.id).then((c) => {
+      fetchFeedbackComments(postId).then((c) => {
         setComments(c)
         setLoaded(true)
       })
     }
-  }, [open, post])
+  }, [open, postId])
+
+  useEffect(() => {
+    return () => {
+      commentPreviews.forEach((p) => URL.revokeObjectURL(p))
+    }
+  }, [commentPreviews])
 
   if (!post) return null
 
+  const handleCommentFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const valid: File[] = []
+    for (const file of Array.from(files)) {
+      if (!COMMENT_MEDIA_TYPES.includes(file.type)) {
+        toast.error(`${file.name}: use an image or video file`)
+        continue
+      }
+      if (file.size > MAX_COMMENT_MEDIA_SIZE) {
+        toast.error(`${file.name}: file is too large (max 50MB)`)
+        continue
+      }
+      valid.push(file)
+    }
+    if (valid.length === 0) return
+    setCommentFiles((prev) => [...prev, ...valid])
+    setCommentPreviews((prev) => [...prev, ...valid.map((f) => URL.createObjectURL(f))])
+  }
+
+  const removeCommentFile = (index: number) => {
+    setCommentFiles((prev) => prev.filter((_, i) => i !== index))
+    setCommentPreviews((prev) => {
+      URL.revokeObjectURL(prev[index])
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
   const handleComment = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!commentText.trim()) return
-    const uid = userProfile?.uid || userProfile?.id
+    if (!commentText.trim() && commentFiles.length === 0) return
     if (!uid) { toast.error("Login to comment"); return }
     setPosting(true)
+    const media: CommentMedia[] = []
+
+    if (commentFiles.length > 0) {
+      for (const file of commentFiles) {
+        try {
+          const upload = await uploadFeedbackMedia(file, undefined, "feedback_comment_media")
+          media.push({ url: upload.secure_url, type: file.type.startsWith("video/") ? "video" : "image" })
+        } catch (error) {
+          setPosting(false)
+          toast.error(error instanceof Error ? error.message : "Media upload failed")
+          return
+        }
+      }
+    }
+
+    const displayName = loggedProfile?.full_name || userProfile?.name || userProfile?.email?.split("@")[0] || "User"
+    const avatarUrl = loggedProfile?.avatar_url || userProfile?.photoUrl || ""
     const comment: Omit<FeedbackComment, "id" | "postId" | "createdAt"> = {
       userId: uid,
-      userName: userProfile?.name || userProfile?.email?.split("@")[0] || "User",
-      userAvatar: userProfile?.photoUrl || "",
+      userName: displayName,
+      userAvatar: avatarUrl,
       content: commentText.trim(),
+      media: media.length > 0 ? media : undefined,
       status: "visible",
     }
     const id = await addFeedbackComment(post.id, comment)
     if (id) {
       setComments((prev) => [...prev, { ...comment, id, postId: post.id, createdAt: new Date().toISOString() }])
       setCommentText("")
+      setCommentFiles([])
+      setCommentPreviews((prev) => {
+        prev.forEach((p) => URL.revokeObjectURL(p))
+        return []
+      })
+      onCommentCountChange?.(post.id, 1)
     } else {
       toast.error("Failed to post comment")
     }
     setPosting(false)
+  }
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!isAdmin) return
+    if (!confirm("Delete this comment?")) return
+    const previous = comments
+    setDeletingCommentId(commentId)
+    setComments((prev) => prev.filter((comment) => comment.id !== commentId))
+    const ok = await deleteFeedbackComment(post.id, commentId)
+    setDeletingCommentId(null)
+    if (!ok) {
+      setComments(previous)
+      toast.error("Could not delete comment")
+      return
+    }
+    onCommentCountChange?.(post.id, -1)
   }
 
   const displayRating = Math.round(post.rating)
@@ -235,14 +343,15 @@ export default function FeedbackDetail({ post, open, onClose, onReaction, userRe
                       whileTap={{ scale: 0.95 }}
                       whileHover={{ x: [0, -1, 1, -1, 0] }}
                       onClick={() => onReaction(post.id, "like")}
+                      disabled={reactionLoading}
                       className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all ${
                         userReaction === "like"
                           ? "bg-gradient-to-br from-[#2563EB]/30 to-[#8B5CF6]/25 text-white"
                           : "text-[#8E8EA3] hover:bg-white/[0.06] hover:text-white"
-                      }`}
+                      } disabled:cursor-wait disabled:opacity-70`}
                       aria-label="Like feedback"
                     >
-                      <ThumbsUp size={17} />
+                      {reactionLoading && userReaction === "like" ? <Loader2 size={17} className="animate-spin" /> : <ThumbsUp size={17} className={userReaction === "like" ? "fill-current" : ""} />}
                     </motion.button>
                     <span className="min-w-10 px-2 text-center text-sm font-semibold tabular-nums text-[#F0F0F5]">
                       {post.helpfulCount}
@@ -252,14 +361,15 @@ export default function FeedbackDetail({ post, open, onClose, onReaction, userRe
                       whileTap={{ scale: 0.95 }}
                       whileHover={{ x: [0, 1, -1, 1, 0] }}
                       onClick={() => onReaction(post.id, "dislike")}
+                      disabled={reactionLoading}
                       className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all ${
                         userReaction === "dislike"
                           ? "bg-gradient-to-br from-[#8B5CF6]/30 to-[#2563EB]/20 text-white"
                           : "text-[#8E8EA3] hover:bg-white/[0.06] hover:text-white"
-                      }`}
+                      } disabled:cursor-wait disabled:opacity-70`}
                       aria-label="Dislike feedback"
                     >
-                      <ThumbsDown size={17} />
+                      {reactionLoading && userReaction === "dislike" ? <Loader2 size={17} className="animate-spin" /> : <ThumbsDown size={17} className={userReaction === "dislike" ? "fill-current" : ""} />}
                     </motion.button>
                     <span className="min-w-10 px-2 text-center text-sm font-semibold tabular-nums text-[#F0F0F5]">
                       {post.downvoteCount || 0}
@@ -271,26 +381,63 @@ export default function FeedbackDetail({ post, open, onClose, onReaction, userRe
                 <motion.div variants={contentVariants} className="border-t border-white/[0.06] pt-6">
                   <h3 className="mb-4 text-sm font-semibold text-[#F0F0F5]">Comments ({comments.length})</h3>
 
-                  <form onSubmit={handleComment} className="mb-6 flex gap-3">
-                    <div className="flex-1 rounded-xl border border-white/10 bg-white/5 transition-colors duration-200 focus-within:border-blue-500/40">
-                      <input
-                        type="text"
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        placeholder="Share your thoughts on this feedback..."
-                        className="w-full rounded-xl bg-transparent px-4 py-3 text-sm text-[#F0F0F5] placeholder-[#77778F] outline-none"
-                      />
+                  <form onSubmit={handleComment} className="mb-6 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <textarea
+                          value={commentText}
+                          onChange={(e) => setCommentText(e.target.value)}
+                          placeholder="Share your thoughts on this feedback..."
+                          rows={3}
+                          maxLength={1200}
+                          className="min-h-20 w-full resize-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-[#F0F0F5] placeholder-[#77778F] outline-none transition-colors focus:border-blue-500/40"
+                        />
+                        {commentPreviews.length > 0 && (
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            {commentPreviews.map((preview, i) => {
+                              const isVideo = commentFiles[i]?.type.startsWith("video/")
+                              return (
+                                <div key={preview} className="relative aspect-video overflow-hidden rounded-xl border border-white/[0.08] bg-black/30">
+                                  {isVideo ? (
+                                    <video src={preview} className="h-full w-full object-cover" controls />
+                                  ) : (
+                                    <img src={preview} alt="" className="h-full w-full object-cover" />
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => removeCommentFile(i)}
+                                    className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-red-500"
+                                    aria-label="Remove media"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 flex-col gap-2">
+                        <label className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] text-[#8E8EA3] transition-all hover:border-[#4F6EF7]/30 hover:text-white">
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime"
+                            className="sr-only"
+                            onChange={(e) => handleCommentFiles(e.target.files)}
+                          />
+                          {commentFiles.length > 0 ? <ImageIcon size={17} /> : <Paperclip size={17} />}
+                        </label>
+                        <motion.button
+                          type="submit"
+                          whileTap={{ scale: 0.95 }}
+                          disabled={posting || (!commentText.trim() && commentFiles.length === 0)}
+                          className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#8B5CF6] text-white shadow-[0_14px_28px_rgba(79,110,247,0.28)] transition-all disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          {posting ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+                        </motion.button>
+                      </div>
                     </div>
-                    <motion.button
-                      type="submit"
-                      whileTap={{ scale: 0.95 }}
-                      disabled={posting || !commentText.trim()}
-                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#8B5CF6] text-white shadow-[0_14px_28px_rgba(79,110,247,0.28)] transition-all disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      <motion.span animate={posting ? { rotate: [45, 0] } : { rotate: 0 }} transition={{ duration: 0.35 }}>
-                        <Send size={17} />
-                      </motion.span>
-                    </motion.button>
                   </form>
 
                   <div className="space-y-3">
@@ -309,16 +456,40 @@ export default function FeedbackDetail({ post, open, onClose, onReaction, userRe
                       </div>
                     )}
                     {comments.map((comment) => (
-                      <motion.div variants={contentVariants} key={comment.id} className="flex gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3">
+                      <motion.div variants={contentVariants} key={comment.id} className="relative flex gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3">
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteComment(comment.id)}
+                            disabled={deletingCommentId === comment.id}
+                            aria-label="Delete comment"
+                            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-red-500/15 bg-red-500/10 text-red-300 transition-colors hover:bg-red-500/20 disabled:cursor-wait disabled:opacity-60"
+                          >
+                            {deletingCommentId === comment.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          </button>
+                        )}
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#4F6EF7]/10 text-xs font-bold text-[#9BA7FF]">
                           {comment.userAvatar ? <img src={comment.userAvatar} alt="" className="h-full w-full object-cover" /> : comment.userName[0]?.toUpperCase()}
                         </div>
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 pr-8">
                           <div className="mb-1 flex items-center gap-2">
                             <span className="text-xs font-semibold text-[#F0F0F5]">{comment.userName}</span>
                             <span className="text-[10px] text-[#8E8EA3]">{new Date(comment.createdAt).toLocaleDateString("en-US")}</span>
                           </div>
-                          <p className="text-xs leading-relaxed text-[#A0A0B5]">{comment.content}</p>
+                          {comment.content && <p className="text-xs leading-relaxed text-[#A0A0B5]">{comment.content}</p>}
+                          {comment.media && comment.media.length > 0 && (
+                            <div className="mt-3 grid grid-cols-2 gap-2">
+                              {comment.media.map((m, i) => (
+                                <div key={i} className="overflow-hidden rounded-xl border border-white/[0.08] bg-black/30">
+                                  {m.type === "video" ? (
+                                    <video src={m.url} controls className="max-h-48 w-full object-cover" />
+                                  ) : (
+                                    <img src={m.url} alt="" className="max-h-48 w-full object-cover" />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </motion.div>
                     ))}

@@ -11,12 +11,13 @@ export interface AdminDashboardStats {
   totalSubmissions: number
   approved: number
   pending: number
-  avgResponseHours: number
+  avgResponseTimeMs: number
+  responseCount: number
   trends: {
     totalSubmissions: number
     approved: number
     pending: number
-    avgResponseHours: number
+    avgResponseTimeMs: number
   }
   recentFeedback: FeedbackPost[]
   activities: AdminActivity[]
@@ -109,8 +110,9 @@ export async function fetchAdminDashboardStats(): Promise<AdminDashboardStats> {
       totalSubmissions: 0,
       approved: 0,
       pending: 0,
-      avgResponseHours: 0,
-      trends: { totalSubmissions: 0, approved: 0, pending: 0, avgResponseHours: 0 },
+      avgResponseTimeMs: 0,
+      responseCount: 0,
+      trends: { totalSubmissions: 0, approved: 0, pending: 0, avgResponseTimeMs: 0 },
       recentFeedback: [],
       activities: [],
       chartData: [],
@@ -150,19 +152,17 @@ export async function fetchAdminDashboardStats(): Promise<AdminDashboardStats> {
   const rows = (postsResult.data || []) as Record<string, unknown>[]
   const posts = rows.map(mapPost)
   const resolved = posts.filter((post) => ["approved", "rejected", "highlighted"].includes(post.status) && post.updatedAt)
-  const avgResponseHours = resolved.length
-    ? Math.round(
-        resolved.reduce((sum, post) => sum + Math.max(0, new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime()) / 3600000, 0) /
-          resolved.length,
-      )
+  const responseTimeMs = resolved.map((post) => Math.max(0, new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime()))
+  const avgResponseTimeMs = resolved.length
+    ? Math.round(responseTimeMs.reduce((sum, ms) => sum + ms, 0) / resolved.length)
     : 0
   const currentResolved = resolved.filter((post) => new Date(post.updatedAt) >= currentStart)
   const previousResolved = resolved.filter((post) => new Date(post.updatedAt) >= previousStart && new Date(post.updatedAt) < currentStart)
-  const currentAvg = currentResolved.length
-    ? currentResolved.reduce((sum, post) => sum + (new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime()) / 3600000, 0) / currentResolved.length
+  const currentAvgMs = currentResolved.length
+    ? currentResolved.reduce((sum, post) => sum + (new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime()), 0) / currentResolved.length
     : 0
-  const previousAvg = previousResolved.length
-    ? previousResolved.reduce((sum, post) => sum + (new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime()) / 3600000, 0) / previousResolved.length
+  const previousAvgMs = previousResolved.length
+    ? previousResolved.reduce((sum, post) => sum + (new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime()), 0) / previousResolved.length
     : 0
 
   const chartData = Array.from({ length: 30 }, (_, index) => {
@@ -198,12 +198,13 @@ export async function fetchAdminDashboardStats(): Promise<AdminDashboardStats> {
     totalSubmissions,
     approved,
     pending,
-    avgResponseHours,
+    avgResponseTimeMs,
+    responseCount: resolved.length,
     trends: {
       totalSubmissions: percentChange(currentTotal, previousTotal),
       approved: percentChange(currentApproved, previousApproved),
       pending: percentChange(currentPending, previousPending),
-      avgResponseHours: -percentChange(Math.round(currentAvg), Math.round(previousAvg)),
+      avgResponseTimeMs: -percentChange(Math.round(currentAvgMs / 3600000), Math.round(previousAvgMs / 3600000)),
     },
     recentFeedback,
     activities,

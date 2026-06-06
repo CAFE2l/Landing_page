@@ -7,9 +7,11 @@ import {
   ChevronDown, Clock, CheckCircle2, XCircle, AlertCircle,
   Phone, Mail, DollarSign, Calendar,
   FileText, Edit3, RefreshCw,
+  Loader2, Trash2,
 } from "lucide-react"
 import {
   fetchServiceOrders,
+  deleteServiceOrder,
   updateServiceOrder,
   subscribeToServiceOrders,
   generateAdminWhatsAppLink,
@@ -26,6 +28,7 @@ import {
 } from "../../lib/types/serviceOrders"
 import { cn, timeAgo } from "../../lib/utils"
 import toast from "react-hot-toast"
+import { useAuth } from "../../contexts/AuthContext"
 
 type StatusTab = "all" | ProjectStatus
 
@@ -92,7 +95,19 @@ function OrderAvatar({ order }: { order: ServiceOrder }) {
   )
 }
 
-function OrderCard({ order, onUpdate }: { order: ServiceOrder; onUpdate: () => void }) {
+function OrderCard({
+  order,
+  deleting,
+  isAdmin,
+  onDelete,
+  onUpdate,
+}: {
+  order: ServiceOrder
+  deleting: boolean
+  isAdmin: boolean
+  onDelete: (order: ServiceOrder) => void
+  onUpdate: () => void
+}) {
   const [expanded, setExpanded] = useState(false)
   const [updating, setUpdating] = useState(false)
   const displayName = getOrderDisplayName(order)
@@ -137,6 +152,17 @@ function OrderCard({ order, onUpdate }: { order: ServiceOrder; onUpdate: () => v
           <div className="flex flex-wrap gap-2 shrink-0">
             <PaymentBadge status={order.paymentStatus} />
             <StatusBadge status={order.projectStatus} />
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => onDelete(order)}
+                disabled={updating || deleting}
+                title="Delete order"
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-red-500/20 bg-red-500/10 text-red-300 transition-colors hover:border-red-400/40 hover:bg-red-500/20 hover:text-red-100 disabled:opacity-50"
+              >
+                {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+              </button>
+            )}
           </div>
         </div>
 
@@ -319,8 +345,10 @@ function SkeletonCard() {
 }
 
 export default function ServiceOrders() {
+  const { isAdmin } = useAuth()
   const [orders, setOrders] = useState<ServiceOrder[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<StatusTab>("all")
   const [search, setSearch] = useState("")
 
@@ -364,6 +392,22 @@ export default function ServiceOrders() {
     }
     return c
   }, [orders])
+
+  const handleDelete = async (order: ServiceOrder) => {
+    if (!isAdmin || deletingId) return
+    const label = getOrderDisplayName(order)
+    const confirmed = window.confirm(`Delete service order for ${label}? This cannot be undone.`)
+    if (!confirmed) return
+
+    setDeletingId(order.id)
+    const ok = await deleteServiceOrder(order.id)
+    setDeletingId(null)
+
+    if (ok) {
+      setOrders((prev) => prev.filter((item) => item.id !== order.id))
+      toast.success("Order deleted")
+    }
+  }
 
   return (
     <div className="w-full min-w-0">
@@ -440,7 +484,14 @@ export default function ServiceOrders() {
         >
           <AnimatePresence mode="popLayout">
             {filtered.map((order) => (
-              <OrderCard key={order.id} order={order} onUpdate={load} />
+              <OrderCard
+                key={order.id}
+                order={order}
+                deleting={deletingId === order.id}
+                isAdmin={isAdmin}
+                onDelete={handleDelete}
+                onUpdate={load}
+              />
             ))}
           </AnimatePresence>
         </motion.div>

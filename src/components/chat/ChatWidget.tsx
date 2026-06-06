@@ -118,11 +118,11 @@ export default function ChatWidget() {
     <>
       {!isMessagesPage && (
         <>
-          <button
-            onClick={() => setView(view === "closed" ? "compact" : "closed")}
-            className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white shadow-[0_4px_24px_rgba(37,99,235,0.35)] hover:shadow-[0_4px_32px_rgba(37,99,235,0.5)] transition-all duration-300 hover:scale-105"
-          >
-            {view === "closed" ? (
+          {view === "closed" && (
+            <button
+              onClick={() => setView("compact")}
+              className="fixed bottom-5 right-5 z-[9998] flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white shadow-[0_4px_24px_rgba(37,99,235,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_4px_32px_rgba(37,99,235,0.5)]"
+            >
               <>
                 <MessageCircle size={24} />
                 {totalUnread > 0 && (
@@ -131,10 +131,8 @@ export default function ChatWidget() {
                   </span>
                 )}
               </>
-            ) : (
-              <X size={20} />
-            )}
-          </button>
+            </button>
+          )}
 
           <AnimatePresence>
             {view === "compact" && (
@@ -143,7 +141,7 @@ export default function ChatWidget() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 20, scale: 0.95 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="fixed bottom-24 right-5 z-40 w-[380px] h-[560px] max-h-[calc(100vh-140px)] rounded-2xl border border-white/[0.08] bg-[#0A0A0F] shadow-2xl shadow-black/60 overflow-hidden flex flex-col"
+                className="fixed inset-x-3 bottom-4 top-20 z-[9999] flex overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0A0A0F] shadow-2xl shadow-black/60 sm:inset-auto sm:bottom-5 sm:right-5 sm:h-[560px] sm:max-h-[calc(100vh-96px)] sm:w-[380px] flex-col"
               >
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-[#0A0A0F]/80 backdrop-blur-md shrink-0">
               <div className="flex items-center gap-3">
@@ -266,7 +264,7 @@ export default function ChatWidget() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
             onClick={() => { setView("closed"); setActiveConv(null) }}
           >
             <motion.div

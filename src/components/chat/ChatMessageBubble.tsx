@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Check, CheckCheck, Loader2, Play, X } from "lucide-react"
+import { Check, CheckCheck, Loader2, Play, X, FileText, Film, ImageIcon, Music, Download } from "lucide-react"
 import AudioPlayer from "./AudioPlayer"
 import type { ChatMessage } from "../../data/feedbackStore"
 
@@ -10,6 +10,21 @@ interface ChatMessageBubbleProps {
   onImageClick?: (url: string) => void
   currentlyPlayingAudio?: string | null
   onPlayAudio?: (msgId: string) => void
+}
+
+function formatFileSize(bytes: number | null): string {
+  if (!bytes) return ""
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function getFileIcon(mimeType: string | null) {
+  if (!mimeType) return <FileText size={20} />
+  if (mimeType.startsWith("image/")) return <ImageIcon size={20} />
+  if (mimeType.startsWith("video/")) return <Film size={20} />
+  if (mimeType.startsWith("audio/")) return <Music size={20} />
+  return <FileText size={20} />
 }
 
 export default function ChatMessageBubble({ message, isOwn, onImageClick, currentlyPlayingAudio, onPlayAudio }: ChatMessageBubbleProps) {
@@ -34,6 +49,8 @@ export default function ChatMessageBubble({ message, isOwn, onImageClick, curren
       statusIcon = <CheckCheck size={12} className="text-blue-300" />
     }
   }
+
+  const fileName = message.fileName || message.mediaUrl?.split("/").pop()?.split("?")[0] || "File"
 
   return (
     <>
@@ -113,6 +130,38 @@ export default function ChatMessageBubble({ message, isOwn, onImageClick, curren
                 className="w-28 h-28 object-contain"
                 loading="lazy"
               />
+            </div>
+          ) : message.messageType === "file" && message.mediaUrl ? (
+            <div className="mb-1.5">
+              <a
+                href={message.mediaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex items-center gap-3 rounded-xl p-3 transition-all ${
+                  isOwn
+                    ? "bg-white/[0.08] hover:bg-white/[0.12]"
+                    : "bg-white/[0.04] hover:bg-white/[0.08]"
+                }`}
+              >
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                  isOwn ? "bg-white/[0.1]" : "bg-[#4F6EF7]/10"
+                } text-[#4F6EF7]`}>
+                  {getFileIcon(message.mediaMimeType)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{fileName}</p>
+                  <p className="text-xs opacity-60 mt-0.5">
+                    {message.mediaMimeType?.split("/").pop()?.toUpperCase() || "FILE"}
+                    {message.mediaSize ? ` — ${formatFileSize(message.mediaSize)}` : ""}
+                  </p>
+                </div>
+                <Download size={16} className="shrink-0 opacity-60" />
+              </a>
+              {message.caption && (
+                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words mt-1.5">
+                  {message.caption}
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">

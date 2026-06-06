@@ -10,10 +10,13 @@ interface FeedbackFeedProps {
   onSortChange: (sort: "recent" | "rating" | "helpful" | "media" | "verified") => void
   onPostClick: (post: FeedbackPost) => void
   onReaction: (postId: string, reactionType: ReactionType) => void
+  reactionLoading?: Set<string>
   userReactions?: Map<string, ReactionType>
   onSave?: (postId: string) => void
   savedPosts?: Set<string>
   onCommentClick: (post: FeedbackPost) => void
+  isAdmin?: boolean
+  onDeletePost?: (postId: string) => void
   category: ServiceCategory | ""
   rating: number
   search: string
@@ -63,7 +66,8 @@ function SkeletonCard() {
 
 export default function FeedbackFeed({
   posts, loading, sort, onSortChange, onPostClick, onReaction,
-  userReactions, onSave, savedPosts, onCommentClick, category, rating, search,
+  reactionLoading, userReactions, onSave, savedPosts, onCommentClick,
+  isAdmin, onDeletePost, category, rating, search,
 }: FeedbackFeedProps) {
   const isEmpty = !loading && posts.length === 0
 
@@ -117,10 +121,13 @@ export default function FeedbackFeed({
                 index={i}
                 onClick={() => onPostClick(post)}
                 onReaction={(rt) => onReaction(post.id, rt)}
+                reactionLoading={reactionLoading?.has(post.id) || false}
                 onSave={onSave ? () => onSave(post.id) : undefined}
                 onComment={() => onCommentClick(post)}
                 userReaction={userReactions?.get(post.id) || null}
                 saved={savedPosts?.has(post.id) || false}
+                isAdmin={isAdmin}
+                onDelete={onDeletePost ? () => onDeletePost(post.id) : undefined}
               />
             ))}
           </AnimatePresence>

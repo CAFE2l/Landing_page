@@ -7,15 +7,18 @@ import {
 import { supabase } from "../../lib/supabase/client";
 import { useAuth } from "../../contexts/AuthContext";
 import { saveCurrentUser, loadCurrentUser } from "../../data/feedbackStore";
+import { editProfileViaEdge } from "../../lib/editProfileEdge";
 
 interface AvatarUploadProps {
   currentAvatarUrl?: string;
   onUploadComplete: (url: string) => void;
+  userId?: string;
 }
 
 export function AvatarUpload({
   currentAvatarUrl,
   onUploadComplete,
+  userId,
 }: AvatarUploadProps) {
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
@@ -52,29 +55,39 @@ export function AvatarUpload({
         const result = await uploadToCloudinary(file, "avatars");
         setProgress(80);
 
-        if (user && supabase) {
-          const { error: dbError } = await supabase.from("profiles").upsert({
-            id: user.id,
-            avatar_url: result.secure_url,
-            avatar_public_id: result.public_id,
-            updated_at: new Date().toISOString(),
-          });
-          if (dbError) {
-            console.warn(
-              "[AvatarUpload] Supabase profile save failed:",
-              dbError.message,
-            );
+        const targetUserId = userId || user?.id;
+        const isOwnProfile = !userId || userId === user?.id;
+
+        if (targetUserId && supabase) {
+          if (isOwnProfile) {
+            const { error: dbError } = await supabase.from("profiles").upsert({
+              id: targetUserId,
+              avatar_url: result.secure_url,
+              avatar_public_id: result.public_id,
+              updated_at: new Date().toISOString(),
+            });
+            if (dbError) {
+              console.warn(
+                "[AvatarUpload] Supabase profile save failed:",
+                dbError.message,
+              );
+            }
+          } else {
+            await editProfileViaEdge(targetUserId, {
+              avatar_url: result.secure_url,
+            });
           }
         }
 
         const localUser = loadCurrentUser();
-        if (localUser) {
+        if (localUser && isOwnProfile) {
           saveCurrentUser({ ...localUser, photoUrl: result.secure_url });
         }
 
+        window.dispatchEvent(new Event("cafe-profile-updated"));
+
         setProgress(100);
         onUploadComplete(result.secure_url);
-        window.dispatchEvent(new Event("cafe-profile-updated"));
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Upload failed");
         setPreview(null);

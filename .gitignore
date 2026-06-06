@@ -25,5 +25,9 @@ client_secret_*.json
 *.sln
 *.sw?
 supabase/*
+!supabase/migrations/
+supabase/migrations/*
+!supabase/migrations/016_feedback_social_comments_reactions_admin.sql
+!supabase/migrations/017_service_orders_admin_delete.sql
 # Stakpak session files
 .stakpak/session*

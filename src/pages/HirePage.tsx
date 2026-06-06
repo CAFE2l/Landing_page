@@ -3,21 +3,13 @@
 import { useState, useEffect, type FormEvent } from "react"
 import { useParams, useNavigate, Link } from "react-router-dom"
 import { motion } from "framer-motion"
-import { ArrowLeft, Loader2, User, Mail, Building, Globe, Calendar, DollarSign, Send, Layers, FileText } from "lucide-react"
+import { ArrowLeft, Loader2, User, Mail, Building, Globe, Calendar, DollarSign, Send, FileText } from "lucide-react"
 import { useAuth } from "../contexts/AuthContext"
 import { createServiceOrder } from "../lib/serviceOrdersService"
 import PhoneInput, { type PhoneFields } from "../components/ui/PhoneInput"
 import TechPremiumBackground from "../components/ui/TechPremiumBackground"
 import { ensureProfileFromAuthUser } from "../lib/supabaseProfile"
 import toast from "react-hot-toast"
-
-const PROJECT_TYPES = [
-  { value: "new", label: "New Project" },
-  { value: "redesign", label: "Redesign / Revamp" },
-  { value: "mvp", label: "MVP / Prototype" },
-  { value: "landing", label: "Landing Page for Campaign" },
-  { value: "other", label: "Other" },
-]
 
 const SLUG_MAP: Record<string, { name: string; price: number; description: string; timeline: string }> = {
   "landing-page": {
@@ -303,24 +295,7 @@ export default function HirePage() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1.5">
-              Project Type <span className="text-zinc-600">(optional)</span>
-            </label>
-            <div className="relative">
-              <Layers size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-              <select
-                value={form.projectType}
-                onChange={(e) => update("projectType", e.target.value)}
-                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-zinc-600 outline-none focus:border-blue-500/40 transition-colors appearance-none"
-              >
-                <option value="" className="bg-[#020408]">Select type...</option>
-                {PROJECT_TYPES.map((t) => (
-                  <option key={t.value} value={t.value} className="bg-[#020408]">{t.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+
 
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-1.5">

@@ -1,7 +1,18 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useId } from "react";
 import { supabase } from "../lib/supabase/client";
 import { useAuth } from "../contexts/AuthContext";
 import { getInitials } from "../lib/utils";
+import {
+  canQuerySocialFollows,
+  markSocialFollowsError,
+} from "../lib/socialFollowsHealth";
+
+const FOLLOWS_TABLE = "social_follows";
+
+function countOrZero(result: { count: number | null; error?: unknown }) {
+  markSocialFollowsError("count profile follows", result.error);
+  return result.count || 0;
+}
 
 export interface UserProfileData {
   id: string;
@@ -11,6 +22,9 @@ export interface UserProfileData {
   avatar_url: string | null;
   role: string;
   bio: string | null;
+  phone: string | null;
+  location: string | null;
+  locationCountryCode: string | null;
   followers_count: number;
   following_count: number;
   initials: string;
@@ -19,6 +33,9 @@ export interface UserProfileData {
 export function useUserProfile(userId?: string) {
   const { user: authUser } = useAuth();
   const targetUserId = userId || authUser?.id;
+  const reactId = useId();
+  const channelInstanceId = useRef(reactId.replace(/[^a-zA-Z0-9_-]/g, ""));
+  const channelSequence = useRef(0);
 
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,20 +49,29 @@ export function useUserProfile(userId?: string) {
 
     try {
       setLoading(true);
+      const followCounts = canQuerySocialFollows()
+        ? [
+            supabase
+              .from(FOLLOWS_TABLE)
+              .select("*", { count: "exact", head: true })
+              .eq("following_id", targetUserId),
+            supabase
+              .from(FOLLOWS_TABLE)
+              .select("*", { count: "exact", head: true })
+              .eq("follower_id", targetUserId),
+          ]
+        : [
+            Promise.resolve({ count: 0, error: null }),
+            Promise.resolve({ count: 0, error: null }),
+          ];
+
       const [profileRes, followersRes, followingRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, full_name, username, email, avatar_url, role, bio")
+          .select("id, full_name, username, email, avatar_url, role, bio, phone, location_country, location_country_code")
           .eq("id", targetUserId)
           .maybeSingle(),
-        supabase
-          .from("social_follows")
-          .select("*", { count: "exact", head: true })
-          .eq("following_id", targetUserId),
-        supabase
-          .from("social_follows")
-          .select("*", { count: "exact", head: true })
-          .eq("follower_id", targetUserId),
+        ...followCounts,
       ]);
 
       if (profileRes.error) throw profileRes.error;
@@ -87,8 +113,11 @@ export function useUserProfile(userId?: string) {
         avatar_url: avatarUrl,
         role: profiles?.role || "client",
         bio: profiles?.bio || null,
-        followers_count: followersRes.count || 0,
-        following_count: followingRes.count || 0,
+        phone: profiles?.phone || null,
+        location: profiles?.location_country || null,
+        locationCountryCode: profiles?.location_country_code || null,
+        followers_count: countOrZero(followersRes),
+        following_count: countOrZero(followingRes),
         initials: getInitials(displayName),
       });
     } catch (err) {
@@ -104,8 +133,11 @@ export function useUserProfile(userId?: string) {
 
     if (!targetUserId || !supabase) return;
 
+    channelSequence.current += 1;
     const channel = supabase
-      .channel(`profile-updates-${targetUserId}`)
+      .channel(
+        `profile-updates-${targetUserId}-${channelInstanceId.current}-${channelSequence.current}`,
+      )
       .on(
         "postgres_changes",
         {

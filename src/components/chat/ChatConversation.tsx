@@ -1,14 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react"
-import { Send, Smile, Sticker, Image, Mic, Loader2 } from "lucide-react"
-import { AnimatePresence } from "framer-motion"
+import { Loader2 } from "lucide-react"
 import ChatMessageBubble from "./ChatMessageBubble"
-import EmojiPicker from "./EmojiPicker"
-import StickerPanel from "./StickerPanel"
-import MediaPreviewModal from "./MediaPreviewModal"
-import AudioRecorder from "./AudioRecorder"
-import { fetchMessages, sendMessage, markMessagesAsRead, subscribeToMessages, uploadChatMedia, uploadAudio, validateMediaFile, getMediaType } from "../../lib/chatService"
+import MessageComposer from "./MessageComposer"
+import { fetchMessages, markMessagesAsRead, subscribeToMessages } from "../../lib/chatService"
 import type { ChatMessage, ChatConversation } from "../../data/feedbackStore"
-import toast from "react-hot-toast"
 
 interface ChatConversationProps {
   conversation: ChatConversation
@@ -18,17 +13,9 @@ interface ChatConversationProps {
 
 export default function ChatConversation({ conversation, currentUserId, onBack }: ChatConversationProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [input, setInput] = useState("")
   const [loading, setLoading] = useState(true)
-  const [sending, setSending] = useState(false)
-  const [showEmoji, setShowEmoji] = useState(false)
-  const [showStickers, setShowStickers] = useState(false)
-  const [showAudioRecorder, setShowAudioRecorder] = useState(false)
-  const [pendingMedia, setPendingMedia] = useState<File | null>(null)
   const [currentlyPlayingAudio, setCurrentlyPlayingAudio] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
 
   const otherUserId = conversation.participantA === currentUserId
@@ -71,141 +58,6 @@ export default function ChatConversation({ conversation, currentUserId, onBack }
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages.length])
-
-  const handleSend = async () => {
-    const text = input.trim()
-    if (!text && !pendingMedia && !showAudioRecorder) return
-    if (sending) return
-
-    setSending(true)
-    const msg = await sendMessage(conversation.id, currentUserId, otherUserId, text)
-    setSending(false)
-
-    if (msg) {
-      setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])
-      setInput("")
-      setShowEmoji(false)
-      setShowStickers(false)
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
-
-  const handleEmojiSelect = (emoji: string) => {
-    setInput((prev) => prev + emoji)
-    inputRef.current?.focus()
-  }
-
-  const handleStickerSelect = async (stickerUrl: string) => {
-    setShowStickers(false)
-    setSending(true)
-    const msg = await sendMessage(conversation.id, currentUserId, otherUserId, "", "sticker", stickerUrl)
-    setSending(false)
-    if (msg) {
-      setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])
-    }
-  }
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const validation = validateMediaFile(file)
-    if (!validation.valid) {
-      toast.error(validation.error || "Invalid file")
-      if (fileRef.current) fileRef.current.value = ""
-      return
-    }
-
-    setPendingMedia(file)
-    if (fileRef.current) fileRef.current.value = ""
-  }
-
-  const handleMediaSend = async (caption: string) => {
-    if (!pendingMedia) return
-
-    const mediaType = getMediaType(pendingMedia)
-    if (!mediaType) {
-      toast.error("Unsupported media type")
-      setPendingMedia(null)
-      return
-    }
-
-    setSending(true)
-    const result = await uploadChatMedia(pendingMedia, currentUserId)
-    if (!result) {
-      setSending(false)
-      setPendingMedia(null)
-      toast.error("Failed to upload media")
-      return
-    }
-
-    let duration: number | undefined
-    if (mediaType === "video" || mediaType === "audio") {
-      const tempEl = mediaType === "video"
-        ? document.createElement("video")
-        : document.createElement("audio")
-      tempEl.preload = "metadata"
-      tempEl.src = URL.createObjectURL(pendingMedia)
-      await new Promise((resolve) => { tempEl.onloadedmetadata = resolve })
-      duration = tempEl.duration
-      URL.revokeObjectURL(tempEl.src)
-    }
-
-    const msg = await sendMessage(
-      conversation.id,
-      currentUserId,
-      otherUserId,
-      "",
-      mediaType,
-      result.url,
-      caption || undefined,
-      result.mimeType,
-      result.size,
-      duration,
-    )
-    setSending(false)
-    setPendingMedia(null)
-
-    if (msg) {
-      setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])
-    }
-  }
-
-  const handleAudioSend = async (blob: Blob, audioDuration: number) => {
-    setSending(true)
-    setShowAudioRecorder(false)
-
-    const result = await uploadAudio(blob, currentUserId, conversation.id)
-    if (!result) {
-      setSending(false)
-      toast.error("Failed to upload audio")
-      return
-    }
-
-    const msg = await sendMessage(
-      conversation.id,
-      currentUserId,
-      otherUserId,
-      "",
-      "audio",
-      result.url,
-      undefined,
-      result.mimeType,
-      result.size,
-      audioDuration,
-    )
-    setSending(false)
-
-    if (msg) {
-      setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])
-    }
-  }
 
   const handlePlayAudio = (msgId: string) => {
     setCurrentlyPlayingAudio((prev) => prev === msgId ? null : msgId)
@@ -269,89 +121,13 @@ export default function ChatConversation({ conversation, currentUserId, onBack }
         <div ref={bottomRef} />
       </div>
 
-      <div className="border-t border-white/[0.06] bg-[#0A0A0F]/80 backdrop-blur-md px-4 py-3 shrink-0">
-        <AnimatePresence>
-          {showAudioRecorder && (
-            <div className="mb-2">
-              <AudioRecorder
-                onSend={handleAudioSend}
-                onCancel={() => setShowAudioRecorder(false)}
-              />
-            </div>
-          )}
-        </AnimatePresence>
-
-        <div className="flex items-end gap-2">
-          <div className="relative flex-1">
-            {showEmoji && (
-              <EmojiPicker
-                onSelect={handleEmojiSelect}
-                onClose={() => setShowEmoji(false)}
-              />
-            )}
-            {showStickers && (
-              <StickerPanel
-                onSelect={handleStickerSelect}
-                onClose={() => setShowStickers(false)}
-              />
-            )}
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={`Message ${conversation.otherUser.name}...`}
-              rows={1}
-              className="w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 pr-28 text-sm text-white placeholder:text-[#4A4A5A] outline-none focus:border-[#4F6EF7]/40 transition-all min-h-[40px] max-h-[120px]"
-            />
-            <div className="absolute right-2 bottom-1.5 flex items-center gap-0.5">
-              <button
-                onClick={() => { setShowEmoji(false); setShowStickers(false); setShowAudioRecorder(false); fileRef.current?.click() }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] hover:text-[#4F6EF7] hover:bg-white/[0.06] transition-all"
-                title="Attach image or video"
-              >
-                <Image size={16} />
-              </button>
-              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime" className="hidden" onChange={handleFileSelect} />
-              <button
-                onClick={() => { setShowEmoji(!showEmoji); setShowStickers(false); setShowAudioRecorder(false) }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] hover:text-[#4F6EF7] hover:bg-white/[0.06] transition-all"
-              >
-                <Smile size={16} />
-              </button>
-              <button
-                onClick={() => { setShowStickers(!showStickers); setShowEmoji(false); setShowAudioRecorder(false) }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] hover:text-[#4F6EF7] hover:bg-white/[0.06] transition-all"
-              >
-                <Sticker size={16} />
-              </button>
-              <button
-                onClick={() => { setShowAudioRecorder(!showAudioRecorder); setShowEmoji(false); setShowStickers(false) }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] hover:text-[#4F6EF7] hover:bg-white/[0.06] transition-all"
-                title="Record audio"
-              >
-                <Mic size={16} />
-              </button>
-            </div>
-          </div>
-          <button
-            onClick={handleSend}
-            disabled={sending || (!input.trim())}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-[0_0_16px_rgba(37,99,235,0.3)] transition-all"
-          >
-            {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-          </button>
-        </div>
-      </div>
-
-      {pendingMedia && (
-        <MediaPreviewModal
-          file={pendingMedia}
-          onSend={handleMediaSend}
-          onCancel={() => setPendingMedia(null)}
-          sending={sending}
-        />
-      )}
+      <MessageComposer
+        conversationId={conversation.id}
+        currentUserId={currentUserId}
+        otherUserId={otherUserId}
+        otherUserName={conversation.otherUser.name}
+        onMessageSent={(msg) => setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])}
+      />
     </div>
   )
 }

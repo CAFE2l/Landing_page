@@ -1,7 +1,12 @@
 import { supabase, supabaseConfigured } from "../lib/supabase/client";
+import {
+  canQuerySocialFollows,
+  markSocialFollowsError,
+} from "../lib/socialFollowsHealth";
 import type {
   FeedbackPost,
   FeedbackComment,
+  CommentMedia,
   FeedbackAdminReply,
   FeedbackMedia,
   FeedbackVoteType,
@@ -110,6 +115,13 @@ function toSnake(data: Partial<FeedbackPost>): Record<string, unknown> {
 }
 
 function mapComment(row: Record<string, unknown>): FeedbackComment {
+  const raw = row.comment_media;
+  let media: CommentMedia[] | undefined;
+  if (Array.isArray(raw)) {
+    media = raw as CommentMedia[];
+  } else if (row.media_url) {
+    media = [{ url: row.media_url as string, type: (row.media_type as "image" | "video") || "image" }];
+  }
   return {
     id: row.id as string,
     postId: (row.post_id as string) || "",
@@ -117,6 +129,7 @@ function mapComment(row: Record<string, unknown>): FeedbackComment {
     userName: (row.user_name as string) || "Anonymous",
     userAvatar: (row.user_avatar as string) || "",
     content: (row.body as string) || "",
+    media,
     status: (row.status as "visible" | "hidden") || "visible",
     createdAt: (row.created_at as string) || new Date().toISOString(),
   };
@@ -296,9 +309,21 @@ export async function updateFeedbackPost(
   await supabase.from(POSTS_TABLE).update(dbData).eq("id", id);
 }
 
-export async function deleteFeedbackPost(id: string): Promise<void> {
-  if (!supabase || !supabaseConfigured) return;
-  await supabase.from(POSTS_TABLE).delete().eq("id", id);
+export async function deleteFeedbackPost(id: string): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false;
+  const { data, error } = await supabase.rpc("admin_delete_feedback_post", {
+    p_feedback_id: id,
+  });
+  if (error) {
+    console.error("deleteFeedbackPost failed", error);
+    return false;
+  }
+  const result = data as { success?: boolean; error?: string } | null;
+  if (!result?.success) {
+    console.error("deleteFeedbackPost denied", result?.error || "Unknown error");
+    return false;
+  }
+  return true;
 }
 
 // ========== Comments ==========
@@ -362,6 +387,7 @@ export async function addFeedbackComment(
       user_id: comment.userId,
       user_name: comment.userName,
       body: comment.content,
+      comment_media: comment.media ?? [],
       status: comment.status || "visible",
       created_at: new Date().toISOString(),
     })
@@ -376,14 +402,22 @@ export async function addFeedbackComment(
 export async function deleteFeedbackComment(
   postId: string,
   commentId: string,
-): Promise<void> {
-  if (!supabase || !supabaseConfigured) return;
-  await supabase
-    .from(COMMENTS_TABLE)
-    .delete()
-    .eq("id", commentId)
-    .eq("post_id", postId);
-  await supabase.rpc("decrement_comment_count", { post_id: postId });
+): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false;
+  const { data, error } = await supabase.rpc("admin_delete_feedback_comment", {
+    p_post_id: postId,
+    p_comment_id: commentId,
+  });
+  if (error) {
+    console.error("deleteFeedbackComment failed", error);
+    return false;
+  }
+  const result = data as { success?: boolean; error?: string } | null;
+  if (!result?.success) {
+    console.error("deleteFeedbackComment denied", result?.error || "Unknown error");
+    return false;
+  }
+  return true;
 }
 
 export async function updateFeedbackCommentStatus(
@@ -591,9 +625,9 @@ export async function getUserHelpfulVote(
 export async function toggleReaction(
   feedbackId: string,
   reactionType: ReactionType,
-): Promise<ReactionType | null> {
+): Promise<{ reactionType: ReactionType | null; helpfulCount: number; downvoteCount: number } | null> {
   if (!supabase || !supabaseConfigured) return null;
-  const { data, error } = await supabase.rpc("toggle_feedback_reaction", {
+  const { data, error } = await supabase.rpc("toggle_feedback_reaction_with_counts", {
     p_feedback_id: feedbackId,
     p_reaction_type: reactionType,
   });
@@ -601,7 +635,18 @@ export async function toggleReaction(
     console.error("toggleReaction RPC failed", error);
     return null;
   }
-  return (data as ReactionType) || null;
+  const rows = data as Array<{
+    reaction_type: ReactionType | null;
+    helpful_count: number;
+    downvote_count: number;
+  }> | null;
+  const row = rows?.[0];
+  if (!row) return null;
+  return {
+    reactionType: row.reaction_type || null,
+    helpfulCount: row.helpful_count || 0,
+    downvoteCount: row.downvote_count || 0,
+  };
 }
 
 export async function fetchUserReactions(
@@ -938,16 +983,24 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfileD
     }),
   );
 
-  const [{ count: followers }, { count: following }] = await Promise.all([
-    supabase
-      .from(FOLLOWS_TABLE)
-      .select("*", { count: "exact", head: true })
-      .eq("following_id", userId),
-    supabase
-      .from(FOLLOWS_TABLE)
-      .select("*", { count: "exact", head: true })
-      .eq("follower_id", userId),
-  ]);
+  const [followersRes, followingRes] = canQuerySocialFollows()
+    ? await Promise.all([
+        supabase
+          .from(FOLLOWS_TABLE)
+          .select("*", { count: "exact", head: true })
+          .eq("following_id", userId),
+        supabase
+          .from(FOLLOWS_TABLE)
+          .select("*", { count: "exact", head: true })
+          .eq("follower_id", userId),
+      ])
+    : [
+        { count: 0, error: null },
+        { count: 0, error: null },
+      ];
+
+  markSocialFollowsError("count followers", followersRes.error);
+  markSocialFollowsError("count following", followingRes.error);
 
   const profileRow = (profile || {}) as Record<string, unknown>;
   return {
@@ -965,20 +1018,22 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfileD
     stats: {
       totalPosts: posts.length,
       totalLikesReceived: posts.reduce((sum, post) => sum + post.helpfulCount, 0),
-      followers: followers || 0,
-      following: following || 0,
+      followers: followersRes.error ? 0 : followersRes.count || 0,
+      following: followingRes.error ? 0 : followingRes.count || 0,
     },
   };
 }
 
 export async function isFollowingProfile(currentUserId: string, profileId: string): Promise<boolean> {
   if (!supabase || !supabaseConfigured) return false;
-  const { data } = await supabase
+  if (!canQuerySocialFollows()) return false;
+  const { data, error } = await supabase
     .from(FOLLOWS_TABLE)
     .select("id")
     .eq("follower_id", currentUserId)
     .eq("following_id", profileId)
     .maybeSingle();
+  markSocialFollowsError("check profile follow", error);
   return !!data;
 }
 

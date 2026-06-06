@@ -9,6 +9,8 @@ import {
   Link as LinkIcon,
   Play,
   Bookmark,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { FeedbackPost, ReactionType } from "../../data/feedbackStore";
@@ -19,22 +21,28 @@ interface FeedbackCardProps {
   post: FeedbackPost;
   index: number;
   onReaction: (reactionType: ReactionType) => void;
+  reactionLoading?: boolean;
   onComment: () => void;
   onClick: () => void;
   onSave?: () => void;
+  onDelete?: () => void;
   userReaction?: ReactionType | null;
   saved?: boolean;
+  isAdmin?: boolean;
 }
 
 export default function FeedbackCard({
   post,
   index,
   onReaction,
+  reactionLoading,
   onComment,
   onClick,
   onSave,
+  onDelete,
   userReaction,
   saved,
+  isAdmin,
 }: FeedbackCardProps) {
   const { profile } = useUserProfile(post.userId);
   const displayRating = Math.round(post.rating);
@@ -135,6 +143,18 @@ export default function FeedbackCard({
                   }`}
                 >
                   <Bookmark size={15} className={saved ? "fill-current" : ""} />
+                </button>
+              )}
+              {isAdmin && onDelete && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
+                  aria-label="Delete feedback"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 text-red-300 transition-all duration-300 hover:border-red-400/40 hover:bg-red-500/20 hover:text-red-100"
+                >
+                  <Trash2 size={15} />
                 </button>
               )}
             </div>
@@ -242,14 +262,19 @@ export default function FeedbackCard({
                   e.stopPropagation();
                   onReaction("like");
                 }}
+                disabled={reactionLoading}
                 aria-label="Like"
                 className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-300 ${
                   userReaction === "like"
                     ? "bg-gradient-to-br from-[#4F6EF7]/20 to-[#4F6EF7]/10 text-[#7C8CFF] shadow-[0_0_12px_rgba(79,110,247,0.15)]"
                     : "text-[#6B6B80] hover:bg-white/[0.06] hover:text-[#F0F0F5]"
-                }`}
+                } disabled:cursor-wait disabled:opacity-70`}
               >
-                <ThumbsUp size={14} />
+                {reactionLoading && userReaction === "like" ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <ThumbsUp size={14} className={userReaction === "like" ? "fill-current" : ""} />
+                )}
               </button>
               <span className="min-w-[1.5rem] text-center text-xs font-semibold tabular-nums text-[#F0F0F5]">
                 {post.helpfulCount}
@@ -260,14 +285,19 @@ export default function FeedbackCard({
                   e.stopPropagation();
                   onReaction("dislike");
                 }}
+                disabled={reactionLoading}
                 aria-label="Dislike"
                 className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-300 ${
                   userReaction === "dislike"
                     ? "bg-gradient-to-br from-[#8B5CF6]/20 to-[#8B5CF6]/10 text-[#C4B5FD] shadow-[0_0_12px_rgba(139,92,246,0.15)]"
                     : "text-[#6B6B80] hover:bg-white/[0.06] hover:text-[#F0F0F5]"
-                }`}
+                } disabled:cursor-wait disabled:opacity-70`}
               >
-                <ThumbsDown size={14} />
+                {reactionLoading && userReaction === "dislike" ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <ThumbsDown size={14} className={userReaction === "dislike" ? "fill-current" : ""} />
+                )}
               </button>
               <span className="min-w-[1.5rem] text-center text-xs font-semibold tabular-nums text-[#F0F0F5]">
                 {post.downvoteCount || 0}

@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Users,
@@ -40,6 +39,7 @@ import { createOrGetConversation } from "../../lib/chatService";
 import { useChatStore } from "../../lib/store/chatStore";
 import { fetchFollowCounts, isFollowing } from "../../lib/socialService";
 import FollowButton from "../../components/ui/FollowButton";
+import { AvatarUpload } from "../../components/profile/AvatarUpload";
 
 type SortField =
   | "name"
@@ -745,7 +745,7 @@ function ClientDrawer({
   adminId,
   onClose,
   onMessage,
-  onClientUpdate: _onClientUpdate,
+  onClientUpdate,
 }: {
   client: Client;
   adminId?: string;
@@ -753,7 +753,7 @@ function ClientDrawer({
   onMessage: () => void;
   onClientUpdate: () => void;
 }) {
-  const navigate = useNavigate();
+  const [avatarUrl, setAvatarUrl] = useState(client.avatarUrl || "");
   const [notes, setNotes] = useState<ClientNote[]>([]);
   const [noteInput, setNoteInput] = useState("");
   const [savingNote, setSavingNote] = useState(false);
@@ -764,6 +764,10 @@ function ClientDrawer({
     followers: 0,
     following: 0,
   });
+
+  useEffect(() => {
+    setAvatarUrl(client.avatarUrl || "");
+  }, [client.avatarUrl, client.id]);
 
   useEffect(() => {
     if (!adminId || !client.id) return;
@@ -806,11 +810,6 @@ function ClientDrawer({
     } else {
       toast.error("Failed to delete note");
     }
-  };
-
-  const handleViewProfile = () => {
-    onClose();
-    navigate(`/profile/${client.id}`);
   };
 
   const infoSections = [
@@ -859,26 +858,14 @@ function ClientDrawer({
               transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
             />
             <div className="relative mx-auto flex flex-col items-center">
-              <button
-                onClick={handleViewProfile}
-                title="View profile"
-                className="group relative"
-              >
-                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-white/[0.12] bg-gradient-to-br from-[#4f6ef7] to-[#8b5cf6] text-2xl font-bold text-white shadow-[0_0_30px_rgba(79,110,247,0.3)] transition-all duration-300 group-hover:border-blue-400/50 group-hover:shadow-[0_0_40px_rgba(79,110,247,0.5)] cursor-pointer">
-                  {client.avatarUrl ? (
-                    <img
-                      src={client.avatarUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    getInitials(client.name)
-                  )}
-                </div>
-                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-full bg-blue-500/20 backdrop-blur-md px-2 py-0.5 text-[9px] text-blue-300 whitespace-nowrap">
-                  View profile
-                </span>
-              </button>
+              <AvatarUpload
+                currentAvatarUrl={avatarUrl}
+                userId={client.id}
+                onUploadComplete={(url) => {
+                  setAvatarUrl(url);
+                  onClientUpdate();
+                }}
+              />
               <h2 className="mt-4 text-xl font-bold text-[#f0f0f5]">
                 {client.name}
               </h2>

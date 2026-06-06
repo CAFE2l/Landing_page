@@ -1,5 +1,8 @@
 import { supabase, supabaseConfigured } from "./supabase/client"
 import type { SocialPost, SocialComment } from "../data/feedbackStore"
+import { canQuerySocialFollows, markSocialFollowsError } from "./socialFollowsHealth"
+
+const FOLLOWS_TABLE = "social_follows"
 
 // ========== Posts ==========
 
@@ -16,10 +19,15 @@ export async function fetchSocialPosts(
     .limit(50)
 
   if (mode === "following" && userId) {
-    const { data: follows } = await supabase
-      .from("social_follows")
+    if (!canQuerySocialFollows()) return []
+
+    const { data: follows, error } = await supabase
+      .from(FOLLOWS_TABLE)
       .select("following_id")
       .eq("follower_id", userId)
+
+    markSocialFollowsError("fetch following feed", error)
+    if (error) return []
 
     const ids = (follows || []).map((r: Record<string, unknown>) => r.following_id as string)
     if (ids.length > 0) {
@@ -169,26 +177,31 @@ export async function toggleFollow(
   followingId: string,
 ): Promise<boolean> {
   if (!supabase || !supabaseConfigured || followerId === followingId) return false
+  if (!canQuerySocialFollows()) return false
 
-  const { data: existing } = await supabase
-    .from("social_follows")
+  const { data: existing, error: existingError } = await supabase
+    .from(FOLLOWS_TABLE)
     .select("id")
     .eq("follower_id", followerId)
     .eq("following_id", followingId)
     .maybeSingle()
 
+  markSocialFollowsError("check before toggle", existingError)
+  if (existingError) return false
+
   if (existing) {
     const { error } = await supabase
-      .from("social_follows")
+      .from(FOLLOWS_TABLE)
       .delete()
       .eq("id", (existing as { id: string }).id)
     return !error
   }
 
   const { error } = await supabase
-    .from("social_follows")
+    .from(FOLLOWS_TABLE)
     .insert({ follower_id: followerId, following_id: followingId })
 
+  markSocialFollowsError("insert", error)
   return !error
 }
 
@@ -197,12 +210,14 @@ export async function isFollowing(
   followingId: string,
 ): Promise<boolean> {
   if (!supabase || !supabaseConfigured) return false
-  const { data } = await supabase
-    .from("social_follows")
+  if (!canQuerySocialFollows()) return false
+  const { data, error } = await supabase
+    .from(FOLLOWS_TABLE)
     .select("id")
     .eq("follower_id", followerId)
     .eq("following_id", followingId)
     .maybeSingle()
+  markSocialFollowsError("check", error)
   return !!data
 }
 
@@ -210,29 +225,40 @@ export async function fetchFollowCounts(
   userId: string,
 ): Promise<{ followers: number; following: number }> {
   if (!supabase || !supabaseConfigured) return { followers: 0, following: 0 }
+  if (!canQuerySocialFollows()) return { followers: 0, following: 0 }
 
-  const [{ count: followers }, { count: following }] = await Promise.all([
+  const [followersRes, followingRes] = await Promise.all([
     supabase
-      .from("social_follows")
+      .from(FOLLOWS_TABLE)
       .select("*", { count: "exact", head: true })
       .eq("following_id", userId),
     supabase
-      .from("social_follows")
+      .from(FOLLOWS_TABLE)
       .select("*", { count: "exact", head: true })
       .eq("follower_id", userId),
   ])
 
-  return { followers: followers || 0, following: following || 0 }
+  markSocialFollowsError("count followers", followersRes.error)
+  markSocialFollowsError("count following", followingRes.error)
+
+  return {
+    followers: followersRes.error ? 0 : followersRes.count || 0,
+    following: followingRes.error ? 0 : followingRes.count || 0,
+  }
 }
 
 export async function fetchFollowingIds(userId: string): Promise<Set<string>> {
   const result = new Set<string>()
   if (!supabase || !supabaseConfigured || !userId) return result
+  if (!canQuerySocialFollows()) return result
 
-  const { data } = await supabase
-    .from("social_follows")
+  const { data, error } = await supabase
+    .from(FOLLOWS_TABLE)
     .select("following_id")
     .eq("follower_id", userId)
+
+  markSocialFollowsError("fetch following ids", error)
+  if (error) return result
 
   if (data) {
     for (const row of data as { following_id: string }[]) {
@@ -246,10 +272,14 @@ export async function fetchFollowersList(
   userId: string,
 ): Promise<Array<{ id: string; name: string; username: string | null; avatarUrl: string | null; bio: string | null }>> {
   if (!supabase || !supabaseConfigured) return []
-  const { data } = await supabase
-    .from("social_follows")
+  if (!canQuerySocialFollows()) return []
+  const { data, error } = await supabase
+    .from(FOLLOWS_TABLE)
     .select("follower_id")
     .eq("following_id", userId)
+
+  markSocialFollowsError("fetch followers list", error)
+  if (error) return []
 
   if (!data) return []
   const followerIds = (data as { follower_id: string }[]).map((r) => r.follower_id)
@@ -274,10 +304,14 @@ export async function fetchFollowingList(
   userId: string,
 ): Promise<Array<{ id: string; name: string; username: string | null; avatarUrl: string | null; bio: string | null }>> {
   if (!supabase || !supabaseConfigured) return []
-  const { data } = await supabase
-    .from("social_follows")
+  if (!canQuerySocialFollows()) return []
+  const { data, error } = await supabase
+    .from(FOLLOWS_TABLE)
     .select("following_id")
     .eq("follower_id", userId)
+
+  markSocialFollowsError("fetch following list", error)
+  if (error) return []
 
   if (!data) return []
   const followingIds = (data as { following_id: string }[]).map((r) => r.following_id)

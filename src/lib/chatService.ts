@@ -52,7 +52,7 @@ export async function fetchConversations(userId: string): Promise<ChatConversati
 
   const { data: allMessages } = await supabase
     .from("messages")
-    .select("conversation_id, sender_id, read_at, created_at, content, message_type, caption")
+    .select("conversation_id, sender_id, read_at, created_at, content, message_type, caption, media_url, file_name")
     .in("conversation_id", conversationIds)
     .order("created_at", { ascending: false })
 
@@ -76,6 +76,7 @@ export async function fetchConversations(userId: string): Promise<ChatConversati
     const lastContent = latest?.content as string | undefined
     const lastMsgType = latest?.message_type as string | undefined
     const lastCaption = latest?.caption as string | undefined
+    const lastFileName = latest?.file_name as string | undefined
 
     let displayLastMessage = lastMsgFromRow
     if (!displayLastMessage && lastContent && lastMsgType === "text") {
@@ -83,10 +84,11 @@ export async function fetchConversations(userId: string): Promise<ChatConversati
     }
 
     const typeLabel = (type?: string) => {
-      if (type === "image") return "📷 Image"
+      if (type === "image") return "🖼️ Photo"
       if (type === "video") return "🎥 Video"
-      if (type === "audio") return "🎙️ Audio"
+      if (type === "audio") return "🎧 Audio"
       if (type === "sticker") return "Sticker"
+      if (type === "file") return lastFileName ? `📎 ${lastFileName.slice(0, 40)}` : "📎 File"
       if (type === "emoji") return "😊 Emoji"
       return null
     }
@@ -95,7 +97,7 @@ export async function fetchConversations(userId: string): Promise<ChatConversati
       displayLastMessage = typeLabel(lastMsgType)
     }
 
-    if (displayLastMessage && lastCaption && (lastMsgType === "image" || lastMsgType === "video")) {
+    if (displayLastMessage && lastCaption && (lastMsgType === "image" || lastMsgType === "video" || lastMsgType === "file")) {
       displayLastMessage = `${displayLastMessage} — ${lastCaption.slice(0, 40)}`
     }
 
@@ -145,6 +147,7 @@ export async function sendMessage(
   mediaMimeType?: string,
   mediaSize?: number,
   mediaDuration?: number,
+  fileName?: string,
 ): Promise<ChatMessage | null> {
   if (!supabase || !supabaseConfigured) return null
 
@@ -164,6 +167,7 @@ export async function sendMessage(
   if (mediaMimeType) payload.media_mime_type = mediaMimeType
   if (mediaSize !== undefined) payload.media_size = mediaSize
   if (mediaDuration !== undefined) payload.media_duration = mediaDuration
+  if (fileName) payload.file_name = fileName
 
   const { data, error } = await supabase
     .from("messages")
@@ -183,6 +187,7 @@ export async function sendMessage(
   else if (lastMsgType === "video") lastMessageStr = caption ? `🎥 Video — ${caption.slice(0, 40)}` : "🎥 Video"
   else if (lastMsgType === "audio") lastMessageStr = "🎙️ Audio"
   else if (lastMsgType === "sticker") lastMessageStr = "Sticker"
+  else if (lastMsgType === "file") lastMessageStr = fileName ? `📎 File — ${fileName.slice(0, 40)}` : caption ? `📎 File — ${caption.slice(0, 40)}` : "📎 File"
   else if (lastMsgType === "emoji") lastMessageStr = content || "😊 Emoji"
 
   await supabase
@@ -235,9 +240,26 @@ export async function getConversationUnreadCounts(): Promise<Record<string, numb
 const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"]
 const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"]
 const ALLOWED_AUDIO_TYPES = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"]
+const ALLOWED_FILE_TYPES = [
+  "application/pdf",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-rar-compressed",
+  "application/gzip",
+  "application/json",
+  "text/plain",
+  "text/csv",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024
 const MAX_AUDIO_SIZE = 25 * 1024 * 1024
+const MAX_FILE_SIZE = 50 * 1024 * 1024
 
 export function validateMediaFile(file: File): { valid: boolean; error?: string } {
   if (ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -252,13 +274,18 @@ export function validateMediaFile(file: File): { valid: boolean; error?: string 
     if (file.size > MAX_AUDIO_SIZE) return { valid: false, error: "Audio must be under 25MB" }
     return { valid: true }
   }
-  return { valid: false, error: "File type not supported. Allowed: PNG, JPG, WEBP, GIF, MP4, WebM, audio." }
+  if (ALLOWED_FILE_TYPES.includes(file.type)) {
+    if (file.size > MAX_FILE_SIZE) return { valid: false, error: "File must be under 50MB" }
+    return { valid: true }
+  }
+  return { valid: false, error: "File type not supported. Allowed: images, videos, audio, PDF, DOC, XLS, ZIP, and more." }
 }
 
-export function getMediaType(file: File): "image" | "video" | "audio" | null {
+export function getMediaType(file: File): "image" | "video" | "audio" | "file" | null {
   if (ALLOWED_IMAGE_TYPES.includes(file.type)) return "image"
   if (ALLOWED_VIDEO_TYPES.includes(file.type)) return "video"
   if (ALLOWED_AUDIO_TYPES.includes(file.type)) return "audio"
+  if (ALLOWED_FILE_TYPES.includes(file.type)) return "file"
   return null
 }
 
@@ -510,6 +537,7 @@ function mapMessage(row: Record<string, unknown>): ChatMessage {
     mediaMimeType: (row.media_mime_type as string) || null,
     mediaSize: (row.media_size as number) || null,
     mediaDuration: (row.media_duration as number) || null,
+    fileName: (row.file_name as string) || null,
     deliveredAt: (row.delivered_at as string) || null,
     readAt: (row.read_at as string) || null,
     createdAt: row.created_at as string,

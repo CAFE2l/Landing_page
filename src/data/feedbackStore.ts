@@ -96,6 +96,11 @@ export interface FeedbackPost {
 export type FeedbackVoteType = "up" | "down"
 export type ReactionType = "like" | "dislike"
 
+export interface CommentMedia {
+  url: string
+  type: "image" | "video"
+}
+
 export interface FeedbackComment {
   id: string
   postId: string
@@ -103,6 +108,7 @@ export interface FeedbackComment {
   userName: string
   userAvatar: string
   content: string
+  media?: CommentMedia[]
   status: "visible" | "hidden"
   createdAt: string
 }
@@ -148,7 +154,7 @@ export const clearCurrentUser = () => {
 
 // ========== Chat Types ==========
 
-export type MessageType = "text" | "image" | "video" | "audio" | "sticker" | "emoji"
+export type MessageType = "text" | "image" | "video" | "audio" | "sticker" | "emoji" | "file"
 
 export interface ChatMessage {
   id: string
@@ -162,6 +168,7 @@ export interface ChatMessage {
   mediaMimeType: string | null
   mediaSize: number | null
   mediaDuration: number | null
+  fileName: string | null
   deliveredAt: string | null
   readAt: string | null
   createdAt: string

@@ -2,8 +2,9 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { useSearchParams, Link } from "react-router-dom"
 import {
   MessageCircle, Loader2, Search, UserPlus, Hash,
-  Send, Smile, Image, X, Camera, ChevronLeft, Heart, MessageSquare,
+  Send, X, Camera, ChevronLeft, Heart, MessageSquare,
   ExternalLink, Plus, AlertCircle, RefreshCw,
+  FileText, Download, Film, ImageIcon, Music,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import FloatingOrbs from "../components/landing/FloatingOrbs"
@@ -11,11 +12,16 @@ import Navbar from "../components/landing/Navbar"
 import { useAuth } from "../contexts/AuthContext"
 import { loadCurrentUser } from "../data/feedbackStore"
 import { supabase } from "../lib/supabase/client"
-import { fetchConversations, fetchMessages, sendMessage, markMessagesAsRead, subscribeToMessages, uploadChatMedia, subscribeToConversationUpdates, createOrGetConversation } from "../lib/chatService"
+import { fetchConversations, fetchMessages, markMessagesAsRead, subscribeToMessages, uploadChatMedia, subscribeToConversationUpdates, createOrGetConversation } from "../lib/chatService"
 import {
   fetchSocialPosts, createSocialPost, toggleSocialLike, addPostComment,
   fetchPostComments, toggleFollow, isFollowing,
 } from "../lib/socialService"
+import {
+  canQuerySocialFollows,
+  markSocialFollowsError,
+} from "../lib/socialFollowsHealth"
+import MessageComposer from "../components/chat/MessageComposer"
 import FollowButton from "../components/ui/FollowButton"
 import type { ChatConversation as ChatConv, ChatMessage, SocialPost } from "../data/feedbackStore"
 import toast from "react-hot-toast"
@@ -43,11 +49,6 @@ export default function MessagesPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [msgLoading, setMsgLoading] = useState(false)
   const [msgError, setMsgError] = useState<string | null>(null)
-  const [input, setInput] = useState("")
-  const [sending, setSending] = useState(false)
-  const [showEmoji, setShowEmoji] = useState(false)
-  const [uploadingImage, setUploadingImage] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
 
   // Social posts
   const [posts, setPosts] = useState<SocialPost[]>([])
@@ -150,45 +151,6 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages.length])
 
-  // ========== Send message ==========
-  const handleSend = async () => {
-    const text = input.trim()
-    if (!text || !activeConv || sending) return
-    setSending(true)
-    const otherUserId = activeConv.participantA === uid ? activeConv.participantB : activeConv.participantA
-    const msg = await sendMessage(activeConv.id, uid!, otherUserId, text)
-    setSending(false)
-    if (msg) {
-      setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])
-      setInput("")
-    }
-  }
-
-  // ========== Image upload ==========
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !activeConv) return
-    setUploadingImage(true)
-    const result = await uploadChatMedia(file, uid!)
-    if (result) {
-      const otherUserId = activeConv.participantA === uid ? activeConv.participantB : activeConv.participantA
-      const msgType = result.mimeType.startsWith("video") ? "video" as const : "image" as const
-      const msg = await sendMessage(activeConv.id, uid!, otherUserId, "", msgType, result.url, file.name, result.mimeType, result.size)
-      if (msg) {
-        setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])
-      }
-    }
-    setUploadingImage(false)
-    if (fileRef.current) fileRef.current.value = ""
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
-
   // ========== Handle select conversation ==========
   const handleSelectConversation = (conv: ChatConv) => {
     setActiveConv(conv)
@@ -288,20 +250,26 @@ export default function MessagesPage() {
     try {
       const { data: profile } = await supabase!.from("profiles").select("*").eq("id", userId).maybeSingle()
       const row = (profile || {}) as Record<string, unknown>
-      const [{ count: followers }, { count: following }, { count: postsCount }, following_] = await Promise.all([
-        supabase!.from("social_follows").select("*", { count: "exact", head: true }).eq("following_id", userId),
-        supabase!.from("social_follows").select("*", { count: "exact", head: true }).eq("follower_id", userId),
+      const [followersRes, followingRes, { count: postsCount }, following_] = await Promise.all([
+        canQuerySocialFollows()
+          ? supabase!.from("social_follows").select("*", { count: "exact", head: true }).eq("following_id", userId)
+          : Promise.resolve({ count: 0, error: null }),
+        canQuerySocialFollows()
+          ? supabase!.from("social_follows").select("*", { count: "exact", head: true }).eq("follower_id", userId)
+          : Promise.resolve({ count: 0, error: null }),
         supabase!.from("social_posts").select("*", { count: "exact", head: true }).eq("user_id", userId),
         uid ? isFollowing(uid, userId) : Promise.resolve(false),
       ])
+      markSocialFollowsError("count drawer followers", followersRes.error)
+      markSocialFollowsError("count drawer following", followingRes.error)
       setDrawerProfile({
         id: userId,
         name: (row.full_name as string) || (row.username as string) || "User",
         avatarUrl: (row.avatar_url as string) || null,
         username: (row.username as string) || null,
         bio: (row.bio as string) || null,
-        followers: followers || 0,
-        following: following || 0,
+        followers: followersRes.error ? 0 : followersRes.count || 0,
+        following: followingRes.error ? 0 : followingRes.count || 0,
         postsCount: postsCount || 0,
         following_,
       })
@@ -758,9 +726,44 @@ export default function MessagesPage() {
                     <audio src={msg.mediaUrl!} controls className="max-w-full h-10" />
                   ) : msg.messageType === "sticker" ? (
                     <img src={msg.mediaUrl!} alt="Sticker" className="w-24 h-24 object-contain" />
-                  ) : (
+                  ) : msg.messageType === "file" && msg.mediaUrl ? (
+                    <div>
+                      <a
+                        href={msg.mediaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center gap-3 rounded-xl p-3 transition-all ${
+                          isOwn
+                            ? "bg-white/[0.08] hover:bg-white/[0.12]"
+                            : "bg-white/[0.04] hover:bg-white/[0.08]"
+                        }`}
+                      >
+                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                          isOwn ? "bg-white/[0.1]" : "bg-[#4F6EF7]/10"
+                        } text-[#4F6EF7]`}>
+                          {msg.mediaMimeType?.startsWith("image/") ? <ImageIcon size={20} /> :
+                           msg.mediaMimeType?.startsWith("video/") ? <Film size={20} /> :
+                           msg.mediaMimeType?.startsWith("audio/") ? <Music size={20} /> :
+                           <FileText size={20} />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{msg.fileName || msg.mediaUrl.split("/").pop()?.split("?")[0] || "File"}</p>
+                          <p className="text-xs opacity-60 mt-0.5">
+                            {msg.mediaMimeType?.split("/").pop()?.toUpperCase() || "FILE"}
+                            {msg.mediaSize ? ` — ${msg.mediaSize < 1024 ? `${msg.mediaSize} B` : msg.mediaSize < 1024 * 1024 ? `${(msg.mediaSize / 1024).toFixed(1)} KB` : `${(msg.mediaSize / (1024 * 1024)).toFixed(1)} MB`}` : ""}
+                          </p>
+                        </div>
+                        <Download size={16} className="shrink-0 opacity-60" />
+                      </a>
+                      {msg.caption && (
+                        <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                          {msg.caption}
+                        </p>
+                      )}
+                    </div>
+                  ) : msg.content ? (
                     msg.content
-                  )}
+                  ) : null}
                   <div className={`text-[10px] mt-1 ${isOwn ? "text-white/50 text-right" : "text-[#4A4A5A]"}`}>
                     {new Date(msg.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                     {isOwn && (
@@ -775,43 +778,13 @@ export default function MessagesPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="border-t border-white/[0.06] bg-[#0A0A0F]/80 backdrop-blur-md px-4 py-3 shrink-0">
-        <div className="flex items-end gap-2">
-          <div className="relative flex-1">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-                  placeholder={`Message ${activeConv.otherUser.name}...`}
-              rows={1}
-              className="w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 pr-20 text-sm text-white placeholder:text-[#4A4A5A] outline-none focus:border-[#4F6EF7]/40 transition-all min-h-[40px] max-h-[120px]"
-            />
-            <div className="absolute right-2 bottom-1.5 flex items-center gap-0.5">
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] hover:text-[#4F6EF7] hover:bg-white/[0.06] transition-all"
-              >
-                {uploadingImage ? <Loader2 size={16} className="animate-spin" /> : <Image size={16} />}
-              </button>
-              <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleImageUpload} />
-              <button
-                onClick={() => setShowEmoji(!showEmoji)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] hover:text-[#4F6EF7] hover:bg-white/[0.06] transition-all"
-              >
-                <Smile size={16} />
-              </button>
-            </div>
-          </div>
-          <button
-            onClick={handleSend}
-            disabled={sending || !input.trim()}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-[0_0_16px_rgba(37,99,235,0.3)] transition-all"
-          >
-            {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-          </button>
-        </div>
-      </div>
+      <MessageComposer
+        conversationId={activeConv.id}
+        currentUserId={uid!}
+        otherUserId={activeConv.participantA === uid ? activeConv.participantB : activeConv.participantA}
+        otherUserName={activeConv.otherUser.name}
+        onMessageSent={(msg) => setMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])}
+      />
     </div>
   ) : null
 

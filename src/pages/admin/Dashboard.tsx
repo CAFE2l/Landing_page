@@ -15,6 +15,19 @@ import {
   type AdminDashboardStats,
 } from "../../data/adminServiceSupabase";
 
+function formatDuration(ms: number): string {
+  if (ms <= 0) return ""
+  const totalSeconds = Math.floor(ms / 1000)
+  const totalMinutes = Math.floor(totalSeconds / 60)
+  const totalHours = Math.floor(totalMinutes / 60)
+  const totalDays = Math.floor(totalHours / 24)
+
+  if (totalDays >= 1) return `${totalDays}d ${totalHours % 24}h`
+  if (totalHours >= 1) return `${totalHours}h ${totalMinutes % 60}m`
+  if (totalMinutes >= 1) return `${totalMinutes} min`
+  return `${totalSeconds} sec`
+}
+
 const container = {
   visible: { transition: { staggerChildren: 0.07 } },
 };
@@ -23,8 +36,9 @@ const emptyStats: AdminDashboardStats = {
   totalSubmissions: 0,
   approved: 0,
   pending: 0,
-  avgResponseHours: 0,
-  trends: { totalSubmissions: 0, approved: 0, pending: 0, avgResponseHours: 0 },
+  avgResponseTimeMs: 0,
+  responseCount: 0,
+  trends: { totalSubmissions: 0, approved: 0, pending: 0, avgResponseTimeMs: 0 },
   recentFeedback: [],
   activities: [],
   chartData: [],
@@ -148,6 +162,7 @@ export default function Dashboard() {
               icon={MessageSquare}
               trend={data.trends.totalSubmissions}
               trendLabel="vs last week"
+              period="All time"
               index={0}
             />
             <StatCard
@@ -156,27 +171,34 @@ export default function Dashboard() {
               icon={Check}
               trend={data.trends.approved}
               trendLabel="vs last week"
+              period="All time"
               accentColor="#22c55e"
               index={1}
             />
             <StatCard
               label="Pending Review"
               value={data.pending}
+              description={data.pending > 0 ? "Needs attention" : "All clear"}
               icon={Clock}
               trend={data.trends.pending}
               trendLabel="vs last week"
+              period="All time"
               accentColor="#f59e0b"
               index={2}
               pulse={data.pending > 0}
             />
             <StatCard
               label="Avg. Response Time"
-              value={data.avgResponseHours}
+              value={data.responseCount > 0 ? data.avgResponseTimeMs : 0}
+              formattedValue={data.responseCount > 0 ? formatDuration(data.avgResponseTimeMs) : undefined}
+              description={data.responseCount > 0 ? `Based on ${data.responseCount} ${data.responseCount === 1 ? "response" : "responses"}` : "No data yet"}
               icon={Timer}
-              trend={data.trends.avgResponseHours}
-              trendLabel="hours vs last week"
+              trend={data.responseCount > 0 ? data.trends.avgResponseTimeMs : undefined}
+              trendLabel={data.responseCount > 0 ? "vs last week" : undefined}
+              period={data.responseCount > 0 ? "All time" : undefined}
               accentColor="#8b5cf6"
               index={3}
+              info="Average Response Time = tempo médio entre a criação de um feedback e a primeira resposta de um administrador (aprovação, rejeição ou destaque)."
             />
           </>
         )}

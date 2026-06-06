@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  CheckCircle2,
   ChevronRight,
   Eye,
   EyeOff,
@@ -36,6 +35,8 @@ import {
 } from "../lib/socialService";
 import { useUserProfile } from "../hooks/useUserProfile";
 import { useAuth } from "../contexts/AuthContext";
+import toast from "react-hot-toast";
+import type { UserProfile } from "../data/feedbackStore";
 
 type ActiveTab = "profile" | "security";
 
@@ -240,14 +241,7 @@ function CountrySelector({
   );
 }
 
-function ProfileCompletionCard({
-  avatarUrl,
-  fullName,
-  email,
-  phone,
-  location,
-  bio,
-}: {
+function calculateProfileCompletion(fields: {
   avatarUrl?: string;
   fullName?: string;
   email?: string;
@@ -255,14 +249,27 @@ function ProfileCompletionCard({
   location?: string;
   bio?: string;
 }) {
-  const items = [
-    { label: "Avatar", complete: Boolean(avatarUrl) },
-    { label: "Name", complete: Boolean(fullName) },
-    { label: "Email", complete: Boolean(email) },
-    { label: "Phone", complete: Boolean(phone) },
-    { label: "Bio", complete: Boolean(bio) },
-    { label: "Location", complete: Boolean(location) },
+  return [
+    { label: "Avatar", complete: Boolean(fields.avatarUrl) },
+    { label: "Name", complete: Boolean(fields.fullName) },
+    { label: "Email", complete: Boolean(fields.email) },
+    { label: "Phone", complete: Boolean(fields.phone) },
+    { label: "Bio", complete: Boolean(fields.bio) },
+    { label: "Location", complete: Boolean(fields.location) },
   ];
+}
+
+function ProfileCompletionCard(
+  fields: {
+    avatarUrl?: string;
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    bio?: string;
+  },
+) {
+  const items = calculateProfileCompletion(fields);
   const percent = Math.round(
     (items.filter((item) => item.complete).length / items.length) * 100,
   );
@@ -413,11 +420,7 @@ export default function ProfilePage() {
       : "profile",
   );
   const [isEditing, setIsEditing] = useState(false);
-  const [showToast, setShowToast] = useState(false);
-  const [toastCopy, setToastCopy] = useState({
-    title: "Profile updated",
-    subtitle: "Your changes were saved.",
-  });
+  const [saving, setSaving] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -441,9 +444,9 @@ export default function ProfilePage() {
       const newForm = {
         fullName: profile.full_name || "",
         email: profile.email || "",
-        phoneE164: "",
-        location: "",
-        locationCountryCode: "",
+        phoneE164: profile.phone || "",
+        location: profile.location || "",
+        locationCountryCode: profile.locationCountryCode || "",
         bio: profile.bio || "",
       };
       setForm(newForm);
@@ -509,48 +512,68 @@ export default function ProfilePage() {
   );
   const passwordsMatch = !confirmPassword || newPassword === confirmPassword;
 
-  useEffect(() => {
-    if (!showToast) return;
-    const timeout = window.setTimeout(() => setShowToast(false), 3500);
-    return () => window.clearTimeout(timeout);
-  }, [showToast]);
+  const hasChanges = useMemo(
+    () =>
+      form.fullName !== savedForm.fullName ||
+      form.phoneE164 !== savedForm.phoneE164 ||
+      form.location !== savedForm.location ||
+      form.locationCountryCode !== savedForm.locationCountryCode ||
+      form.bio !== savedForm.bio,
+    [form, savedForm],
+  );
 
   if (!authUser && !profileLoading) return <Navigate to="/login" replace />;
+  if (profileLoading) {
+    return (
+      <main className="relative min-h-screen overflow-hidden bg-[#0a0a0f] px-4 pb-8 pt-28 text-white sm:px-6">
+        <AuthBackground />
+        <Navbar />
+        <div className="relative z-10 mx-auto flex items-center justify-center py-32">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 size={32} className="animate-spin text-white/40" />
+            <p className="text-sm text-white/30">Loading profile...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   const updateField = (field: keyof ProfileForm, value: string) => {
-    setForm((current) => ({ ...current, [field]: value }));
-  };
-
-  const notify = (title: string, subtitle: string) => {
-    setToastCopy({ title, subtitle });
-    setShowToast(true);
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const saveProfile = async () => {
-    if (!profile?.id) return;
-    setSavedForm(form);
-    setIsEditing(false);
+    if (!profile?.id || saving) return;
+    setSaving(true);
 
-    const payload = {
-      name: form.fullName,
-      bio: form.bio,
-    };
+    try {
+      const userProfile: UserProfile = {
+        uid: profile.id,
+        name: form.fullName,
+        email: profile.email,
+        role: profile.role as "client" | "admin",
+        photoUrl: avatarUrl || undefined,
+        phone: form.phoneE164 || undefined,
+        location: form.location || undefined,
+        locationCountryCode: form.locationCountryCode || undefined,
+        bio: form.bio || undefined,
+      };
 
-    await updateProfileMetadata(payload);
+      await updatePublicProfile(userProfile);
+      await updateProfileMetadata({ name: form.fullName, bio: form.bio });
 
-    await updatePublicProfile({
-      uid: profile.id,
-      name: form.fullName,
-      photoUrl: avatarUrl,
-      email: profile.email,
-      role: profile.role,
-      bio: form.bio,
-    } as any);
+      setSavedForm(form);
+      setIsEditing(false);
+      await refreshProfile();
+      window.dispatchEvent(new Event("cafe-profile-updated"));
 
-    refreshProfile();
-    window.dispatchEvent(new Event("cafe-profile-updated"));
-
-    notify("Profile updated", "Your changes were saved.");
+      toast.success("Profile updated successfully");
+    } catch (error) {
+      console.error("Error saving profile:", error);
+      toast.error("Failed to save profile. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const cancelEdit = () => {
@@ -567,16 +590,13 @@ export default function ProfilePage() {
       setPasswordError(
         "Use a stronger password and make sure both fields match.",
       );
-      notify(
-        "Password not updated",
-        "Use a stronger password and make sure both fields match.",
-      );
+      toast.error("Use a stronger password and make sure both fields match.");
       return;
     }
 
     if (!supabase) {
       setPasswordError("Authentication not configured.");
-      notify("Password not updated", "Authentication is not configured.");
+      toast.error("Authentication is not configured.");
       return;
     }
 
@@ -589,7 +609,7 @@ export default function ProfilePage() {
       });
       if (signError) {
         setPasswordError("Current password is incorrect.");
-        notify("Password not updated", "Current password is incorrect.");
+        toast.error("Current password is incorrect.");
         return;
       }
 
@@ -598,10 +618,7 @@ export default function ProfilePage() {
       });
       if (updateError) {
         setPasswordError("Could not update password. Try again later.");
-        notify(
-          "Password not updated",
-          "Could not update password. Try again later.",
-        );
+        toast.error("Could not update password. Try again later.");
         return;
       }
 
@@ -609,11 +626,11 @@ export default function ProfilePage() {
       setNewPassword("");
       setConfirmPassword("");
       setPasswordSuccess(true);
-      notify("Password updated", "Your new password was saved.");
+      toast.success("Password updated successfully.");
     } catch (error) {
       console.error("Error updating password:", error);
       setPasswordError("Unexpected error updating password.");
-      notify("Password not updated", "Unexpected error updating password.");
+      toast.error("Unexpected error updating password.");
     } finally {
       setPasswordLoading(false);
     }
@@ -853,10 +870,15 @@ export default function ProfilePage() {
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.97 }}
                         onClick={saveProfile}
-                        className="flex items-center gap-2 rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300 hover:bg-[#1d4ed8] hover:shadow-[0_0_32px_rgba(37,99,235,0.55)]"
+                        disabled={!hasChanges || saving}
+                        className={`flex items-center gap-2 rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300 hover:bg-[#1d4ed8] hover:shadow-[0_0_32px_rgba(37,99,235,0.55)] ${(!hasChanges || saving) ? "cursor-not-allowed opacity-50" : ""}`}
                       >
-                        <Save size={16} />
-                        Save
+                        {saving ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Save size={16} />
+                        )}
+                        {saving ? "Saving..." : "Save"}
                       </motion.button>
                     </div>
                   )}
@@ -999,10 +1021,15 @@ export default function ProfilePage() {
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.97 }}
                           onClick={saveProfile}
-                          className="relative flex items-center gap-2 overflow-hidden rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-6 py-2.5 font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300 hover:bg-[#1d4ed8] hover:shadow-[0_0_32px_rgba(37,99,235,0.55)]"
+                          disabled={!hasChanges || saving}
+                          className={`relative flex items-center gap-2 overflow-hidden rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-6 py-2.5 font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300 hover:bg-[#1d4ed8] hover:shadow-[0_0_32px_rgba(37,99,235,0.55)] ${(!hasChanges || saving) ? "cursor-not-allowed opacity-50" : ""}`}
                         >
-                          <Save size={16} />
-                          Save Changes
+                          {saving ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Save size={16} />
+                          )}
+                          {saving ? "Saving..." : "Save Changes"}
                         </motion.button>
                         <button
                           onClick={cancelEdit}
@@ -1392,23 +1419,6 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 48, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 48, scale: 0.9 }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="fixed bottom-6 right-6 z-50 flex min-w-[280px] items-center gap-3 rounded-2xl border border-[#22c55e]/30 bg-[#0a1628] px-5 py-4 shadow-[0_0_24px_rgba(34,197,94,0.15)]"
-          >
-            <CheckCircle2 size={22} className="text-[#22c55e]" />
-            <div>
-              <p className="font-semibold text-white">{toastCopy.title}</p>
-              <p className="text-sm text-[#94a3b8]">{toastCopy.subtitle}</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </main>
   );
 }
