@@ -48,9 +48,7 @@ export default function Settings() {
     loadSettings()
   }, [loadSettings])
 
-  const _activeTabDef = TABS.find((t) => t.id === activeTab) ?? TABS[0]
-
-  return (
+return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}

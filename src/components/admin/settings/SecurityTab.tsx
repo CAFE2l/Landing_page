@@ -58,7 +58,7 @@ interface SecurityTabProps {
   onSettingsChange: (_s: SiteSettings) => void
 }
 
-export default function SecurityTab({ onSettingsChange: _onSettingsChange }: SecurityTabProps) {
+export default function SecurityTab({ onSettingsChange }: SecurityTabProps) {
   const [logs, setLogs] = useState<ActivityLogEntry[]>([])
   const [sessions, setSessions] = useState<AdminSession[]>([])
   const [loadingLogs, setLoadingLogs] = useState(true)
