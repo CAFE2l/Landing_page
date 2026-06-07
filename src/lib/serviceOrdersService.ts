@@ -40,6 +40,7 @@ function mapOrder(row: Record<string, unknown>): ServiceOrder {
     budgetNotes: (row.budget_notes as string) || null,
     additionalNotes: (row.additional_notes as string) || null,
     adminNotes: (row.admin_notes as string) || null,
+    deliveredProjectUrl: (row.delivered_project_url as string) || null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   }
@@ -240,6 +241,51 @@ export async function createServiceOrder(
   return order
 }
 
+async function sendBotMessageToUser(userId: string, message: string, preview: string): Promise<void> {
+  if (!supabase || !supabaseConfigured) return
+  const fakeBotUserId = "00000000-0000-0000-0000-000000000001"
+
+  const { data: existing } = await supabase
+    .from("conversations")
+    .select("id")
+    .or(`and(participant_1.eq.${fakeBotUserId},participant_2.eq.${userId}),and(participant_1.eq.${userId},participant_2.eq.${fakeBotUserId})`)
+    .maybeSingle()
+
+  let convId: string
+  if (existing) {
+    convId = existing.id as string
+  } else {
+    const { data: newConv } = await supabase
+      .from("conversations")
+      .insert({
+        participant_1: fakeBotUserId,
+        participant_2: userId,
+        last_message: preview.slice(0, 200),
+        last_message_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+    if (!newConv) return
+    convId = (newConv as Record<string, unknown>).id as string
+  }
+
+  await supabase.from("messages").insert({
+    conversation_id: convId,
+    sender_id: fakeBotUserId,
+    receiver_id: userId,
+    content: message,
+    message_type: "text",
+    delivered_at: new Date().toISOString(),
+  })
+
+  await supabase
+    .from("conversations")
+    .update({ last_message: preview.slice(0, 200), last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", convId)
+}
+
 async function notifyNewOrder(order: ServiceOrder, serviceName: string, upfrontAmount: number): Promise<void> {
   const displayName = getOrderDisplayName(order)
 
@@ -248,6 +294,22 @@ async function notifyNewOrder(order: ServiceOrder, serviceName: string, upfrontA
     title: "New order received",
     message: `${displayName} — ${serviceName} — Payment Pending ($${upfrontAmount} upfront)`,
   })
+
+  // Notify the client via bot DM if they have an account
+  if (order.userId) {
+    const userMsg = [
+      `🎉 Your order was received!`,
+      ``,
+      `Service: ${serviceName}`,
+      `Total: $${order.totalPrice}`,
+      `Upfront (50%): $${upfrontAmount}`,
+      ``,
+      `✅ Your order has been added to your order history. You can track it anytime in your profile under "My Orders".`,
+      ``,
+      `Next step: complete your upfront payment so we can start your project. We'll be in touch shortly!`,
+    ].join("\n")
+    await sendBotMessageToUser(order.userId, userMsg, `🎉 Order received: ${serviceName} — check your order history!`)
+  }
 
   const { data: adminProfile } = await supabase!
     .from("profiles")
@@ -299,6 +361,20 @@ export async function confirmPayment(
     message: `${displayName} sent payment via ${method} for order ${order.id.slice(0, 8)}`,
     payload: { orderId, method, status: order.paymentStatus, amount: order.upfrontAmount },
   })
+
+  // Notify the client via bot DM
+  if (order.userId) {
+    const userMsg = [
+      `✅ Payment notification sent!`,
+      ``,
+      `We received your payment notification for:`,
+      `Service: ${order.serviceName}`,
+      `Amount: $${order.upfrontAmount}`,
+      ``,
+      `Our team will verify and confirm your payment shortly. You can track your order status in your profile under "My Orders".`,
+    ].join("\n")
+    await sendBotMessageToUser(order.userId, userMsg, `✅ Payment notification received for ${order.serviceName}`)
+  }
 
   // Get the real admin user ID to send the bot message to
   const { data: adminProfile } = await supabase
@@ -386,6 +462,69 @@ async function sendBotPaymentConfirmation(order: ServiceOrder): Promise<void> {
       last_message_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
+    .eq("id", convId)
+}
+
+async function sendBotDeliveryMessage(order: ServiceOrder, projectUrl?: string): Promise<void> {
+  if (!supabase || !supabaseConfigured) return
+
+  const fakeBotUserId = "00000000-0000-0000-0000-000000000001"
+  const adminUserId = "00000000-0000-0000-0000-000000000002"
+  const displayName = getOrderDisplayName(order)
+
+  const botMessage = [
+    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `🎉 PROJECT DELIVERED`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    ``,
+    `Client: ${displayName}`,
+    `Service: ${order.serviceName}`,
+    projectUrl ? `Project URL: ${projectUrl}` : ``,
+    ``,
+    `A congratulations message has been sent to the client.`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+  ].filter(Boolean).join("\n")
+
+  const preview = `🎉 Delivered: ${order.serviceName} — ${displayName}`
+
+  const { data: botConv } = await supabase
+    .from("conversations")
+    .select("id")
+    .or(`and(participant_1.eq.${fakeBotUserId},participant_2.eq.${adminUserId}),and(participant_1.eq.${adminUserId},participant_2.eq.${fakeBotUserId})`)
+    .maybeSingle()
+
+  let convId: string
+  if (botConv) {
+    convId = botConv.id as string
+  } else {
+    const { data: newConv } = await supabase
+      .from("conversations")
+      .insert({
+        participant_1: fakeBotUserId,
+        participant_2: adminUserId,
+        last_message: preview.slice(0, 200),
+        last_message_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+    if (!newConv) return
+    convId = (newConv as Record<string, unknown>).id as string
+  }
+
+  await supabase.from("messages").insert({
+    conversation_id: convId,
+    sender_id: fakeBotUserId,
+    receiver_id: adminUserId,
+    content: botMessage,
+    message_type: "text",
+    delivered_at: new Date().toISOString(),
+  })
+
+  await supabase
+    .from("conversations")
+    .update({ last_message: preview.slice(0, 200), last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq("id", convId)
 }
 
@@ -497,6 +636,7 @@ export async function updateServiceOrder(
     upfrontPaid: boolean
     remainingPaid: boolean
     adminNotes: string
+    deliveredProjectUrl: string
   }>,
 ): Promise<boolean> {
   if (!supabase || !supabaseConfigured) return false
@@ -509,6 +649,7 @@ export async function updateServiceOrder(
   if (updates.upfrontPaid !== undefined) dbPayload.upfront_paid = updates.upfrontPaid
   if (updates.remainingPaid !== undefined) dbPayload.remaining_paid = updates.remainingPaid
   if (updates.adminNotes !== undefined) dbPayload.admin_notes = updates.adminNotes
+  if (updates.deliveredProjectUrl !== undefined) dbPayload.delivered_project_url = updates.deliveredProjectUrl
 
   if (updates.projectStatus === "paid_upfront") {
     dbPayload.upfront_paid = true
@@ -534,12 +675,14 @@ export async function updateServiceOrder(
       payload: { orderId: id, status: updates.projectStatus },
     })
 
-    // Send bot notification when payment is confirmed
     if (updates.projectStatus === "paid_upfront") {
       const order = await fetchServiceOrder(id)
-      if (order) {
-        await sendBotPaymentConfirmation(order)
-      }
+      if (order) await sendBotPaymentConfirmation(order)
+    }
+
+    if (updates.projectStatus === "delivered") {
+      const order = await fetchServiceOrder(id)
+      if (order) await sendBotDeliveryMessage(order, updates.deliveredProjectUrl)
     }
   }
 

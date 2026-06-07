@@ -49,6 +49,7 @@ export interface ServiceOrder {
   budgetNotes: string | null
   additionalNotes: string | null
   adminNotes: string | null
+  deliveredProjectUrl: string | null
   createdAt: string
   updatedAt: string
 }

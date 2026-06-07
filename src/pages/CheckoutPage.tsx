@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, Link } from "react-router-dom"
+import { useParams, Link, useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import {
   Check, ArrowLeft, AlertCircle, DollarSign, Calendar, User,
@@ -86,6 +86,8 @@ export default function CheckoutPage() {
   const [order, setOrder] = useState<ServiceOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [notifying, setNotifying] = useState(false)
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (!orderId) return
@@ -328,14 +330,18 @@ export default function CheckoutPage() {
               </p>
 
               <button
-                onClick={() => {
-                  confirmPayment(order.id, "paypal_manual")
+                disabled={notifying}
+                onClick={async () => {
+                  setNotifying(true)
+                  await confirmPayment(order.id, "paypal_manual")
+                  setNotifying(false)
                   toast.success("Thanks! We'll confirm your payment and start your project soon.")
+                  navigate("/profile?tab=orders")
                 }}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#0070BA] hover:bg-[#003087] px-5 py-3.5 text-sm font-semibold text-white transition-all shadow-lg"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#0070BA] hover:bg-[#003087] disabled:opacity-60 disabled:cursor-not-allowed px-5 py-3.5 text-sm font-semibold text-white transition-all shadow-lg"
               >
-                <Check size={16} />
-                I've Paid — Notify CAFÉ
+                {notifying ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                {notifying ? "Sending notification..." : "I've Paid — Notify CAFÉ"}
               </button>
 
               <div className="mt-4 p-3 rounded-xl border border-white/[0.06] bg-white/[0.02]">

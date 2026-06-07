@@ -17,6 +17,13 @@ import {
   UserPlus,
   CalendarDays,
   X,
+  ShoppingBag,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  RefreshCw,
+  ExternalLink,
 } from "lucide-react";
 import AuthBackground from "../components/auth/AuthBackground";
 import Navbar from "../components/landing/Navbar";
@@ -33,13 +40,21 @@ import {
   fetchFollowingList,
   fetchFollowingIds,
 } from "../lib/socialService";
+import { fetchUserServiceOrders, confirmPayment } from "../lib/serviceOrdersService";
+import type { ServiceOrder } from "../lib/types/serviceOrders";
+import {
+  PROJECT_STATUS_LABELS,
+  PROJECT_STATUS_COLORS,
+  PAYMENT_STATUS_LABELS,
+  PAYMENT_STATUS_COLORS,
+} from "../lib/types/serviceOrders";
 import { createOrGetConversation } from "../lib/chatService";
 import { useUserProfile } from "../hooks/useUserProfile";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 import type { UserProfile } from "../data/feedbackStore";
 
-type ActiveTab = "profile" | "security";
+type ActiveTab = "profile" | "security" | "orders";
 
 interface ProfileForm {
   fullName: string;
@@ -56,6 +71,7 @@ const cardClass =
 const tabs = [
   { id: "profile", label: "Profile Information", icon: User },
   { id: "security", label: "Security", icon: Shield },
+  { id: "orders", label: "My Orders", icon: ShoppingBag },
 ] as const;
 
 const links = [
@@ -415,12 +431,13 @@ export default function ProfilePage() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() =>
-    location.pathname.includes("settings") ||
-    new URLSearchParams(location.search).get("tab") === "settings"
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    const p = new URLSearchParams(location.search)
+    if (p.get("tab") === "orders") return "orders"
+    return location.pathname.includes("settings") || p.get("tab") === "settings"
       ? "security"
-      : "profile",
-  );
+      : "profile"
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -430,6 +447,23 @@ export default function ProfilePage() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  // ========== Orders ==========
+  const [orders, setOrders] = useState<ServiceOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTab !== "orders" || !profile?.id) return;
+    setOrdersLoading(true);
+    setOrdersError(null);
+    fetchUserServiceOrders(profile.id)
+      .then(setOrders)
+      .catch(() => setOrdersError("Failed to load orders"))
+      .finally(() => setOrdersLoading(false));
+  }, [activeTab, profile?.id]);
 
   const [form, setForm] = useState<ProfileForm>({
     fullName: "",
@@ -662,7 +696,7 @@ export default function ProfilePage() {
   };
 
   const statItems = [
-    { value: 0, label: "Orders" },
+    { value: orders.length, label: "Orders" },
     { value: 0, label: "Services" },
     { value: 0, label: "Feedbacks" },
   ];
@@ -1068,6 +1102,244 @@ export default function ProfilePage() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+              </motion.div>
+            ) : activeTab === "orders" ? (
+              <motion.div
+                key="orders"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+              >
+                <div className="mb-6 border-b border-[#1a2d4a] pb-6">
+                  <h2 className="text-xl font-bold text-white">My Orders</h2>
+                  <p className="mt-1 text-sm text-[#94a3b8]">
+                    Track the status of your service orders.
+                  </p>
+                </div>
+
+                {ordersLoading ? (
+                  <div className="flex items-center justify-center py-20">
+                    <Loader2 size={24} className="animate-spin text-white/30" />
+                  </div>
+                ) : ordersError ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <AlertCircle size={28} className="mb-3 text-red-400" />
+                    <p className="text-sm text-[#94a3b8] mb-3">{ordersError}</p>
+                    <button
+                      onClick={() => {
+                        if (!profile?.id) return;
+                        setOrdersLoading(true);
+                        setOrdersError(null);
+                        fetchUserServiceOrders(profile.id)
+                          .then(setOrders)
+                          .catch(() => setOrdersError("Failed to load orders"))
+                          .finally(() => setOrdersLoading(false));
+                      }}
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white"
+                    >
+                      <RefreshCw size={13} /> Retry
+                    </button>
+                  </div>
+                ) : orders.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.03] mb-4">
+                      <ShoppingBag size={28} className="text-white/20" />
+                    </div>
+                    <p className="text-base font-semibold text-white">No orders yet</p>
+                    <p className="mt-1 text-sm text-[#94a3b8]">
+                      Your service orders will appear here once you hire a service.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {orders.map((order) => {
+                      const isExpanded = expandedOrderId === order.id;
+                      return (
+                        <div
+                          key={order.id}
+                          className="rounded-2xl border border-[#1a2d4a] bg-[#060d14] overflow-hidden"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                            className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-white/[0.02]"
+                          >
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/10">
+                              <ShoppingBag size={18} className="text-[#60a5fa]" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-white truncate">{order.serviceName}</p>
+                              <p className="text-xs text-[#94a3b8] mt-0.5">
+                                {new Date(order.createdAt).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 flex-col items-end gap-1.5">
+                              <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${PROJECT_STATUS_COLORS[order.projectStatus]}`}>
+                                {PROJECT_STATUS_LABELS[order.projectStatus]}
+                              </span>
+                              <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${PAYMENT_STATUS_COLORS[order.paymentStatus]}`}>
+                                {PAYMENT_STATUS_LABELS[order.paymentStatus]}
+                              </span>
+                            </div>
+                            <ChevronRight
+                              size={16}
+                              className={`shrink-0 text-white/30 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                            />
+                          </button>
+
+                          <AnimatePresence>
+                            {isExpanded && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="border-t border-[#1a2d4a] px-5 py-4 space-y-3">
+                                  {/* Progress timeline */}
+                                  <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                                    {([
+                                      { key: "new_request", label: "Requested" },
+                                      { key: "paid_upfront", label: "Upfront Paid" },
+                                      { key: "in_progress", label: "In Progress" },
+                                      { key: "waiting_delivery_payment", label: "Awaiting Final" },
+                                      { key: "delivered", label: "Delivered" },
+                                      { key: "completed", label: "Completed" },
+                                    ] as const).map((step, i, arr) => {
+                                      const statuses = ["new_request", "paid_upfront", "in_progress", "waiting_delivery_payment", "delivered", "completed"];
+                                      const currentIdx = statuses.indexOf(order.projectStatus);
+                                      const stepIdx = statuses.indexOf(step.key);
+                                      const done = currentIdx >= stepIdx;
+                                      const active = currentIdx === stepIdx;
+                                      const cancelled = order.projectStatus === "cancelled";
+                                      return (
+                                        <div key={step.key} className="flex items-center gap-1 shrink-0">
+                                          <div className="flex flex-col items-center gap-1">
+                                            <div className={`flex h-7 w-7 items-center justify-center rounded-full border text-xs transition-all ${
+                                              cancelled ? "border-red-500/30 bg-red-500/10 text-red-400"
+                                              : done ? "border-[#22c55e]/40 bg-[#22c55e]/15 text-[#22c55e]"
+                                              : "border-white/[0.08] bg-white/[0.03] text-white/20"
+                                            }`}>
+                                              {cancelled ? <XCircle size={13} /> : done ? <CheckCircle2 size={13} /> : <Clock size={13} />}
+                                            </div>
+                                            <span className={`text-[9px] whitespace-nowrap ${
+                                              cancelled ? "text-red-400" : active ? "text-white" : done ? "text-[#22c55e]" : "text-white/25"
+                                            }`}>{step.label}</span>
+                                          </div>
+                                          {i < arr.length - 1 && (
+                                            <div className={`h-px w-6 shrink-0 mb-3 ${
+                                              cancelled ? "bg-red-500/20" : done && currentIdx > stepIdx ? "bg-[#22c55e]/40" : "bg-white/[0.06]"
+                                            }`} />
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* Details grid */}
+                                  <div className="grid gap-2 sm:grid-cols-2 text-sm">
+                                    <div className="rounded-xl border border-[#1a2d4a] bg-black/20 px-3 py-2.5">
+                                      <p className="text-[10px] uppercase tracking-wider text-[#475569] mb-1">Total</p>
+                                      <p className="font-semibold text-white">${order.totalPrice}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-[#1a2d4a] bg-black/20 px-3 py-2.5">
+                                      <p className="text-[10px] uppercase tracking-wider text-[#475569] mb-1">Upfront (50%)</p>
+                                      <p className={`font-semibold ${order.upfrontPaid ? "text-[#22c55e]" : "text-yellow-400"}`}>
+                                        ${order.upfrontAmount} {order.upfrontPaid ? "✓ Paid" : "Pending"}
+                                      </p>
+                                    </div>
+                                    <div className="rounded-xl border border-[#1a2d4a] bg-black/20 px-3 py-2.5">
+                                      <p className="text-[10px] uppercase tracking-wider text-[#475569] mb-1">Remaining (50%)</p>
+                                      <p className={`font-semibold ${order.remainingPaid ? "text-[#22c55e]" : "text-white/50"}`}>
+                                        ${order.remainingAmount} {order.remainingPaid ? "✓ Paid" : "Not yet"}
+                                      </p>
+                                    </div>
+                                    {order.desiredDeadline && (
+                                      <div className="rounded-xl border border-[#1a2d4a] bg-black/20 px-3 py-2.5">
+                                        <p className="text-[10px] uppercase tracking-wider text-[#475569] mb-1">Deadline</p>
+                                        <p className="font-semibold text-white">{order.desiredDeadline}</p>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {order.adminNotes && (
+                                    <div className="rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/5 px-3 py-2.5">
+                                      <p className="text-[10px] uppercase tracking-wider text-[#60a5fa] mb-1">Note from CAFÉ</p>
+                                      <p className="text-sm text-[#94a3b8]">{order.adminNotes}</p>
+                                    </div>
+                                  )}
+
+                                  {(order.projectStatus === "delivered" || order.projectStatus === "completed") && order.deliveredProjectUrl && (
+                                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/8 p-4 space-y-3">
+                                      <div className="flex items-start gap-2.5">
+                                        <span className="text-2xl">🎉</span>
+                                        <div>
+                                          <p className="text-sm font-bold text-emerald-400">Your project is ready!</p>
+                                          <p className="text-xs text-white/50 mt-0.5">
+                                            Congratulations! Your {order.serviceName} has been delivered. Click below to access it.
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <a
+                                        href={order.deliveredProjectUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center justify-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/12 px-4 py-2.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20 transition-all"
+                                      >
+                                        <ExternalLink size={14} />
+                                        Access your project
+                                      </a>
+                                    </div>
+                                  )}
+
+                                  {order.projectStatus === "waiting_delivery_payment" && !order.remainingPaid && (
+                                    <div className="rounded-xl border border-[#0070BA]/25 bg-[#0070BA]/8 p-4 space-y-3">
+                                      <div>
+                                        <p className="text-xs font-semibold text-white">Final payment due</p>
+                                        <p className="text-xs text-[#94a3b8] mt-0.5">
+                                          Your project is ready for delivery. Pay the remaining <span className="text-white font-semibold">${order.remainingAmount}</span> to receive it.
+                                        </p>
+                                      </div>
+                                      <button
+                                        disabled={payingOrderId === order.id}
+                                        onClick={async () => {
+                                          setPayingOrderId(order.id);
+                                          const ok = await confirmPayment(order.id, "paypal_remaining");
+                                          setPayingOrderId(null);
+                                          if (ok) {
+                                            toast.success("Payment notification sent! CAFÉ will confirm and deliver your project.");
+                                            setOrders((prev) =>
+                                              prev.map((o) =>
+                                                o.id === order.id ? { ...o, remainingPaid: true } : o
+                                              )
+                                            );
+                                          }
+                                        }}
+                                        className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#0070BA] hover:bg-[#003087] disabled:opacity-60 disabled:cursor-not-allowed px-4 py-3 text-sm font-semibold text-white transition-all shadow-[0_4px_20px_rgba(0,112,186,0.35)]"
+                                      >
+                                        {payingOrderId === order.id ? (
+                                          <Loader2 size={16} className="animate-spin" />
+                                        ) : (
+                                          <img src="/imgs/icons/PayPal.png" alt="PayPal" className="h-5 w-auto" />
+                                        )}
+                                        Pay ${order.remainingAmount} with PayPal
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  <p className="text-[10px] text-white/20 text-right">
+                                    Order #{order.id.slice(0, 8).toUpperCase()}
+                                  </p>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </motion.div>
             ) : (
               <motion.div
