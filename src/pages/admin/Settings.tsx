@@ -48,7 +48,7 @@ export default function Settings() {
     loadSettings()
   }, [loadSettings])
 
-  const activeTabDef = TABS.find((t) => t.id === activeTab) ?? TABS[0]
+  const _activeTabDef = TABS.find((t) => t.id === activeTab) ?? TABS[0]
 
   return (
     <motion.div

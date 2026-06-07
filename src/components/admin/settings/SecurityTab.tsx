@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
 import {
   Key,
   Shield,
@@ -23,11 +22,12 @@ import {
   exportAllData,
   clearAllFeedbacks,
   deleteAccount,
-  updateSettings,
 } from "../../../lib/services/settingsService"
 import { useAdminStore } from "../../../lib/store/adminStore"
 
-const ACTIVITY_ICONS: Record<string, typeof Activity> = {
+type IconComponent = React.FC<{ size?: number; className?: string }>
+
+const ACTIVITY_ICONS: Record<string, IconComponent> = {
   login: LogOut,
   settings_updated: SettingsIcon,
   member_invited: UserPlusIcon,
@@ -55,10 +55,10 @@ const ACTIVITY_COLORS: Record<string, string> = {
 
 interface SecurityTabProps {
   settings: SiteSettings | null
-  onSettingsChange: (s: SiteSettings) => void
+  onSettingsChange: (_s: SiteSettings) => void
 }
 
-export default function SecurityTab({ settings, onSettingsChange }: SecurityTabProps) {
+export default function SecurityTab({ onSettingsChange: _onSettingsChange }: SecurityTabProps) {
   const [logs, setLogs] = useState<ActivityLogEntry[]>([])
   const [sessions, setSessions] = useState<AdminSession[]>([])
   const [loadingLogs, setLoadingLogs] = useState(true)
@@ -520,15 +520,15 @@ function DangerAction({
   )
 }
 
-function SettingsIcon({ size, className }: { size: number; className?: string }) {
+function SettingsIcon({ size, className }: { size?: number; className?: string }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
 }
 
-function UserPlusIcon({ size, className }: { size: number; className?: string }) {
+function UserPlusIcon({ size, className }: { size?: number; className?: string }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
 }
 
-function UserMinusIcon({ size, className }: { size: number; className?: string }) {
+function UserMinusIcon({ size, className }: { size?: number; className?: string }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
 }
 

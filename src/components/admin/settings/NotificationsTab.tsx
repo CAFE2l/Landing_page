@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Save, Bell, Send } from "lucide-react"
+import { Save, Send } from "lucide-react"
 import toast from "react-hot-toast"
 import type { SiteSettings } from "../../../lib/types/settings"
 import { updateSettings, sendTestNotification } from "../../../lib/services/settingsService"
@@ -73,22 +73,7 @@ export default function NotificationsTab({ settings, onSettingsChange }: Notific
     }
   }
 
-  const Switch = ({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) => (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`${TOGGLE_CLASS} ${checked ? "bg-[#4f6ef7]" : "bg-white/[0.12]"}`}
-    >
-      <span
-        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition-transform ${
-          checked ? "translate-x-5" : "translate-x-0.5"
-        }`}
-      />
-    </button>
-  )
+
 
   return (
     <div className="space-y-8">

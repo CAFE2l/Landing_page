@@ -528,6 +528,7 @@ async function sendBotDeliveryMessage(order: ServiceOrder, projectUrl?: string):
     .eq("id", convId)
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function sendBotPaymentNotification(order: ServiceOrder, event: string): Promise<void> {
   if (!supabase || !supabaseConfigured) return
 
@@ -789,6 +790,7 @@ export async function subscribeToServiceOrders(onChange: () => void) {
 
 // ========== CAFÉ Website Bot ==========
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function createWebsiteBotMessage(order: ServiceOrder): Promise<void> {
   if (!supabase || !supabaseConfigured) return
 

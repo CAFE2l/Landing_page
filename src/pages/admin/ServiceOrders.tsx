@@ -15,7 +15,6 @@ import {
   deleteServiceOrder,
   updateServiceOrder,
   subscribeToServiceOrders,
-  generateAdminWhatsAppLink,
   getOrderDisplayName,
   getOrderAvatarUrl,
 } from "../../lib/serviceOrdersService"
