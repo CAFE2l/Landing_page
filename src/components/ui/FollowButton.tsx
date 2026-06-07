@@ -7,7 +7,7 @@ import toast from "react-hot-toast"
 interface FollowButtonProps {
   currentUserId: string
   targetUserId: string
-  targetUserName?: string
+  targetUserName?: string // kept for API compatibility
   initialFollowing?: boolean
   onStateChange?: (nowFollowing: boolean) => void
   className?: string
@@ -17,6 +17,7 @@ interface FollowButtonProps {
 export default function FollowButton({
   currentUserId,
   targetUserId,
+  targetUserName: _targetUserName,
   initialFollowing = false,
   onStateChange,
   className = "",
