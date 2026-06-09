@@ -288,7 +288,7 @@ export interface SocialPost {
   isHidden: boolean
   createdAt: string
   updatedAt: string
-  user: { id: string; name: string; avatarUrl: string | null; username: string | null } | null
+  user: { id: string; name: string; avatarUrl: string | null; username: string | null; bio?: string | null; role?: string | null } | null
   liked: boolean
   comments: SocialComment[]
 }

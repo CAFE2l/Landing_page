@@ -6,7 +6,6 @@ import { motion } from "framer-motion"
 import {
   AlertCircle,
   ArrowLeft,
-  Banknote,
   Check,
   CheckCircle2,
   Copy,
@@ -138,8 +137,12 @@ function PaymentMethodCard({
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl", isPayPal ? "bg-[#0070BA]/15 text-[#4DB4FF]" : "bg-cyan-500/12 text-cyan-300")}>
-          {isPayPal ? <CreditCard size={20} /> : <Banknote size={20} />}
+        <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl border", isPayPal ? "border-[#0070BA]/20 bg-[#0070BA]/15" : "border-cyan-400/20 bg-cyan-500/12")}>
+          <img
+            src={isPayPal ? "/imgs/icons/PayPal.png" : "/imgs/icons/wise.png"}
+            alt={isPayPal ? "PayPal" : "Wise"}
+            className="h-6 w-6 object-contain"
+          />
         </div>
         <span className={cn("rounded-full border px-2.5 py-0.5 text-[10px] font-semibold", selected ? "border-blue-400/30 text-blue-200" : "border-white/[0.08] text-white/35")}>
           {selected ? "Selected" : "Choose"}

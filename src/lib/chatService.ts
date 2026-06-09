@@ -510,6 +510,33 @@ export async function softDeleteMessage(
   return true
 }
 
+export async function clearConversationMessages(conversationId: string, label = "Chat cleared"): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+  const now = new Date().toISOString()
+
+  const { error } = await supabase
+    .from("messages")
+    .delete()
+    .eq("conversation_id", conversationId)
+
+  if (error) {
+    console.error("clearConversationMessages failed", error)
+    toast.error("Failed to clear chat")
+    return false
+  }
+
+  await supabase
+    .from("conversations")
+    .update({
+      last_message: label,
+      last_message_at: now,
+      updated_at: now,
+    })
+    .eq("id", conversationId)
+
+  return true
+}
+
 export async function replyToMessage(
   conversationId: string,
   senderId: string,

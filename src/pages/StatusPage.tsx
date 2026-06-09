@@ -7,6 +7,8 @@ import {
   BriefcaseBusiness,
   Camera,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   EyeOff,
   Flag,
@@ -62,6 +64,7 @@ interface StatusGroup {
   username: string | null
   avatarUrl: string | null
   bio: string | null
+  role: string | null
   category: SocialStatusCategory
   posts: SocialPost[]
   followers: number | null
@@ -164,10 +167,11 @@ function groupStatus(posts: SocialPost[], followState: Map<string, boolean>, cou
     const followCounts = counts.get(post.userId)
     groups.set(post.userId, {
       userId: post.userId,
-      name: post.user?.name || "CAFÉ member",
+      name: post.user?.name || "User unavailable",
       username: post.user?.username || null,
       avatarUrl: post.user?.avatarUrl || null,
-      bio: null,
+      bio: post.user?.bio || null,
+      role: post.user?.role || null,
       category: post.category,
       posts: [post],
       followers: followCounts?.followers ?? null,
@@ -489,18 +493,30 @@ function StatusComposer({
 function StatusViewer({
   group,
   currentUserId,
+  isAdmin,
   onClose,
   onFollowChanged,
   onOpenProfile,
+  onDeleteStatus,
 }: {
   group: StatusGroup | null
   currentUserId?: string
+  isAdmin: boolean
   onClose: () => void
   onFollowChanged: () => Promise<void>
   onOpenProfile: (group: StatusGroup) => void
+  onDeleteStatus: (post: SocialPost) => Promise<void>
 }) {
   const [busyFollow, setBusyFollow] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [deleting, setDeleting] = useState(false)
   const navigate = useNavigate()
+  const posts = group?.posts || []
+  const activePost = posts[Math.min(activeIndex, Math.max(0, posts.length - 1))]
+
+  useEffect(() => {
+    setActiveIndex(0)
+  }, [group?.userId])
 
   const handleFollow = async () => {
     if (!group || !currentUserId) {
@@ -516,6 +532,23 @@ function StatusViewer({
       return
     }
     await onFollowChanged()
+  }
+
+  const goPrev = () => setActiveIndex((index) => Math.max(0, index - 1))
+  const goNext = () => setActiveIndex((index) => Math.min(posts.length - 1, index + 1))
+
+  const handleDeleteActive = async () => {
+    if (!activePost) return
+    const confirmed = window.confirm("Delete this status? This removes it from the community feed.")
+    if (!confirmed) return
+    setDeleting(true)
+    await onDeleteStatus(activePost)
+    setDeleting(false)
+    if (posts.length <= 1) {
+      onClose()
+      return
+    }
+    setActiveIndex((index) => Math.max(0, Math.min(index, posts.length - 2)))
   }
 
   return (
@@ -534,113 +567,174 @@ function StatusViewer({
             exit={{ opacity: 0, y: 18, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 250, damping: 24 }}
             onClick={(event) => event.stopPropagation()}
-            className="relative max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-[34px] border border-white/[0.11] bg-[#090a10]/96 shadow-[0_48px_150px_rgba(0,0,0,0.65)]"
+            className="relative h-[92vh] w-full max-w-6xl overflow-hidden rounded-[34px] border border-white/[0.11] bg-[#05060a]/96 shadow-[0_48px_150px_rgba(0,0,0,0.65)]"
           >
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(79,110,247,0.22),transparent_34%),radial-gradient(circle_at_88%_8%,rgba(139,92,246,0.16),transparent_32%)]" />
-            <div className="relative max-h-[92vh] overflow-y-auto">
-              <div className="sticky top-0 z-10 border-b border-white/[0.07] bg-[#090a10]/78 px-5 py-4 backdrop-blur-2xl">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="lg" className="h-13 w-13" />
-                    <div className="min-w-0">
-                      <p className="truncate text-lg font-semibold text-white">{group.name}</p>
-                      <p className="truncate text-xs text-white/42">{group.username ? `@${group.username}` : "CAFÉ community member"}</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.045] text-white/55 transition hover:bg-white/[0.08] hover:text-white"
-                  >
-                    <X size={17} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid gap-6 p-5 lg:grid-cols-[320px_minmax(0,1fr)] md:p-6">
-                <aside className="lg:sticky lg:top-24 lg:self-start">
-                  <div className="rounded-[28px] border border-white/[0.09] bg-white/[0.045] p-5 backdrop-blur-xl">
-                    <div className="flex flex-col items-center text-center">
-                      <span className={cn("rounded-full bg-gradient-to-br p-[2px]", CATEGORY_META[group.category].ring)}>
-                        <span className="block rounded-full bg-[#090a10] p-1">
-                          <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="xl" className="h-24 w-24" ring={false} />
-                        </span>
-                      </span>
-                      <h2 className="mt-4 text-xl font-semibold text-white">{group.name}</h2>
-                      <p className="mt-1 text-sm text-white/42">{group.bio || "Sharing progress, projects and updates with the CAFÉ community."}</p>
-                    </div>
-                    <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-                      <div className="rounded-2xl border border-white/[0.07] bg-black/18 p-3">
-                        <p className="text-lg font-semibold text-white">{group.posts.length}</p>
-                        <p className="text-[10px] uppercase tracking-[0.14em] text-white/36">Status</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/[0.07] bg-black/18 p-3">
-                        <p className="text-lg font-semibold text-white">{group.followers ?? "—"}</p>
-                        <p className="text-[10px] uppercase tracking-[0.14em] text-white/36">Followers</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/[0.07] bg-black/18 p-3">
-                        <p className="text-lg font-semibold text-white">{group.following ?? "—"}</p>
-                        <p className="text-[10px] uppercase tracking-[0.14em] text-white/36">Following</p>
-                      </div>
-                    </div>
-                    <div className="mt-5 grid gap-2">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(79,110,247,0.24),transparent_34%),radial-gradient(circle_at_82%_12%,rgba(139,92,246,0.18),transparent_34%)]" />
+            <div className="relative grid h-full lg:grid-cols-[minmax(0,1fr)_310px]">
+              <section className="relative flex min-h-0 flex-col">
+                <div className="absolute inset-x-0 top-0 z-20 p-4">
+                  <div className="mb-4 flex gap-1.5">
+                    {posts.map((post, index) => (
                       <button
+                        key={post.id}
                         type="button"
-                        onClick={() => onOpenProfile(group)}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white text-sm font-semibold text-black transition hover:bg-white/90"
+                        onClick={() => setActiveIndex(index)}
+                        className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/16"
+                        aria-label={`Open status ${index + 1}`}
                       >
-                        View Profile
-                        <ArrowRight size={15} />
+                        <motion.span
+                          className="block h-full rounded-full bg-white"
+                          initial={false}
+                          animate={{ width: index < activeIndex ? "100%" : index === activeIndex ? "100%" : "0%" }}
+                          transition={{ duration: index === activeIndex ? 0.35 : 0.18 }}
+                        />
                       </button>
-                      {currentUserId !== group.userId ? (
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/34 px-3 py-2 backdrop-blur-xl">
+                      <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="sm" ring={false} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{group.name}</p>
+                        <p className="truncate text-[11px] text-white/46">{activePost ? timeAgo(activePost.createdAt) : "Status"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isAdmin && activePost ? (
                         <button
                           type="button"
-                          onClick={handleFollow}
-                          disabled={busyFollow || !currentUserId}
-                          className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.045] text-sm font-semibold text-white/76 transition hover:bg-white/[0.07] hover:text-white disabled:opacity-45"
+                          onClick={handleDeleteActive}
+                          disabled={deleting}
+                          className="inline-flex h-10 items-center gap-2 rounded-2xl border border-red-400/25 bg-red-500/12 px-3 text-xs font-semibold text-red-100 backdrop-blur-xl transition hover:bg-red-500/18 disabled:opacity-50"
                         >
-                          {busyFollow ? <Loader2 size={15} className="animate-spin" /> : <UserPlus size={15} />}
-                          {group.followedByMe ? "Following" : "Follow"}
+                          {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          Delete
                         </button>
                       ) : null}
                       <button
                         type="button"
-                        onClick={() => navigate("/messages")}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.045] text-sm font-semibold text-white/76 transition hover:bg-white/[0.07] hover:text-white"
+                        onClick={onClose}
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-black/34 text-white/70 backdrop-blur-xl transition hover:bg-white/[0.08] hover:text-white"
                       >
-                        <MessageCircle size={15} />
-                        Send Message
+                        <X size={17} />
                       </button>
                     </div>
                   </div>
-                </aside>
+                </div>
 
-                <motion.div className="space-y-4" initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }}>
-                  {group.posts.map((post) => (
-                    <motion.article
-                      key={post.id}
-                      variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
-                      className="overflow-hidden rounded-[28px] border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl"
-                    >
-                      {post.mediaUrl && post.mediaType === "image" ? (
-                        <img src={post.mediaUrl} alt="" className="max-h-[460px] w-full object-cover" />
-                      ) : null}
-                      <div className="p-5">
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                          <CategoryBadge category={post.category} />
-                          <span className="text-xs text-white/34">{timeAgo(post.createdAt)}</span>
+                <div className="relative flex min-h-0 flex-1 items-center justify-center p-4 pt-24 md:p-8 md:pt-24">
+                  <button
+                    type="button"
+                    onClick={goPrev}
+                    disabled={activeIndex === 0}
+                    className="absolute left-4 top-1/2 z-10 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.1] bg-black/34 text-white/72 backdrop-blur-xl transition hover:bg-white/[0.08] disabled:opacity-25 md:flex"
+                  >
+                    <ChevronLeft size={22} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    disabled={activeIndex >= posts.length - 1}
+                    className="absolute right-4 top-1/2 z-10 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.1] bg-black/34 text-white/72 backdrop-blur-xl transition hover:bg-white/[0.08] disabled:opacity-25 md:flex"
+                  >
+                    <ChevronRight size={22} />
+                  </button>
+
+                  <AnimatePresence mode="wait">
+                    {activePost ? (
+                      <motion.article
+                        key={activePost.id}
+                        initial={{ opacity: 0, scale: 0.96, y: 14 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.98, y: -10 }}
+                        transition={{ type: "spring", stiffness: 260, damping: 25 }}
+                        className="flex h-full max-h-[720px] w-full max-w-[520px] flex-col overflow-hidden rounded-[32px] border border-white/[0.12] bg-[linear-gradient(145deg,rgba(255,255,255,0.085),rgba(255,255,255,0.025))] shadow-[0_34px_110px_rgba(0,0,0,0.50)] backdrop-blur-2xl"
+                      >
+                        {activePost.mediaUrl && activePost.mediaType === "image" ? (
+                          <img src={activePost.mediaUrl} alt="" className="min-h-0 flex-1 object-cover" />
+                        ) : activePost.mediaUrl && activePost.mediaType === "video" ? (
+                          <video src={activePost.mediaUrl} controls className="min-h-0 flex-1 bg-black object-contain" />
+                        ) : activePost.mediaUrl && activePost.mediaType === "audio" ? (
+                          <div className="flex flex-1 items-center justify-center bg-black/26 p-8">
+                            <audio src={activePost.mediaUrl} controls className="w-full" />
+                          </div>
+                        ) : (
+                          <div className="flex flex-1 items-center justify-center p-8">
+                            <p className="whitespace-pre-wrap text-center text-2xl font-semibold leading-relaxed text-white md:text-3xl">{activePost.content}</p>
+                          </div>
+                        )}
+                        {(activePost.mediaUrl && activePost.content) ? (
+                          <div className="border-t border-white/[0.08] bg-black/24 p-5">
+                            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-white/82">{activePost.content}</p>
+                          </div>
+                        ) : null}
+                        <div className="flex items-center justify-between border-t border-white/[0.08] bg-black/22 px-5 py-4 text-xs text-white/48">
+                          <CategoryBadge category={activePost.category} />
+                          <div className="flex items-center gap-4">
+                            <span>{activePost.likesCount} likes</span>
+                            <span>{activePost.viewsCount} views</span>
+                          </div>
                         </div>
-                        {post.content ? <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-white/76">{post.content}</p> : null}
-                        <div className="mt-4 flex items-center gap-4 text-xs text-white/42">
-                          <span>{post.likesCount} likes</span>
-                          <span>{post.commentsCount} comments</span>
-                          <span>{post.viewsCount} views</span>
-                        </div>
-                      </div>
-                    </motion.article>
-                  ))}
-                </motion.div>
-              </div>
+                      </motion.article>
+                    ) : null}
+                  </AnimatePresence>
+                </div>
+
+                <div className="flex items-center justify-center gap-3 border-t border-white/[0.07] bg-black/18 px-4 py-3 md:hidden">
+                  <button type="button" onClick={goPrev} disabled={activeIndex === 0} className="rounded-full border border-white/[0.1] bg-white/[0.04] p-3 text-white disabled:opacity-25">
+                    <ChevronLeft size={18} />
+                  </button>
+                  <span className="text-xs text-white/42">{activeIndex + 1} / {posts.length}</span>
+                  <button type="button" onClick={goNext} disabled={activeIndex >= posts.length - 1} className="rounded-full border border-white/[0.1] bg-white/[0.04] p-3 text-white disabled:opacity-25">
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              </section>
+
+              <aside className="hidden border-l border-white/[0.08] bg-white/[0.035] p-5 backdrop-blur-2xl lg:block">
+                <div className="flex flex-col items-center text-center">
+                  <span className={cn("rounded-full bg-gradient-to-br p-[2px]", CATEGORY_META[group.category].ring)}>
+                    <span className="block rounded-full bg-[#090a10] p-1">
+                      <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="xl" className="h-24 w-24" ring={false} />
+                    </span>
+                  </span>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                    <h2 className="text-xl font-semibold text-white">{group.name}</h2>
+                    {group.role ? <span className="rounded-full border border-white/[0.1] bg-white/[0.05] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/48">{group.role}</span> : null}
+                  </div>
+                  <p className="mt-1 text-sm text-white/42">{group.bio || "Sharing progress, projects and updates with the CAFÉ community."}</p>
+                </div>
+                <div className="mt-5 grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-2xl border border-white/[0.07] bg-black/18 p-3">
+                    <p className="text-lg font-semibold text-white">{group.posts.length}</p>
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-white/36">Status</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/[0.07] bg-black/18 p-3">
+                    <p className="text-lg font-semibold text-white">{group.followers ?? "—"}</p>
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-white/36">Followers</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/[0.07] bg-black/18 p-3">
+                    <p className="text-lg font-semibold text-white">{group.following ?? "—"}</p>
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-white/36">Following</p>
+                  </div>
+                </div>
+                <div className="mt-5 grid gap-2">
+                  <button type="button" onClick={() => onOpenProfile(group)} className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white text-sm font-semibold text-black transition hover:bg-white/90">
+                    View Profile
+                    <ArrowRight size={15} />
+                  </button>
+                  {currentUserId !== group.userId ? (
+                    <button type="button" onClick={handleFollow} disabled={busyFollow || !currentUserId} className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.045] text-sm font-semibold text-white/76 transition hover:bg-white/[0.07] hover:text-white disabled:opacity-45">
+                      {busyFollow ? <Loader2 size={15} className="animate-spin" /> : <UserPlus size={15} />}
+                      {group.followedByMe ? "Following" : "Follow"}
+                    </button>
+                  ) : null}
+                  <button type="button" onClick={() => navigate("/messages")} className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.045] text-sm font-semibold text-white/76 transition hover:bg-white/[0.07] hover:text-white">
+                    <MessageCircle size={15} />
+                    Send Message
+                  </button>
+                </div>
+              </aside>
             </div>
           </motion.div>
         </motion.div>
@@ -820,9 +914,9 @@ function StatusCard({
       <div className={cn("p-5", compactText && "p-6")}>
         <div className="flex items-start justify-between gap-3">
           <button type="button" onClick={onOpenViewer} className="flex min-w-0 items-center gap-3 text-left">
-            <UserAvatar user={{ name: post.user?.name || "CAFÉ member", avatarUrl: post.user?.avatarUrl }} size="md" ring={false} />
+            <UserAvatar user={{ name: post.user?.name || "User unavailable", avatarUrl: post.user?.avatarUrl }} size="md" ring={false} />
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-white">{post.user?.name || "CAFÉ member"}</span>
+              <span className="block truncate text-sm font-semibold text-white">{post.user?.name || "User unavailable"}</span>
               <span className="block truncate text-xs text-white/38">{post.user?.username ? `@${post.user.username}` : "Community"} · {timeAgo(post.createdAt)}</span>
             </span>
           </button>
@@ -1226,9 +1320,11 @@ export default function StatusPage() {
       <StatusViewer
         group={selectedGroup}
         currentUserId={uid}
+        isAdmin={isAdmin}
         onClose={() => setSelectedGroupId(null)}
         onFollowChanged={loadPosts}
         onOpenProfile={openGroupProfile}
+        onDeleteStatus={handleDelete}
       />
     </PageShell>
   )

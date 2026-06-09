@@ -73,6 +73,16 @@ export interface BotNotificationRow {
   raw: unknown
 }
 
+export interface RecentMessageThread {
+  id: string
+  clientName: string
+  username: string | null
+  avatarUrl: string | null
+  lastMessage: string | null
+  lastMessageAt: string
+  unreadCount: number
+}
+
 export interface AdminCommandCenterData {
   metrics: CommandMetric[]
   orders: ServiceOrder[]
@@ -82,6 +92,8 @@ export interface AdminCommandCenterData {
   users: AdminUserRow[]
   community: CommunityStats
   botNotifications: BotNotificationRow[]
+  recentMessages: RecentMessageThread[]
+  recentMessagesAvailability: DataAvailability
   auditLogs: WebhookLogRow[]
   errors: string[]
 }
@@ -100,22 +112,10 @@ type CountQuery = {
 
 const BOT_ID = "00000000-0000-0000-0000-000000000001"
 
-function startOfToday() {
-  const date = new Date()
-  date.setHours(0, 0, 0, 0)
-  return date.toISOString()
-}
-
 function startOfMonth() {
   const date = new Date()
   date.setDate(1)
   date.setHours(0, 0, 0, 0)
-  return date.toISOString()
-}
-
-function last30Days() {
-  const date = new Date()
-  date.setDate(date.getDate() - 30)
   return date.toISOString()
 }
 
@@ -188,33 +188,6 @@ function mapOrder(row: Record<string, unknown>): ServiceOrder {
   }
 }
 
-function mapSocialPost(row: Record<string, unknown>): SocialPost {
-  const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
-  const profileRow = profile as { full_name?: string | null; username?: string | null; avatar_url?: string | null } | null
-  return {
-    id: String(row.id),
-    userId: String(row.user_id || ""),
-    content: String(row.content || ""),
-    mediaUrl: (row.media_url as string) || null,
-    mediaType: (row.media_type as "image" | "video" | "audio") || null,
-    category: (row.category as SocialPost["category"]) || "business",
-    likesCount: Number(row.likes_count || 0),
-    commentsCount: Number(row.comments_count || 0),
-    viewsCount: Number(row.views_count || 0),
-    isHidden: Boolean(row.is_hidden),
-    createdAt: String(row.created_at || new Date().toISOString()),
-    updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()),
-    liked: false,
-    comments: [],
-    user: {
-      id: String(row.user_id || ""),
-      name: profileRow?.full_name || profileRow?.username || "CAFÉ member",
-      username: profileRow?.username || null,
-      avatarUrl: profileRow?.avatar_url || null,
-    },
-  }
-}
-
 function paymentFromOrder(order: ServiceOrder): PaymentRow {
   return {
     paymentId: order.paypalCaptureId || order.paypalOrderId || order.id,
@@ -252,13 +225,103 @@ function parseBotNotification(row: Record<string, unknown>): BotNotificationRow 
   }
 }
 
+function summarizeMessage(row: Record<string, unknown> | null | undefined) {
+  if (!row) return null
+  const content = String(row.content || "")
+  try {
+    const parsed = JSON.parse(content) as { cafeBotNotification?: boolean; title?: string; clientName?: string; amount?: number }
+    if (parsed.cafeBotNotification && parsed.title) {
+      return [parsed.title, parsed.clientName, parsed.amount == null ? null : `$${parsed.amount}`].filter(Boolean).join(" · ")
+    }
+  } catch {
+    // Plain chat messages are expected here.
+  }
+
+  const messageType = String(row.message_type || "text")
+  if (messageType === "image") return row.caption ? `Image · ${String(row.caption).slice(0, 80)}` : "Image"
+  if (messageType === "video") return row.caption ? `Video · ${String(row.caption).slice(0, 80)}` : "Video"
+  if (messageType === "audio") return "Audio message"
+  if (messageType === "file") return row.file_name ? `File · ${String(row.file_name).slice(0, 80)}` : "File"
+  if (messageType === "sticker") return "Sticker"
+  return content || null
+}
+
+async function fetchRecentMessageThreads(currentUserId: string | null): Promise<QueryResult<RecentMessageThread[]>> {
+  if (!currentUserId) return { availability: supabaseConfigured ? "ready" : "not_configured", data: [] }
+
+  const conversationsResult = await safeQuery("Recent messages", () =>
+    supabase!
+      .from("conversations")
+      .select("id, participant_1, participant_2, last_message, last_message_at, created_at, updated_at")
+      .or(`participant_1.eq.${currentUserId},participant_2.eq.${currentUserId}`)
+      .order("last_message_at", { ascending: false })
+      .limit(8),
+  [] as Record<string, unknown>[])
+
+  if (conversationsResult.availability !== "ready" || conversationsResult.data.length === 0) {
+    return { availability: conversationsResult.availability, data: [], error: conversationsResult.error }
+  }
+
+  const conversationIds = conversationsResult.data.map((row) => String(row.id))
+  const otherIds = conversationsResult.data
+    .map((row) => String(row.participant_1) === currentUserId ? String(row.participant_2) : String(row.participant_1))
+    .filter(Boolean)
+
+  const [profilesResult, messagesResult] = await Promise.all([
+    safeQuery("Message profiles", () =>
+      supabase!
+        .from("profiles")
+        .select("id, full_name, username, email, avatar_url")
+        .in("id", otherIds),
+    [] as Record<string, unknown>[]),
+    safeQuery("Message previews", () =>
+      supabase!
+        .from("messages")
+        .select("conversation_id, sender_id, receiver_id, read_at, created_at, content, message_type, caption, file_name")
+        .in("conversation_id", conversationIds)
+        .order("created_at", { ascending: false }),
+    [] as Record<string, unknown>[]),
+  ])
+
+  const profileMap = new Map(profilesResult.data.map((profile) => [String(profile.id), profile]))
+  const latestByConversation = new Map<string, Record<string, unknown>>()
+  const unreadByConversation = new Map<string, number>()
+
+  for (const message of messagesResult.data) {
+    const conversationId = String(message.conversation_id)
+    if (!latestByConversation.has(conversationId)) latestByConversation.set(conversationId, message)
+    if (String(message.receiver_id || "") === currentUserId && !message.read_at) {
+      unreadByConversation.set(conversationId, (unreadByConversation.get(conversationId) || 0) + 1)
+    }
+  }
+
+  const threads = conversationsResult.data.map((row) => {
+    const id = String(row.id)
+    const otherId = String(row.participant_1) === currentUserId ? String(row.participant_2) : String(row.participant_1)
+    const profile = profileMap.get(otherId)
+    const latest = latestByConversation.get(id)
+    const rowPreview = row.last_message ? { content: row.last_message, message_type: "text" } : null
+    return {
+      id,
+      clientName: String(profile?.full_name || profile?.username || profile?.email || "Unknown client"),
+      username: (profile?.username as string) || null,
+      avatarUrl: (profile?.avatar_url as string) || null,
+      lastMessage: summarizeMessage(latest || rowPreview),
+      lastMessageAt: String(latest?.created_at || row.last_message_at || row.updated_at || row.created_at || new Date().toISOString()),
+      unreadCount: unreadByConversation.get(id) || 0,
+    }
+  })
+
+  const error = profilesResult.error || messagesResult.error
+  return { availability: error ? "error" : "ready", data: threads, error }
+}
+
 export async function fetchAdminCommandCenter(): Promise<AdminCommandCenterData> {
   const errors: string[] = []
-  const today = startOfToday()
   const month = startOfMonth()
-  const recent = last30Days()
+  const currentUserId = supabase && supabaseConfigured ? (await supabase.auth.getUser()).data.user?.id || null : null
 
-  const [ordersResult, usersResult, postsResult, unreadMessages, feedbackPending, notificationsResult, socialComments, socialLikes, ticketsCount, auditResult] = await Promise.all([
+  const [ordersResult, unreadMessages, notificationsResult] = await Promise.all([
     safeQuery("Orders", () =>
       supabase!
         .from("service_orders")
@@ -267,24 +330,7 @@ export async function fetchAdminCommandCenter(): Promise<AdminCommandCenterData>
         .limit(300),
     [] as Record<string, unknown>[],
     ),
-    safeQuery("Users", () =>
-      supabase!
-        .from("profiles")
-        .select("id, full_name, username, email, phone, avatar_url, role, status, location_country, country, created_at, updated_at, last_seen_at")
-        .order("created_at", { ascending: false })
-        .limit(500),
-    [] as Record<string, unknown>[],
-    ),
-    safeQuery("Community posts", () =>
-      supabase!
-        .from("social_posts")
-        .select("*, profiles(full_name, username, avatar_url)")
-        .order("created_at", { ascending: false })
-        .limit(500),
-    [] as Record<string, unknown>[],
-    ),
     safeCount("messages", "Unread messages", (query) => query.is("read_at", null)),
-    safeCount("feedback_posts", "Pending reviews", (query) => query.eq("status", "pending")),
     safeQuery("Notifications", () =>
       supabase!
         .from("notifications")
@@ -293,48 +339,21 @@ export async function fetchAdminCommandCenter(): Promise<AdminCommandCenterData>
         .limit(200),
     [] as Record<string, unknown>[],
     ),
-    safeCount("social_post_comments", "Social comments"),
-    safeCount("social_post_likes", "Social reactions"),
-    safeCount("support_tickets", "Support tickets", (query) => query.neq("status", "closed")),
-    safeQuery("Audit logs", () =>
-      supabase!
-        .from("audit_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(200),
-    [] as Record<string, unknown>[],
-    ),
   ])
 
-  for (const item of [ordersResult, usersResult, postsResult, unreadMessages, feedbackPending, notificationsResult, socialComments, socialLikes, ticketsCount, auditResult]) {
+  for (const item of [ordersResult, unreadMessages, notificationsResult]) {
     if (item.error) errors.push(item.error)
   }
 
   const orders = ordersResult.data.map(mapOrder)
-  const posts = postsResult.data.map(mapSocialPost)
-  const users: AdminUserRow[] = usersResult.data.map((row) => ({
-    id: String(row.id),
-    name: String(row.full_name || row.username || row.email || "Unknown user"),
-    username: (row.username as string) || null,
-    email: (row.email as string) || null,
-    phone: (row.phone as string) || null,
-    country: (row.location_country as string) || (row.country as string) || null,
-    role: String(row.role || "user"),
-    status: row.last_seen_at && String(row.last_seen_at) >= recent ? "active" : row.status ? String(row.status) === "active" ? "active" : "inactive" : "unknown",
-    avatarUrl: (row.avatar_url as string) || null,
-    createdAt: (row.created_at as string) || null,
-    lastActivity: (row.last_seen_at as string) || (row.updated_at as string) || null,
-  }))
 
   const paidOrders = orders.filter((order) => order.upfrontPaid || ["paid", "paid_upfront"].includes(order.projectStatus))
   const activeProjects = orders.filter((order) => ["paid", "paid_upfront", "in_progress", "waiting_delivery_payment"].includes(order.projectStatus))
   const completedProjects = orders.filter((order) => ["delivered", "completed"].includes(order.projectStatus))
   const pendingPayments = orders.filter((order) => ["awaiting_payment", "payment_claimed", "payment_pending", "waiting_payment"].includes(order.projectStatus) || ["client_claimed_paid", "wise_manual_review", "payment_pending", "waiting_upfront_payment"].includes(order.paymentStatus))
-  const revenueAllTime = paidOrders.reduce((sum, order) => sum + (order.upfrontPaid ? order.upfrontAmount : 0) + (order.remainingPaid ? order.remainingAmount : 0), 0)
   const revenueThisMonth = paidOrders
     .filter((order) => (order.paymentConfirmedAt || order.updatedAt) >= month)
     .reduce((sum, order) => sum + (order.upfrontPaid ? order.upfrontAmount : 0) + (order.remainingPaid ? order.remainingAmount : 0), 0)
-  const postsToday = posts.filter((post) => post.createdAt >= today).length
   const botRows = await safeQuery("CAFÉ Bot notifications", () =>
     supabase!
       .from("messages")
@@ -347,6 +366,9 @@ export async function fetchAdminCommandCenter(): Promise<AdminCommandCenterData>
   if (botRows.error) errors.push(botRows.error)
 
   const botNotifications = botRows.data.map(parseBotNotification).filter((row): row is BotNotificationRow => !!row)
+  const recentMessagesResult = await fetchRecentMessageThreads(currentUserId)
+  if (recentMessagesResult.error) errors.push(recentMessagesResult.error)
+
   const webhookLogs: WebhookLogRow[] = notificationsResult.data
     .filter((row) => String(row.type || "").includes("webhook") || String(row.type || "").includes("payment"))
     .map((row) => ({
@@ -357,33 +379,17 @@ export async function fetchAdminCommandCenter(): Promise<AdminCommandCenterData>
       payload: row.payload,
       timestamp: String(row.created_at || new Date().toISOString()),
     }))
-  const auditLogs: WebhookLogRow[] = auditResult.data.map((row) => ({
-    id: String(row.id),
-    eventType: String(row.action || row.event_type || row.type || "admin_action"),
-    status: String(row.status || row.title || "Recorded"),
-    response: row.description || row.message ? String(row.description || row.message) : null,
-    payload: row.payload || row.metadata || row,
-    timestamp: String(row.created_at || row.timestamp || new Date().toISOString()),
-  }))
-
   const payments = orders
     .filter((order) => order.paymentStatus !== "not_paid" || order.paymentMethod || order.paypalOrderId || order.paypalCaptureId)
     .map(paymentFromOrder)
 
   const metrics: CommandMetric[] = [
-    { key: "total_orders", label: "Total Orders", value: orders.length, availability: ordersResult.availability },
-    { key: "active_projects", label: "Active Projects", value: activeProjects.length, availability: ordersResult.availability },
-    { key: "completed_projects", label: "Completed Projects", value: completedProjects.length, availability: ordersResult.availability },
     { key: "revenue_month", label: "Revenue This Month", value: revenueThisMonth, money: true, availability: ordersResult.availability },
-    { key: "revenue_all", label: "Revenue All Time", value: revenueAllTime, money: true, availability: ordersResult.availability },
     { key: "pending_payments", label: "Pending Payments", value: pendingPayments.length, availability: ordersResult.availability },
-    { key: "pending_reviews", label: "Pending Reviews", value: feedbackPending.data, availability: feedbackPending.availability },
-    { key: "new_users", label: "New Users", value: users.filter((user) => user.createdAt && user.createdAt >= month).length, availability: usersResult.availability },
-    { key: "active_users", label: "Active Users", value: users.filter((user) => user.status === "active").length, availability: usersResult.availability },
-    { key: "stories_today", label: "Stories Today", value: postsToday, availability: postsResult.availability, detail: "Backed by social_posts status updates" },
-    { key: "community_posts", label: "Community Posts", value: posts.length, availability: postsResult.availability },
+    { key: "active_projects", label: "Active Projects", value: activeProjects.length, availability: ordersResult.availability },
+    { key: "new_orders", label: "New Orders", value: orders.filter((order) => order.createdAt >= month).length, availability: ordersResult.availability },
     { key: "unread_messages", label: "Unread Messages", value: unreadMessages.data, availability: unreadMessages.availability },
-    { key: "open_tickets", label: "Open Support Tickets", value: ticketsCount.availability === "ready" ? ticketsCount.data : null, availability: ticketsCount.availability },
+    { key: "completed_projects", label: "Completed Projects", value: completedProjects.length, availability: ordersResult.availability },
   ]
 
   return {
@@ -392,18 +398,20 @@ export async function fetchAdminCommandCenter(): Promise<AdminCommandCenterData>
     payments,
     webhookLogs,
     wisePayments: payments.filter((payment) => payment.method === "wise"),
-    users,
+    users: [],
     community: {
-      postsToday,
-      storiesToday: postsToday,
+      postsToday: null,
+      storiesToday: null,
       reportsPending: null,
-      comments: socialComments.availability === "ready" ? socialComments.data : null,
-      reactions: socialLikes.availability === "ready" ? socialLikes.data : null,
-      recentStatus: posts.slice(0, 6),
-      availability: postsResult.availability,
+      comments: null,
+      reactions: null,
+      recentStatus: [],
+      availability: "not_configured",
     },
     botNotifications,
-    auditLogs,
+    recentMessages: recentMessagesResult.data,
+    recentMessagesAvailability: recentMessagesResult.availability,
+    auditLogs: [],
     errors,
   }
 }

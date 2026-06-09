@@ -105,13 +105,23 @@ export async function createSocialPost(
     return null
   }
 
-  return mapPost(data as Record<string, unknown>)
+  const [enrichedPost] = await enrichPosts([mapPost(data as Record<string, unknown>)], userId)
+  return enrichedPost || null
 }
 
 export async function deleteSocialPost(postId: string): Promise<boolean> {
   if (!supabase || !supabaseConfigured) return false
   const { error } = await supabase.from("social_posts").delete().eq("id", postId)
-  return !error
+  if (!error) return true
+
+  const { error: rpcError } = await supabase.rpc("admin_delete_social_post", {
+    p_post_id: postId,
+  })
+  if (rpcError) {
+    console.error("deleteSocialPost failed", error, rpcError)
+    return false
+  }
+  return true
 }
 
 export async function hideSocialPost(postId: string, hidden = true): Promise<boolean> {
@@ -376,7 +386,7 @@ export async function fetchFollowersList(
   if (!profiles) return []
   return (profiles as Record<string, unknown>[]).map((r) => ({
     id: r.id as string,
-    name: (r.full_name as string) || (r.username as string) || (r.email as string)?.split("@")[0] || "Unknown user",
+    name: (r.full_name as string) || (r.username as string) || (r.email as string)?.split("@")[0] || "User unavailable",
     username: (r.username as string) || null,
     avatarUrl: (r.avatar_url as string) || null,
     bio: (r.bio as string) || null,
@@ -408,7 +418,7 @@ export async function fetchFollowingList(
   if (!profiles) return []
   return (profiles as Record<string, unknown>[]).map((r) => ({
     id: r.id as string,
-    name: (r.full_name as string) || (r.username as string) || (r.email as string)?.split("@")[0] || "Unknown user",
+    name: (r.full_name as string) || (r.username as string) || (r.email as string)?.split("@")[0] || "User unavailable",
     username: (r.username as string) || null,
     avatarUrl: (r.avatar_url as string) || null,
     bio: (r.bio as string) || null,
@@ -489,22 +499,48 @@ async function enrichCommentAuthors(comments: SocialComment[]): Promise<SocialCo
 
 async function fetchProfiles(
   userIds: string[],
-): Promise<Map<string, { id: string; name: string; avatarUrl: string | null; username: string | null }>> {
-  const map = new Map()
+): Promise<Map<string, { id: string; name: string; avatarUrl: string | null; username: string | null; bio: string | null; role: string | null }>> {
+  const map = new Map<string, { id: string; name: string; avatarUrl: string | null; username: string | null; bio: string | null; role: string | null }>()
   if (!supabase || !supabaseConfigured || userIds.length === 0) return map
 
-  const { data } = await supabase
+  const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, full_name, username, avatar_url")
+    .select("id, full_name, username, avatar_url, bio, role, email")
     .in("id", userIds)
 
-  if (data) {
-    for (const row of data as Record<string, unknown>[]) {
+  if (profiles) {
+    for (const row of profiles as Record<string, unknown>[]) {
+      const emailPrefix = typeof row.email === "string" ? row.email.split("@")[0] : null
       map.set(row.id as string, {
         id: row.id as string,
-        name: (row.full_name as string) || (row.username as string) || "Unknown user",
+        name: (row.full_name as string) || (row.username as string) || emailPrefix || "User unavailable",
         avatarUrl: (row.avatar_url as string) || null,
         username: (row.username as string) || null,
+        bio: (row.bio as string) || null,
+        role: (row.role as string) || null,
+      })
+    }
+  }
+
+  const missingOwnProfile = userIds.length === 1 && !map.has(userIds[0])
+  if (missingOwnProfile) {
+    const { data: authData } = await supabase.auth.getUser()
+    const authUser = authData.user
+    if (authUser?.id === userIds[0]) {
+      const meta = authUser.user_metadata || {}
+      const name =
+        (meta.full_name as string) ||
+        (meta.name as string) ||
+        (meta.display_name as string) ||
+        authUser.email?.split("@")[0] ||
+        "User unavailable"
+      map.set(authUser.id, {
+        id: authUser.id,
+        name,
+        avatarUrl: (meta.avatar_url as string) || (meta.picture as string) || null,
+        username: (meta.username as string) || (meta.preferred_username as string) || null,
+        bio: null,
+        role: (authUser.app_metadata?.role as string) || (authUser.user_metadata?.role as string) || null,
       })
     }
   }

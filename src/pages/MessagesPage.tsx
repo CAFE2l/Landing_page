@@ -17,7 +17,7 @@ import { supabase } from "../lib/supabase/client"
 import {
   fetchConversations, fetchMessages, markMessagesAsRead, subscribeToMessages,
   uploadChatMedia, subscribeToConversationUpdates, createOrGetConversation,
-  editMessage, softDeleteMessage, forwardMessage,
+  editMessage, softDeleteMessage, clearConversationMessages, forwardMessage,
   createGroup, fetchUserGroups, fetchGroupMessages, sendGroupMessage,
   subscribeToGroupMessages, fetchProfilesByIds, updateGroupDetails,
   addGroupMembers, removeGroupMember, leaveGroup, updateGroupMemberRole, deleteGroup,
@@ -63,6 +63,11 @@ export default function MessagesPage() {
   const uid = supabaseUser?.id || userProfile?.uid || userProfile?.id
   const BOT_ID = "00000000-0000-0000-0000-000000000001"
   const { profile: currentProfile } = useUserProfile()
+  const canClearBotChat =
+    currentProfile?.role === "admin" ||
+    currentProfile?.role === "owner" ||
+    supabaseUser?.app_metadata?.role === "admin" ||
+    supabaseUser?.app_metadata?.role === "owner"
   useBotNotifications(uid)
   const composerUser = useMemo(() => ({
     ...userProfile,
@@ -97,6 +102,7 @@ export default function MessagesPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [msgLoading, setMsgLoading] = useState(false)
   const [msgError, setMsgError] = useState<string | null>(null)
+  const [clearingChat, setClearingChat] = useState(false)
 
   // Status feed
   const [posts, setPosts] = useState<SocialPost[]>([])
@@ -791,6 +797,22 @@ export default function MessagesPage() {
     setShowGroupSettings(false)
     if (activeGroup?.id === group.id) handleBack()
     loadGroups()
+  }
+
+  const handleClearChat = async () => {
+    if (!activeConv) return
+    const label = isActiveConvBot ? "CAFÉ Bot chat cleared" : "Chat cleared"
+    const confirmed = window.confirm(`Clear all messages from this ${isActiveConvBot ? "CAFÉ Bot " : ""}chat? This removes the visible conversation history.`)
+    if (!confirmed) return
+
+    setClearingChat(true)
+    const ok = await clearConversationMessages(activeConv.id, label)
+    setClearingChat(false)
+
+    if (!ok) return
+    setMessages([])
+    toast.success(label)
+    await loadConversations()
   }
 
   // ========== Filtered conversations ==========
@@ -1715,12 +1737,26 @@ export default function MessagesPage() {
             )}
           </div>
         </div>
-        <button
-          onClick={() => !isActiveConvBot && openProfile(activeConv.otherUser.id)}
-          className="flex h-9 w-9 items-center justify-center rounded-xl text-white/40 hover:text-white hover:bg-white/[0.06] transition-all"
-        >
-          <ExternalLink size={16} />
-        </button>
+        {(canClearBotChat || !isActiveConvBot) && (
+          <button
+            type="button"
+            onClick={handleClearChat}
+            disabled={clearingChat || messages.length === 0}
+            className="inline-flex h-9 items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-3 text-xs font-semibold text-red-200 transition-all hover:bg-red-400/15 disabled:cursor-not-allowed disabled:opacity-45"
+            title="Clear chat"
+          >
+            {clearingChat ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            <span className="hidden sm:inline">Clear chat</span>
+          </button>
+        )}
+        {!isActiveConvBot && (
+          <button
+            onClick={() => openProfile(activeConv.otherUser.id)}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-white/40 hover:text-white hover:bg-white/[0.06] transition-all"
+          >
+            <ExternalLink size={16} />
+          </button>
+        )}
       </div>
 
       {/* Messages area */}
