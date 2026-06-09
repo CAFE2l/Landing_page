@@ -30,6 +30,14 @@ function mapOrder(row: Record<string, unknown>): ServiceOrder {
     remainingPaid: row.remaining_paid as boolean,
     paymentStatus: row.payment_status as PaymentStatus,
     projectStatus: row.project_status as ProjectStatus,
+    paymentMethod: (row.payment_method as "paypal" | "wise" | "manual") || null,
+    paypalOrderId: (row.paypal_order_id as string) || null,
+    paypalCaptureId: (row.paypal_capture_id as string) || null,
+    payerEmail: (row.payer_email as string) || null,
+    paymentCurrency: (row.payment_currency as string) || null,
+    paymentAmount: row.payment_amount == null ? null : Number(row.payment_amount),
+    paymentClaimedAt: (row.payment_claimed_at as string) || null,
+    paymentConfirmedAt: (row.payment_confirmed_at as string) || null,
     projectType: (row.project_type as string) || null,
     projectGoal: (row.project_goal as string) || null,
     projectDescription: row.project_description as string,
@@ -188,8 +196,8 @@ export async function createServiceOrder(
     remaining_amount: remainingAmount,
     upfront_paid: false,
     remaining_paid: false,
-    payment_status: "waiting_upfront_payment",
-    project_status: "new_request",
+    payment_status: "not_paid",
+    project_status: "pending_checkout",
     project_type: input.projectType || null,
     project_goal: input.projectGoal || null,
     project_description: input.projectDescription,
@@ -216,7 +224,11 @@ export async function createServiceOrder(
 
   if (error) {
     if (input.phoneFields && error.message?.includes("phone_country")) {
-      const { phone_country_code: _a, phone_country: _b, phone_number: _c, phone_e164: _d, ...fallbackPayload } = payload
+      const fallbackPayload = { ...payload }
+      delete fallbackPayload.phone_country_code
+      delete fallbackPayload.phone_country
+      delete fallbackPayload.phone_number
+      delete fallbackPayload.phone_e164
       const retry = await supabase
         .from("service_orders")
         .insert(fallbackPayload)
@@ -227,9 +239,7 @@ export async function createServiceOrder(
         toast.error("Failed to create service order")
         return null
       }
-      const order = mapOrder(retry.data as Record<string, unknown>)
-      await notifyNewOrder(order, input.serviceName, upfrontAmount)
-      return order
+      return mapOrder(retry.data as Record<string, unknown>)
     }
     console.error("createServiceOrder failed", error)
     toast.error("Failed to create service order")
@@ -237,7 +247,6 @@ export async function createServiceOrder(
   }
 
   const order = mapOrder(data as Record<string, unknown>)
-  await notifyNewOrder(order, input.serviceName, upfrontAmount)
   return order
 }
 
@@ -286,49 +295,6 @@ async function sendBotMessageToUser(userId: string, message: string, preview: st
     .eq("id", convId)
 }
 
-async function notifyNewOrder(order: ServiceOrder, serviceName: string, upfrontAmount: number): Promise<void> {
-  const displayName = getOrderDisplayName(order)
-
-  await createNotification({
-    type: "new_service_order",
-    title: "New order received",
-    message: `${displayName} — ${serviceName} — Payment Pending ($${upfrontAmount} upfront)`,
-  })
-
-  // Notify the client via bot DM if they have an account
-  if (order.userId) {
-    const userMsg = [
-      `🎉 Your order was received!`,
-      ``,
-      `Service: ${serviceName}`,
-      `Total: $${order.totalPrice}`,
-      `Upfront (50%): $${upfrontAmount}`,
-      ``,
-      `✅ Your order has been added to your order history. You can track it anytime in your profile under "My Orders".`,
-      ``,
-      `Next step: complete your upfront payment so we can start your project. We'll be in touch shortly!`,
-    ].join("\n")
-    await sendBotMessageToUser(order.userId, userMsg, `🎉 Order received: ${serviceName} — check your order history!`)
-  }
-
-  const { data: adminProfile } = await supabase!
-    .from("profiles")
-    .select("id")
-    .eq("email", "gutiajs@gmail.com")
-    .maybeSingle()
-
-  if (adminProfile?.id) {
-    await supabase!.rpc("notify_payment_bot", {
-      p_order_id: order.id,
-      p_display_name: displayName,
-      p_service_name: serviceName,
-      p_amount: upfrontAmount,
-      p_method: "new_order",
-      p_admin_id: adminProfile.id,
-    })
-  }
-}
-
 export async function requestPaymentLink(orderId: string, method: string): Promise<boolean> {
   const order = await fetchServiceOrder(orderId)
   if (!order) return false
@@ -354,12 +320,31 @@ export async function confirmPayment(
   if (!order) return false
 
   const displayName = getOrderDisplayName(order)
+  const normalizedMethod = method.includes("wise") ? "wise" : method.includes("paypal") ? "paypal" : "manual"
+  const paymentStatus: PaymentStatus = normalizedMethod === "wise" ? "wise_manual_review" : "client_claimed_paid"
+
+  const { error } = await supabase
+    .from("service_orders")
+    .update({
+      payment_method: normalizedMethod,
+      payment_status: paymentStatus,
+      project_status: "payment_claimed",
+      payment_claimed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orderId)
+
+  if (error) {
+    console.error("confirmPayment update failed", error)
+    toast.error("Could not update payment status")
+    return false
+  }
 
   await createNotification({
     type: "payment_confirmation",
-    title: "Payment Notified",
-    message: `${displayName} sent payment via ${method} for order ${order.id.slice(0, 8)}`,
-    payload: { orderId, method, status: order.paymentStatus, amount: order.upfrontAmount },
+    title: normalizedMethod === "wise" ? "Wise payment needs review" : "Client claimed payment",
+    message: `${displayName} clicked I've Paid via ${normalizedMethod.toUpperCase()} for order ${order.id.slice(0, 8)}`,
+    payload: { orderId, method: normalizedMethod, status: paymentStatus, amount: order.upfrontAmount },
   })
 
   // Notify the client via bot DM
@@ -370,6 +355,7 @@ export async function confirmPayment(
       `We received your payment notification for:`,
       `Service: ${order.serviceName}`,
       `Amount: $${order.upfrontAmount}`,
+      `Method: ${normalizedMethod.toUpperCase()}`,
       ``,
       `Our team will verify and confirm your payment shortly. You can track your order status in your profile under "My Orders".`,
     ].join("\n")
@@ -389,7 +375,7 @@ export async function confirmPayment(
       p_display_name: displayName,
       p_service_name: order.serviceName,
       p_amount: order.upfrontAmount,
-      p_method: method,
+      p_method: normalizedMethod === "wise" ? "wise_manual_review" : "client_claimed_paid",
       p_admin_id: adminProfile.id,
     })
   }
@@ -397,27 +383,58 @@ export async function confirmPayment(
   return true
 }
 
-async function sendBotPaymentConfirmation(order: ServiceOrder): Promise<void> {
+type BotNotificationAction =
+  | "view_order"
+  | "mark_paid"
+  | "reply_client"
+  | "view_proof"
+  | "move_in_progress"
+  | "open_dashboard"
+
+type BotNotificationPayload = {
+  cafeBotNotification: true
+  version: number
+  type:
+    | "new_order"
+    | "payment_claimed"
+    | "payment_confirmed"
+    | "payment_failed"
+    | "deadline_warning"
+    | "client_message"
+    | "file_uploaded"
+    | "project_approved"
+    | "project_delivered"
+  title: string
+  description: string
+  orderId?: string
+  clientName?: string
+  serviceName?: string
+  amount?: number
+  paymentMethod?: string
+  status?: string
+  proofUrl?: string
+  priority?: "low" | "normal" | "high" | "urgent"
+  createdAt: string
+  updatedAt?: string
+  count?: number
+  actions: BotNotificationAction[]
+}
+
+function botPayload(input: Omit<BotNotificationPayload, "cafeBotNotification" | "version" | "createdAt">): BotNotificationPayload {
+  return {
+    cafeBotNotification: true,
+    version: 1,
+    createdAt: new Date().toISOString(),
+    ...input,
+  }
+}
+
+async function sendAdminBotNotification(payload: BotNotificationPayload, preview: string): Promise<void> {
   if (!supabase || !supabaseConfigured) return
 
   const fakeBotUserId = "00000000-0000-0000-0000-000000000001"
   const adminUserId = "00000000-0000-0000-0000-000000000002"
-  const displayName = getOrderDisplayName(order)
-
-  const botMessage = [
-    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `✅ UPFRONT PAYMENT CONFIRMED`,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    ``,
-    `Client: ${displayName}`,
-    `Service: ${order.serviceName}`,
-    `Amount: $${order.upfrontAmount}`,
-    `Order: ${order.id}`,
-    ``,
-    `Status: Ready to start! 🚀`,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-  ].join("\n")
-  const preview = `✅ Payment confirmed: ${displayName} — $${order.upfrontAmount} — Ready to start! 🚀`
+  const now = new Date().toISOString()
 
   const { data: botConv } = await supabase
     .from("conversations")
@@ -435,197 +452,145 @@ async function sendBotPaymentConfirmation(order: ServiceOrder): Promise<void> {
         participant_1: fakeBotUserId,
         participant_2: adminUserId,
         last_message: preview.slice(0, 200),
-        last_message_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
+        last_message_at: now,
+        updated_at: now,
+        created_at: now,
       })
       .select()
       .single()
-
     if (!newConv) return
     convId = (newConv as Record<string, unknown>).id as string
   }
 
-  await supabase.from("messages").insert({
-    conversation_id: convId,
-    sender_id: fakeBotUserId,
-    receiver_id: adminUserId,
-    content: botMessage,
-    message_type: "text",
-    delivered_at: new Date().toISOString(),
-  })
+  const windowStart = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+  const { data: recent } = await supabase
+    .from("messages")
+    .select("id, content")
+    .eq("conversation_id", convId)
+    .eq("sender_id", fakeBotUserId)
+    .gte("created_at", windowStart)
+    .order("created_at", { ascending: false })
+    .limit(12)
+
+  const existing = (recent || []).find((message: Record<string, unknown>) => {
+    try {
+      const parsed = JSON.parse((message.content as string) || "{}") as BotNotificationPayload
+      return parsed.cafeBotNotification && parsed.type === payload.type && parsed.orderId === payload.orderId
+    } catch {
+      return false
+    }
+  }) as Record<string, unknown> | undefined
+
+  if (existing?.id) {
+    const count = (() => {
+      try {
+      const parsed = JSON.parse((existing.content as string) || "{}") as BotNotificationPayload
+        return (parsed.count || 1) + 1
+      } catch {
+        return 2
+      }
+    })()
+    await supabase
+      .from("messages")
+      .update({
+        content: JSON.stringify({ ...payload, count, updatedAt: now }),
+        delivered_at: now,
+      })
+      .eq("id", existing.id as string)
+  } else {
+    await supabase.from("messages").insert({
+      conversation_id: convId,
+      sender_id: fakeBotUserId,
+      receiver_id: adminUserId,
+      content: JSON.stringify(payload),
+      message_type: "text",
+      delivered_at: now,
+    })
+  }
 
   await supabase
     .from("conversations")
     .update({
       last_message: preview.slice(0, 200),
-      last_message_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      last_message_at: now,
+      updated_at: now,
     })
     .eq("id", convId)
+}
+
+async function sendBotPaymentConfirmation(order: ServiceOrder): Promise<void> {
+  const displayName = getOrderDisplayName(order)
+  await sendAdminBotNotification(
+    botPayload({
+      type: "payment_confirmed",
+      title: "Payment Confirmed",
+      description: "PayPal or admin confirmed the payment. The project is ready to start.",
+      orderId: order.id,
+      clientName: displayName,
+      serviceName: order.serviceName,
+      amount: order.upfrontAmount,
+      paymentMethod: order.paymentMethod || "manual",
+      status: "Ready to start",
+      priority: "high",
+      actions: ["view_order", "move_in_progress", "open_dashboard"],
+    }),
+    `Payment confirmed - ${displayName} - $${order.upfrontAmount}`,
+  )
 }
 
 async function sendBotDeliveryMessage(order: ServiceOrder, projectUrl?: string): Promise<void> {
-  if (!supabase || !supabaseConfigured) return
-
-  const fakeBotUserId = "00000000-0000-0000-0000-000000000001"
-  const adminUserId = "00000000-0000-0000-0000-000000000002"
   const displayName = getOrderDisplayName(order)
-
-  const botMessage = [
-    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `🎉 PROJECT DELIVERED`,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    ``,
-    `Client: ${displayName}`,
-    `Service: ${order.serviceName}`,
-    projectUrl ? `Project URL: ${projectUrl}` : ``,
-    ``,
-    `A congratulations message has been sent to the client.`,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-  ].filter(Boolean).join("\n")
-
-  const preview = `🎉 Delivered: ${order.serviceName} — ${displayName}`
-
-  const { data: botConv } = await supabase
-    .from("conversations")
-    .select("id")
-    .or(`and(participant_1.eq.${fakeBotUserId},participant_2.eq.${adminUserId}),and(participant_1.eq.${adminUserId},participant_2.eq.${fakeBotUserId})`)
-    .maybeSingle()
-
-  let convId: string
-  if (botConv) {
-    convId = botConv.id as string
-  } else {
-    const { data: newConv } = await supabase
-      .from("conversations")
-      .insert({
-        participant_1: fakeBotUserId,
-        participant_2: adminUserId,
-        last_message: preview.slice(0, 200),
-        last_message_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-    if (!newConv) return
-    convId = (newConv as Record<string, unknown>).id as string
-  }
-
-  await supabase.from("messages").insert({
-    conversation_id: convId,
-    sender_id: fakeBotUserId,
-    receiver_id: adminUserId,
-    content: botMessage,
-    message_type: "text",
-    delivered_at: new Date().toISOString(),
-  })
-
-  await supabase
-    .from("conversations")
-    .update({ last_message: preview.slice(0, 200), last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq("id", convId)
+  await sendAdminBotNotification(
+    botPayload({
+      type: "project_delivered",
+      title: "Project Delivered",
+      description: "The project was delivered to the client.",
+      orderId: order.id,
+      clientName: displayName,
+      serviceName: order.serviceName,
+      proofUrl: projectUrl,
+      status: "Delivered",
+      priority: "normal",
+      actions: projectUrl ? ["view_order", "view_proof", "open_dashboard"] : ["view_order", "open_dashboard"],
+    }),
+    `Project delivered - ${order.serviceName} - ${displayName}`,
+  )
+  void projectUrl
 }
 
 export async function sendBotPaymentNotification(order: ServiceOrder, event: string): Promise<void> {
-  if (!supabase || !supabaseConfigured) return
-
-  const fakeBotUserId = "00000000-0000-0000-0000-000000000001"
-  const adminUserId = "00000000-0000-0000-0000-000000000002"
   const displayName = getOrderDisplayName(order)
+  const method = event.replace("requested_", "").replace("approved_via_", "")
+  const confirmed = event === "approved_via_paypal" || event.includes("confirmed")
+  const failed = event.includes("failed") || event.includes("denied")
+  const type = failed ? "payment_failed" : confirmed ? "payment_confirmed" : "payment_claimed"
+  const title = failed ? "Payment Failed" : confirmed ? "Payment Confirmed" : "Payment Notification"
+  const description = failed
+    ? "Payment failed or was denied. Review the order before contacting the client."
+    : confirmed
+      ? "PayPal confirmed the payment."
+      : "Client says payment was completed. Payment needs manual verification."
 
-  const isApproved = event === "approved_via_paypal"
-  const isRequest = event.startsWith("requested_")
-
-  let botMessage: string
-  let preview: string
-
-  if (isApproved) {
-    botMessage = [
-      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      `💳 PAYMENT APPROVED VIA PAYPAL`,
-      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      ``,
-      `Client: ${displayName}`,
-      `Service: ${order.serviceName}`,
-      `Amount: $${order.upfrontAmount}`,
-      `Order: ${order.id}`,
-      ``,
-      `Action needed:`,
-      `1. Verify in PayPal dashboard`,
-      `2. Mark "Upfront Paid" in admin`,
-      `3. Start the project 🚀`,
-      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    ].join("\n")
-    preview = `💳 PayPal approved: ${displayName} — $${order.upfrontAmount}`
-  } else if (isRequest) {
-    const methodLabel = event.replace("requested_", "")
-    botMessage = [
-      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      `📋 PAYMENT METHOD REQUESTED`,
-      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      ``,
-      `Client: ${displayName}`,
-      `Service: ${order.serviceName}`,
-      `Method: ${methodLabel.toUpperCase()}`,
-      `Amount: $${order.upfrontAmount}`,
-      `Order: ${order.id}`,
-      ``,
-      `Action needed:`,
-      `  • Send payment instructions to client`,
-      `  • Update order status in admin panel`,
-      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    ].join("\n")
-    preview = `📋 Payment requested: ${displayName} — ${methodLabel.toUpperCase()}`
-  } else {
-    return
-  }
-
-  const { data: botConv } = await supabase
-    .from("conversations")
-    .select("id")
-    .or(`and(participant_1.eq.${fakeBotUserId},participant_2.eq.${adminUserId}),and(participant_1.eq.${adminUserId},participant_2.eq.${fakeBotUserId})`)
-    .maybeSingle()
-
-  let convId: string
-  if (botConv) {
-    convId = botConv.id as string
-  } else {
-    const { data: newConv } = await supabase
-      .from("conversations")
-      .insert({
-        participant_1: fakeBotUserId,
-        participant_2: adminUserId,
-        last_message: preview.slice(0, 200),
-        last_message_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-
-    if (!newConv) return
-    convId = (newConv as Record<string, unknown>).id as string
-  }
-
-  await supabase.from("messages").insert({
-    conversation_id: convId,
-    sender_id: fakeBotUserId,
-    receiver_id: adminUserId,
-    content: botMessage,
-    message_type: "text",
-    delivered_at: new Date().toISOString(),
-  })
-
-  await supabase
-    .from("conversations")
-    .update({
-      last_message: preview.slice(0, 200),
-      last_message_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", convId)
+  await sendAdminBotNotification(
+    botPayload({
+      type,
+      title,
+      description,
+      orderId: order.id,
+      clientName: displayName,
+      serviceName: order.serviceName,
+      amount: order.upfrontAmount,
+      paymentMethod: method || order.paymentMethod || "manual",
+      status: failed ? "Payment failed" : confirmed ? "Confirmed" : "Awaiting verification",
+      priority: failed || !confirmed ? "high" : "normal",
+      actions: failed
+        ? ["view_order", "reply_client", "open_dashboard"]
+        : confirmed
+          ? ["view_order", "move_in_progress", "open_dashboard"]
+          : ["view_order", "mark_paid", "open_dashboard"],
+    }),
+    `${title} - ${displayName} - $${order.upfrontAmount}`,
+  )
 }
 
 export async function updateServiceOrder(
@@ -633,6 +598,7 @@ export async function updateServiceOrder(
   updates: Partial<{
     projectStatus: ProjectStatus
     paymentStatus: PaymentStatus
+    paymentMethod: "paypal" | "wise" | "manual" | null
     upfrontPaid: boolean
     remainingPaid: boolean
     adminNotes: string
@@ -646,14 +612,16 @@ export async function updateServiceOrder(
   }
   if (updates.projectStatus !== undefined) dbPayload.project_status = updates.projectStatus
   if (updates.paymentStatus !== undefined) dbPayload.payment_status = updates.paymentStatus
+  if (updates.paymentMethod !== undefined) dbPayload.payment_method = updates.paymentMethod
   if (updates.upfrontPaid !== undefined) dbPayload.upfront_paid = updates.upfrontPaid
   if (updates.remainingPaid !== undefined) dbPayload.remaining_paid = updates.remainingPaid
   if (updates.adminNotes !== undefined) dbPayload.admin_notes = updates.adminNotes
   if (updates.deliveredProjectUrl !== undefined) dbPayload.delivered_project_url = updates.deliveredProjectUrl
 
-  if (updates.projectStatus === "paid_upfront") {
+  if (updates.projectStatus === "paid_upfront" || updates.projectStatus === "paid") {
     dbPayload.upfront_paid = true
-    dbPayload.payment_status = "paid_upfront"
+    dbPayload.payment_status = updates.paymentStatus || "paypal_confirmed"
+    dbPayload.payment_confirmed_at = new Date().toISOString()
   }
 
   const { error } = await supabase
@@ -675,7 +643,7 @@ export async function updateServiceOrder(
       payload: { orderId: id, status: updates.projectStatus },
     })
 
-    if (updates.projectStatus === "paid_upfront") {
+    if (updates.projectStatus === "paid_upfront" || updates.projectStatus === "paid") {
       const order = await fetchServiceOrder(id)
       if (order) await sendBotPaymentConfirmation(order)
     }
@@ -735,6 +703,7 @@ export async function createNotification(input: {
     type: input.type,
     title: input.title,
     message: input.message || null,
+    payload: input.payload || null,
     is_read: false,
   })
   if (notifError) console.error("createNotification error:", notifError)
@@ -790,90 +759,8 @@ export async function subscribeToServiceOrders(onChange: () => void) {
 // ========== CAFÉ Website Bot ==========
 
 export async function createWebsiteBotMessage(order: ServiceOrder): Promise<void> {
-  if (!supabase || !supabaseConfigured) return
-
-  const fakeBotUserId = "00000000-0000-0000-0000-000000000001"
-  const adminUserId = "00000000-0000-0000-0000-000000000002"
-  const displayName = getOrderDisplayName(order)
-
-  const botMessage = [
-    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `🆕 NEW SERVICE ORDER RECEIVED`,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    ``,
-    `Client: ${displayName}`,
-    `Email: ${order.clientEmail}`,
-    `WhatsApp: ${order.clientPhone}`,
-    order.company ? `Company: ${order.company}` : ``,
-    `Service: ${order.serviceName}`,
-    `Total: $${order.totalPrice}`,
-    `Upfront (50%): $${order.upfrontAmount}`,
-    `Remaining (50%): $${order.remainingAmount}`,
-    `Payment Status: Payment Pending`,
-    `Project Status: New Request`,
-    `Deadline: ${order.desiredDeadline || "To be discussed"}`,
-    ``,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `Description:`,
-    order.projectDescription,
-    ``,
-    order.referencesText ? `References: ${order.referencesText}` : ``,
-    order.currentProjectUrl ? `Project URL: ${order.currentProjectUrl}` : ``,
-    ``,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `Actions needed:`,
-    `  • Payment is pending. Send payment instructions to the client.`,
-    `  • Open in admin → /admin/service-orders`,
-    `  • Contact client via WhatsApp`,
-    `  • Mark upfront paid only after real payment`,
-  ]
-    .filter(Boolean)
-    .join("\n")
-
-  const { data: botConv } = await supabase
-    .from("conversations")
-    .select("id")
-    .or(`and(participant_1.eq.${fakeBotUserId},participant_2.eq.${adminUserId}),and(participant_1.eq.${adminUserId},participant_2.eq.${fakeBotUserId})`)
-    .maybeSingle()
-
-  let convId: string
-  if (botConv) {
-    convId = botConv.id as string
-  } else {
-    const { data: newConv } = await supabase
-      .from("conversations")
-      .insert({
-        participant_1: fakeBotUserId,
-        participant_2: adminUserId,
-        last_message: botMessage.slice(0, 200),
-        last_message_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-
-    if (!newConv) return
-    convId = (newConv as Record<string, unknown>).id as string
-  }
-
-  await supabase.from("messages").insert({
-    conversation_id: convId,
-    sender_id: fakeBotUserId,
-    receiver_id: adminUserId,
-    content: botMessage,
-    message_type: "text",
-    delivered_at: new Date().toISOString(),
-  })
-
-  await supabase
-    .from("conversations")
-    .update({
-      last_message: `📦 New order: ${order.serviceName} — ${displayName} (Payment Pending)`,
-      last_message_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", convId)
+  void order
+  return
 }
 
 // ========== WhatsApp notification ==========

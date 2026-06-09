@@ -267,14 +267,25 @@ export interface UserSticker {
 
 // ========== Social Post Types ==========
 
+export type SocialStatusCategory =
+  | "business"
+  | "project"
+  | "study"
+  | "lifestyle"
+  | "win"
+  | "behind_the_scenes"
+
 export interface SocialPost {
   id: string
   userId: string
   content: string
   mediaUrl: string | null
   mediaType: "image" | "video" | "audio" | null
+  category: SocialStatusCategory
   likesCount: number
   commentsCount: number
+  viewsCount: number
+  isHidden: boolean
   createdAt: string
   updatedAt: string
   user: { id: string; name: string; avatarUrl: string | null; username: string | null } | null

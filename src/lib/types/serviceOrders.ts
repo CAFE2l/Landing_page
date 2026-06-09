@@ -1,4 +1,11 @@
 export type ProjectStatus =
+  | "draft"
+  | "pending_checkout"
+  | "awaiting_payment"
+  | "payment_claimed"
+  | "payment_pending"
+  | "paid"
+  | "payment_failed"
   | "new_request"
   | "waiting_payment"
   | "paid_upfront"
@@ -9,6 +16,13 @@ export type ProjectStatus =
   | "cancelled"
 
 export type PaymentStatus =
+  | "not_paid"
+  | "client_claimed_paid"
+  | "paypal_confirmed"
+  | "wise_confirmed"
+  | "wise_manual_review"
+  | "payment_pending"
+  | "payment_failed"
   | "waiting_upfront_payment"
   | "paid_upfront"
   | "remaining_paid"
@@ -39,6 +53,14 @@ export interface ServiceOrder {
   remainingPaid: boolean
   paymentStatus: PaymentStatus
   projectStatus: ProjectStatus
+  paymentMethod: "paypal" | "wise" | "manual" | null
+  paypalOrderId: string | null
+  paypalCaptureId: string | null
+  payerEmail: string | null
+  paymentCurrency: string | null
+  paymentAmount: number | null
+  paymentClaimedAt: string | null
+  paymentConfirmedAt: string | null
   projectType: string | null
   projectGoal: string | null
   projectDescription: string
@@ -72,6 +94,13 @@ export const SERVICE_PLANS: Record<ServiceSlug, { name: string; price: number }>
 }
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  not_paid: "Not paid",
+  client_claimed_paid: "Client claimed paid",
+  paypal_confirmed: "PayPal confirmed",
+  wise_confirmed: "Wise confirmed",
+  wise_manual_review: "Wise manual confirmation needed",
+  payment_pending: "Payment pending",
+  payment_failed: "Payment failed",
   waiting_upfront_payment: "Payment Pending",
   paid_upfront: "Upfront Paid",
   remaining_paid: "Remaining Paid",
@@ -80,6 +109,13 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
 }
 
 export const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
+  not_paid: "bg-zinc-500/10 text-zinc-300 border-zinc-500/20",
+  client_claimed_paid: "bg-amber-500/10 text-amber-300 border-amber-500/20",
+  paypal_confirmed: "bg-green-500/10 text-green-400 border-green-500/20",
+  wise_confirmed: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20",
+  wise_manual_review: "bg-cyan-500/10 text-cyan-300 border-cyan-500/20",
+  payment_pending: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+  payment_failed: "bg-red-500/10 text-red-400 border-red-500/20",
   waiting_upfront_payment: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
   paid_upfront: "bg-green-500/10 text-green-400 border-green-500/20",
   remaining_paid: "bg-teal-500/10 text-teal-400 border-teal-500/20",
@@ -88,6 +124,13 @@ export const PAYMENT_STATUS_COLORS: Record<PaymentStatus, string> = {
 }
 
 export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
+  draft: "Draft",
+  pending_checkout: "Pending Checkout",
+  awaiting_payment: "Awaiting Payment",
+  payment_claimed: "Payment Claimed",
+  payment_pending: "Payment Pending",
+  paid: "Paid",
+  payment_failed: "Payment Failed",
   new_request: "New Request",
   waiting_payment: "Awaiting Payment Instructions",
   paid_upfront: "Upfront Paid",
@@ -99,6 +142,13 @@ export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
 }
 
 export const PROJECT_STATUS_COLORS: Record<ProjectStatus, string> = {
+  draft: "bg-zinc-500/10 text-zinc-300 border-zinc-500/20",
+  pending_checkout: "bg-blue-500/10 text-blue-300 border-blue-500/20",
+  awaiting_payment: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+  payment_claimed: "bg-amber-500/10 text-amber-300 border-amber-500/20",
+  payment_pending: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+  paid: "bg-green-500/10 text-green-400 border-green-500/20",
+  payment_failed: "bg-red-500/10 text-red-400 border-red-500/20",
   new_request: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   waiting_payment: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
   paid_upfront: "bg-green-500/10 text-green-400 border-green-500/20",

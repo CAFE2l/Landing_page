@@ -3,7 +3,7 @@
 import { useState, useEffect, type FormEvent } from "react"
 import { useParams, useNavigate, Link } from "react-router-dom"
 import { motion } from "framer-motion"
-import { ArrowLeft, Loader2, User, Mail, Building, Globe, Calendar, DollarSign, Send, FileText } from "lucide-react"
+import { ArrowLeft, Loader2, User, Mail, Building, Globe, Calendar, DollarSign, CreditCard, FileText } from "lucide-react"
 import { useAuth } from "../contexts/AuthContext"
 import { createServiceOrder } from "../lib/serviceOrdersService"
 import PhoneInput, { type PhoneFields } from "../components/ui/PhoneInput"
@@ -156,7 +156,7 @@ export default function HirePage() {
       })
 
       if (result) {
-        toast.success("Order submitted! Payment is pending.")
+        toast.success("Order saved. Continue to checkout.")
         navigate(`/checkout/${result.id}`)
       }
     } catch {
@@ -224,7 +224,7 @@ export default function HirePage() {
             <span className="text-zinc-500">Timeline: <span className="text-white">{serviceInfo.timeline}</span></span>
           </div>
           <div className="mt-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 px-4 py-2 text-xs text-yellow-400">
-            50% upfront (${serviceInfo.price / 2}) required to start. Payment instructions will be sent after submission.
+            50% upfront (${serviceInfo.price / 2}) is required to start. Your project starts after payment confirmation.
           </div>
         </motion.div>
 
@@ -419,14 +419,14 @@ export default function HirePage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-[0_0_30px_rgba(37,99,235,0.2)]"
+            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2563eb] to-[#6d28d9] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(37,99,235,0.24)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
-              <Send size={16} />
+              <CreditCard size={16} />
             )}
-            {submitting ? "Submitting..." : "Submit Order"}
+            {submitting ? "Creating checkout..." : "Continue to secure checkout"}
           </button>
         </motion.form>
       </div>

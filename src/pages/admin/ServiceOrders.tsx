@@ -8,7 +8,7 @@ import {
   Phone, Mail, DollarSign, Calendar,
   FileText, Edit3, RefreshCw,
   Loader2, Trash2, Link2, X, Package,
-  TrendingUp, CreditCard, Rocket,
+  TrendingUp, Rocket,
 } from "lucide-react"
 import {
   fetchServiceOrders,
@@ -19,7 +19,7 @@ import {
   getOrderAvatarUrl,
 } from "../../lib/serviceOrdersService"
 import { formatPhoneDisplay } from "../../components/ui/PhoneInput"
-import type { ServiceOrder, ProjectStatus, PaymentStatus } from "../../lib/types/serviceOrders"
+import type { ServiceOrder, ProjectStatus } from "../../lib/types/serviceOrders"
 import {
   PROJECT_STATUS_LABELS,
   PROJECT_STATUS_COLORS,
@@ -34,27 +34,26 @@ type StatusTab = "all" | ProjectStatus
 
 const TABS: { key: StatusTab; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "new_request", label: "New" },
+  { key: "pending_checkout", label: "Checkout" },
   { key: "waiting_payment", label: "Awaiting Payment" },
-  { key: "paid_upfront", label: "Upfront Paid" },
+  { key: "payment_claimed", label: "Claimed Paid" },
+  { key: "paid", label: "Paid" },
   { key: "in_progress", label: "In Progress" },
-  { key: "waiting_delivery_payment", label: "Awaiting Final" },
   { key: "delivered", label: "Delivered" },
   { key: "completed", label: "Completed" },
   { key: "cancelled", label: "Cancelled" },
 ]
 
 const STATUS_ACTIONS: { from: ProjectStatus[]; to: ProjectStatus; label: string; icon: typeof ChevronDown; needsUrl?: boolean }[] = [
-  { from: ["new_request"], to: "waiting_payment", label: "Send Payment Instructions", icon: AlertCircle },
-  { from: ["waiting_payment", "new_request"], to: "paid_upfront", label: "Mark Upfront Paid", icon: CheckCircle2 },
-  { from: ["paid_upfront"], to: "in_progress", label: "Start Project", icon: Rocket },
-  { from: ["in_progress"], to: "waiting_delivery_payment", label: "Request Final Payment", icon: CreditCard },
-  { from: ["waiting_delivery_payment"], to: "delivered", label: "Deliver Project", icon: CheckCircle2, needsUrl: true },
+  { from: ["draft", "pending_checkout"], to: "awaiting_payment", label: "Mark Awaiting Payment", icon: AlertCircle },
+  { from: ["awaiting_payment", "payment_claimed", "payment_pending", "new_request", "waiting_payment"], to: "paid", label: "Confirm Payment Manually", icon: CheckCircle2 },
+  { from: ["paid", "paid_upfront"], to: "in_progress", label: "Start Project", icon: Rocket },
+  { from: ["in_progress", "waiting_delivery_payment"], to: "delivered", label: "Deliver Project", icon: CheckCircle2, needsUrl: true },
   { from: ["delivered"], to: "completed", label: "Mark Completed", icon: CheckCircle2 },
-  { from: ["new_request", "waiting_payment", "paid_upfront", "in_progress", "waiting_delivery_payment"], to: "cancelled", label: "Cancel Order", icon: XCircle },
+  { from: ["draft", "pending_checkout", "awaiting_payment", "payment_claimed", "payment_pending", "paid", "new_request", "waiting_payment", "paid_upfront", "in_progress", "waiting_delivery_payment"], to: "cancelled", label: "Cancel Order", icon: XCircle },
 ]
 
-const PIPELINE = ["new_request", "paid_upfront", "in_progress", "waiting_delivery_payment", "delivered", "completed"] as const
+const PIPELINE = ["pending_checkout", "payment_claimed", "paid", "in_progress", "delivered", "completed"] as const
 
 function StatusBadge({ status }: { status: ProjectStatus }) {
   return (
@@ -68,11 +67,19 @@ function StatusBadge({ status }: { status: ProjectStatus }) {
   )
 }
 
-function PaymentBadge({ status }: { status: PaymentStatus }) {
+function AdminPaymentBadge({ order }: { order: ServiceOrder }) {
+  let label = PAYMENT_STATUS_LABELS[order.paymentStatus]
+  if (order.paymentStatus === "not_paid") label = "Not paid"
+  if (order.paymentStatus === "client_claimed_paid") label = "Client claimed paid"
+  if (order.paymentStatus === "paypal_confirmed") label = "PayPal confirmed"
+  if (order.paymentStatus === "wise_manual_review") {
+    label = order.upfrontPaid ? "Wise manually confirmed" : "Wise manual confirmation needed"
+  }
+
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold", PAYMENT_STATUS_COLORS[status])}>
+    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold", PAYMENT_STATUS_COLORS[order.paymentStatus])}>
       <DollarSign size={10} />
-      {PAYMENT_STATUS_LABELS[status]}
+      {label}
     </span>
   )
 }
@@ -238,9 +245,10 @@ function OrderCard({
     }
     setUpdating(true)
     const updates: Parameters<typeof updateServiceOrder>[1] = { projectStatus: action.to }
-    if (action.to === "paid_upfront") {
+    if (action.to === "paid" || action.to === "paid_upfront") {
       updates.upfrontPaid = true
-      updates.paymentStatus = "paid_upfront"
+      updates.paymentStatus = order.paymentMethod === "wise" ? "wise_manual_review" : "paypal_confirmed"
+      updates.paymentMethod = order.paymentMethod || "manual"
     }
     const ok = await updateServiceOrder(order.id, updates)
     setUpdating(false)
@@ -297,7 +305,7 @@ function OrderCard({
               </div>
 
               <div className="mt-2.5 flex flex-wrap gap-1.5">
-                <PaymentBadge status={order.paymentStatus} />
+                <AdminPaymentBadge order={order} />
                 <StatusBadge status={order.projectStatus} />
               </div>
             </div>
@@ -513,7 +521,9 @@ export default function ServiceOrders() {
   }, [])
 
   useEffect(() => {
-    load()
+    queueMicrotask(() => {
+      void load()
+    })
     const unsub = subscribeToServiceOrders(load)
     return () => { unsub.then((fn) => fn()) }
   }, [load])
@@ -547,7 +557,7 @@ export default function ServiceOrders() {
     revenue: orders.filter(o => o.upfrontPaid).reduce((s, o) => s + o.upfrontAmount, 0)
       + orders.filter(o => o.remainingPaid).reduce((s, o) => s + o.remainingAmount, 0),
     active: orders.filter(o => o.projectStatus === "in_progress").length,
-    pending: orders.filter(o => o.projectStatus === "new_request" || o.projectStatus === "waiting_payment").length,
+    pending: orders.filter(o => ["pending_checkout", "awaiting_payment", "payment_claimed", "payment_pending", "new_request", "waiting_payment"].includes(o.projectStatus)).length,
   }), [orders])
 
   const handleDelete = async (order: ServiceOrder) => {

@@ -1,8 +1,9 @@
 import { supabase, supabaseConfigured } from "./supabase/client"
-import type { SocialPost, SocialComment } from "../data/feedbackStore"
+import type { SocialPost, SocialComment, SocialStatusCategory } from "../data/feedbackStore"
 import { canQuerySocialFollows, markSocialFollowsError } from "./socialFollowsHealth"
 
 const FOLLOWS_TABLE = "social_follows"
+const DEFAULT_CATEGORY: SocialStatusCategory = "business"
 
 // ========== Posts ==========
 
@@ -11,17 +12,20 @@ export async function fetchSocialPosts(
   userId?: string,
 ): Promise<SocialPost[]> {
   if (!supabase || !supabaseConfigured) return []
+  const client = supabase
 
-  let q = supabase
+  const baseQuery = () => client
     .from("social_posts")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(50)
 
+  let q = baseQuery().or("is_hidden.is.null,is_hidden.eq.false")
+
   if (mode === "following" && userId) {
     if (!canQuerySocialFollows()) return []
 
-    const { data: follows, error } = await supabase
+    const { data: follows, error } = await client
       .from(FOLLOWS_TABLE)
       .select("following_id")
       .eq("follower_id", userId)
@@ -37,7 +41,22 @@ export async function fetchSocialPosts(
     }
   }
 
-  const { data, error } = await q
+  let { data, error } = await q
+  if (error) {
+    q = baseQuery()
+    if (mode === "following" && userId) {
+      const { data: follows } = await client
+        .from(FOLLOWS_TABLE)
+        .select("following_id")
+        .eq("follower_id", userId)
+      const ids = (follows || []).map((r: Record<string, unknown>) => r.following_id as string)
+      if (ids.length === 0) return []
+      q = q.in("user_id", ids)
+    }
+    const fallback = await q
+    data = fallback.data
+    error = fallback.error
+  }
   if (error || !data) return []
 
   const posts = (data as Record<string, unknown>[]).map(mapPost)
@@ -51,20 +70,36 @@ export async function createSocialPost(
   content: string,
   mediaUrl?: string,
   mediaType?: "image" | "video" | "audio",
+  category: SocialStatusCategory = DEFAULT_CATEGORY,
 ): Promise<SocialPost | null> {
   if (!supabase || !supabaseConfigured) return null
 
-  const { data, error } = await supabase
+  let result = await supabase
     .from("social_posts")
     .insert({
       user_id: userId,
       content,
       media_url: mediaUrl || null,
       media_type: mediaType || null,
+      category,
     })
     .select()
     .single()
 
+  if (result.error?.code === "PGRST204") {
+    result = await supabase
+      .from("social_posts")
+      .insert({
+        user_id: userId,
+        content,
+        media_url: mediaUrl || null,
+        media_type: mediaType || null,
+      })
+      .select()
+      .single()
+  }
+
+  const { data, error } = result
   if (error || !data) {
     console.error("createSocialPost failed", error)
     return null
@@ -77,6 +112,50 @@ export async function deleteSocialPost(postId: string): Promise<boolean> {
   if (!supabase || !supabaseConfigured) return false
   const { error } = await supabase.from("social_posts").delete().eq("id", postId)
   return !error
+}
+
+export async function hideSocialPost(postId: string, hidden = true): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+  const { error } = await supabase
+    .from("social_posts")
+    .update({
+      is_hidden: hidden,
+      hidden_at: hidden ? new Date().toISOString() : null,
+    })
+    .eq("id", postId)
+  return !error
+}
+
+export async function recordSocialPostView(postId: string, userId?: string): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+
+  const { error } = await supabase
+    .from("social_post_views")
+    .upsert(
+      {
+        post_id: postId,
+        user_id: userId || null,
+        viewer_key: userId ? null : getAnonymousViewerKey(),
+      },
+      { onConflict: userId ? "post_id,user_id" : "post_id,viewer_key" },
+    )
+
+  return !error
+}
+
+export async function fetchSocialPostReportCounts(postIds: string[]): Promise<Map<string, number>> {
+  const counts = new Map<string, number>()
+  if (!supabase || !supabaseConfigured || postIds.length === 0) return counts
+
+  const { data } = await supabase
+    .from("social_post_reports")
+    .select("post_id")
+    .in("post_id", postIds)
+
+  for (const row of (data || []) as Array<{ post_id: string }>) {
+    counts.set(row.post_id, (counts.get(row.post_id) || 0) + 1)
+  }
+  return counts
 }
 
 // ========== Likes ==========
@@ -345,14 +424,27 @@ function mapPost(row: Record<string, unknown>): SocialPost {
     content: row.content as string,
     mediaUrl: (row.media_url as string) || null,
     mediaType: (row.media_type as "image" | "video" | "audio") || null,
+    category: (row.category as SocialStatusCategory) || DEFAULT_CATEGORY,
     likesCount: (row.likes_count as number) || 0,
     commentsCount: (row.comments_count as number) || 0,
+    viewsCount: (row.views_count as number) || 0,
+    isHidden: Boolean(row.is_hidden),
     createdAt: row.created_at as string,
     updatedAt: (row.updated_at as string) || row.created_at as string,
     user: null,
     liked: false,
     comments: [],
   }
+}
+
+function getAnonymousViewerKey() {
+  if (typeof window === "undefined") return "server"
+  const key = "cafe-services-status-viewer"
+  const existing = window.localStorage.getItem(key)
+  if (existing) return existing
+  const next = crypto.randomUUID()
+  window.localStorage.setItem(key, next)
+  return next
 }
 
 function mapComment(row: Record<string, unknown>): SocialComment {

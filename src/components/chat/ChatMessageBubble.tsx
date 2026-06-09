@@ -2,6 +2,7 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import { Check, CheckCheck, Loader2, Play, X, FileText, Film, ImageIcon, Music, Download } from "lucide-react"
 import AudioPlayer from "./AudioPlayer"
+import BotNotificationCard, { parseBotNotification } from "./BotNotificationCard"
 import type { ChatMessage } from "../../data/feedbackStore"
 
 interface ChatMessageBubbleProps {
@@ -29,6 +30,11 @@ function getFileIcon(mimeType: string | null) {
 
 export default function ChatMessageBubble({ message, isOwn, onImageClick, currentlyPlayingAudio, onPlayAudio }: ChatMessageBubbleProps) {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const botPayload = !isOwn ? parseBotNotification(message.content || "") : null
+
+  if (botPayload) {
+    return <BotNotificationCard payload={botPayload} timestamp={message.createdAt} />
+  }
 
   const time = (
     <span className={`text-[10px] ${isOwn ? "text-blue-200/70" : "text-[#6B6B80]"}`}>

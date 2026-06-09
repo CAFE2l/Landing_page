@@ -2,6 +2,27 @@ import { supabase, supabaseConfigured } from "./supabase/client"
 import type { ChatMessage, ChatConversation, UserSticker, MessageType, Group } from "../data/feedbackStore"
 import toast from "react-hot-toast"
 
+function summarizeStructuredBotContent(content?: string | null): string | null {
+  if (!content) return null
+  try {
+    const parsed = JSON.parse(content) as {
+      cafeBotNotification?: boolean
+      title?: string
+      description?: string
+      amount?: number
+      clientName?: string
+    }
+    if (parsed.cafeBotNotification && parsed.title) {
+      const amount = parsed.amount != null ? ` — $${parsed.amount}` : ""
+      const client = parsed.clientName ? ` — ${parsed.clientName}` : ""
+      return `${parsed.title}${client}${amount}`
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 // ========== Conversations ==========
 
 export async function createOrGetConversation(
@@ -78,9 +99,9 @@ export async function fetchConversations(userId: string): Promise<ChatConversati
     const lastCaption = latest?.caption as string | undefined
     const lastFileName = latest?.file_name as string | undefined
 
-    let displayLastMessage = lastMsgFromRow
+    let displayLastMessage = summarizeStructuredBotContent(lastMsgFromRow) || lastMsgFromRow
     if (!displayLastMessage && lastContent && lastMsgType === "text") {
-      displayLastMessage = lastContent
+      displayLastMessage = summarizeStructuredBotContent(lastContent) || lastContent
     }
 
     const typeLabel = (type?: string) => {

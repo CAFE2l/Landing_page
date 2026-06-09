@@ -31,6 +31,7 @@ import {
   markSocialFollowsError,
 } from "../lib/socialFollowsHealth"
 import MessageComposer from "../components/chat/MessageComposer"
+import BotNotificationCard, { parseBotNotification } from "../components/chat/BotNotificationCard"
 import FollowButton from "../components/ui/FollowButton"
 import { getUserDisplayName } from "../lib/utils"
 import UserAvatar from "../components/ui/UserAvatar"
@@ -834,6 +835,18 @@ export default function MessagesPage() {
   // ========== Render message with actions ==========
   const renderMessage = (msg: ChatMessage, isOwn: boolean, showSender = false, senderName?: string) => {
     const isDeleted = !!msg.deletedAt
+    const botPayload = !isOwn && msg.senderId === BOT_ID ? parseBotNotification(msg.content || "") : null
+    if (botPayload) {
+      return (
+        <div
+          key={msg.id}
+          ref={(node) => { messageRefs.current[msg.id] = node }}
+          id={`message-${msg.id}`}
+        >
+          <BotNotificationCard payload={botPayload} timestamp={msg.createdAt} />
+        </div>
+      )
+    }
     const isEditing = editingMsgId === msg.id
     const showDropdown = dropdownMsgId === msg.id
     const displayContent = isDeleted ? "[deleted]" : msg.content

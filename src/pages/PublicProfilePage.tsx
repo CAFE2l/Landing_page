@@ -22,6 +22,7 @@ import {
 } from "../data/feedbackServiceSupabase";
 import type { FeedbackPost, ReactionType } from "../data/feedbackStore";
 import { deleteClient } from "../lib/adminClientService";
+import { fetchSocialPosts } from "../lib/socialService";
 
 function extractReactions(posts: FeedbackPost[]): Map<string, ReactionType> {
   const map = new Map<string, ReactionType>();
@@ -49,6 +50,7 @@ export default function PublicProfilePage() {
   const [reactionLoading, setReactionLoading] = useState<Set<string>>(new Set());
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [selectedPost, setSelectedPost] = useState<FeedbackPost | null>(null);
+  const [statusCount, setStatusCount] = useState(0);
 
   const isOwnProfile = !!user?.id && user.id === resolvedUserId;
   const uid = user?.id;
@@ -82,6 +84,18 @@ export default function PublicProfilePage() {
     }
     getUserSavedPostIds(uid).then(setSavedPosts).catch(() => setSavedPosts(new Set()));
   }, [uid]);
+
+  useEffect(() => {
+    if (!profile?.id) {
+      setStatusCount(0);
+      return;
+    }
+    queueMicrotask(() => {
+      fetchSocialPosts("all", uid)
+        .then((items) => setStatusCount(items.filter((item) => item.userId === profile.id).length))
+        .catch(() => setStatusCount(0));
+    });
+  }, [profile?.id, uid]);
 
   const applyReactionState = useCallback(
     (postId: string, previousReaction: ReactionType | undefined, nextReaction: ReactionType | null) => {
@@ -348,13 +362,12 @@ export default function PublicProfilePage() {
                 )}
               </div>
             </div>
-            <div className="mt-6 grid gap-3 sm:grid-cols-5">
+            <div className="mt-6 grid gap-3 sm:grid-cols-4">
               {[
                 ["Posts", profile.stats.totalPosts],
-                ["Likes", profile.stats.totalLikesReceived],
+                ["Status", statusCount],
                 ["Followers", profile.stats.followers],
                 ["Following", profile.stats.following],
-                ["Member", profile.memberSince ? new Date(profile.memberSince).toLocaleDateString("en-US") : "-"],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
                   <p className="text-xs uppercase tracking-[0.22em] text-[#6B6B80]">{label}</p>

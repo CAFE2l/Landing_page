@@ -1,17 +1,29 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useParams, Link, useNavigate } from "react-router-dom"
+import { useEffect, useMemo, useState } from "react"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import { motion } from "framer-motion"
 import {
-  Check, ArrowLeft, AlertCircle, DollarSign, Calendar, User,
-  MessageSquare, CreditCard, FileText, Send, Copy, Loader2,
+  AlertCircle,
+  ArrowLeft,
+  Banknote,
+  Check,
+  CheckCircle2,
+  Copy,
+  CreditCard,
+  DollarSign,
+  FileText,
+  Loader2,
+  Mail,
+  ShieldCheck,
+  User,
+  WalletCards,
 } from "lucide-react"
 import {
-  fetchServiceOrder,
-  getOrderDisplayName,
-  getOrderAvatarUrl,
   confirmPayment,
+  fetchServiceOrder,
+  getOrderAvatarUrl,
+  getOrderDisplayName,
 } from "../lib/serviceOrdersService"
 import type { ServiceOrder } from "../lib/types/serviceOrders"
 import { PAYMENT_STATUS_LABELS } from "../lib/types/serviceOrders"
@@ -20,11 +32,21 @@ import TechPremiumBackground from "../components/ui/TechPremiumBackground"
 import { cn } from "../lib/utils"
 import toast from "react-hot-toast"
 
+type PaymentMethod = "paypal" | "wise"
+
+const PAYPAL_EMAIL = "gutiajs@gmail.com"
+const WISE_DETAILS = {
+  accountHolder: "CAFÉ Services",
+  email: "gutiajs@gmail.com",
+  currency: "USD",
+  note: "Use your order ID as payment reference.",
+}
+
 const STEPS = [
-  { key: "details", label: "Project Details", icon: FileText },
-  { key: "review", label: "Review", icon: Check },
-  { key: "payment", label: "Payment", icon: CreditCard },
-  { key: "contact", label: "Admin Contact", icon: MessageSquare },
+  { label: "Project details", icon: FileText },
+  { label: "Review order", icon: Check },
+  { label: "Payment method", icon: WalletCards },
+  { label: "Payment confirmation", icon: ShieldCheck },
 ] as const
 
 function OrderAvatar({ order }: { order: ServiceOrder }) {
@@ -32,17 +54,11 @@ function OrderAvatar({ order }: { order: ServiceOrder }) {
   const name = getOrderDisplayName(order)
 
   if (avatarUrl) {
-    return (
-      <img
-        src={avatarUrl}
-        alt={name}
-        className="h-12 w-12 shrink-0 rounded-full object-cover border border-white/10"
-      />
-    )
+    return <img src={avatarUrl} alt={name} className="h-12 w-12 shrink-0 rounded-full border border-white/10 object-cover" />
   }
 
   return (
-    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/20 to-cyan-500/20 text-lg font-bold text-blue-400 border border-blue-500/20">
+    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-blue-500/20 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 text-lg font-bold text-blue-300">
       {name.charAt(0).toUpperCase()}
     </div>
   )
@@ -50,17 +66,14 @@ function OrderAvatar({ order }: { order: ServiceOrder }) {
 
 function Stepper({ currentStep }: { currentStep: number }) {
   return (
-    <div className="mb-8 grid grid-cols-4 gap-3">
+    <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
       {STEPS.map((step, index) => {
         const Icon = step.icon
         const active = index <= currentStep
         const current = index === currentStep
         return (
-          <motion.div
-            key={step.key}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.08 }}
+          <div
+            key={step.label}
             className={cn(
               "rounded-xl border px-3 py-3 text-center transition-all",
               current
@@ -70,13 +83,198 @@ function Stepper({ currentStep }: { currentStep: number }) {
                   : "border-white/[0.05] bg-white/[0.02] opacity-60",
             )}
           >
-            <Icon size={16} className={cn("mx-auto mb-1.5", current ? "text-blue-400" : "text-zinc-500")} />
-            <p className={cn("text-[10px] font-medium leading-tight", current ? "text-blue-300" : "text-zinc-500")}>
+            <Icon size={16} className={cn("mx-auto mb-1.5", current ? "text-blue-300" : "text-zinc-500")} />
+            <p className={cn("text-[10px] font-medium leading-tight", current ? "text-blue-200" : "text-zinc-500")}>
               {step.label}
             </p>
-          </motion.div>
+          </div>
         )
       })}
+    </div>
+  )
+}
+
+function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(value)
+    setCopied(true)
+    toast.success("Copied")
+    window.setTimeout(() => setCopied(false), 1600)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] px-2.5 py-1.5 text-xs text-zinc-400 transition-all hover:bg-white/[0.06] hover:text-white"
+    >
+      {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+      {copied ? "Copied" : label}
+    </button>
+  )
+}
+
+function PaymentMethodCard({
+  method,
+  selected,
+  onSelect,
+}: {
+  method: PaymentMethod
+  selected: boolean
+  onSelect: () => void
+}) {
+  const isPayPal = method === "paypal"
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "rounded-2xl border p-5 text-left transition-all",
+        selected
+          ? "border-blue-500/45 bg-blue-500/12 shadow-[0_0_34px_rgba(37,99,235,0.18)]"
+          : "border-white/[0.08] bg-white/[0.035] hover:border-white/[0.16] hover:bg-white/[0.055]",
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl", isPayPal ? "bg-[#0070BA]/15 text-[#4DB4FF]" : "bg-cyan-500/12 text-cyan-300")}>
+          {isPayPal ? <CreditCard size={20} /> : <Banknote size={20} />}
+        </div>
+        <span className={cn("rounded-full border px-2.5 py-0.5 text-[10px] font-semibold", selected ? "border-blue-400/30 text-blue-200" : "border-white/[0.08] text-white/35")}>
+          {selected ? "Selected" : "Choose"}
+        </span>
+      </div>
+      <h3 className="mt-4 text-lg font-semibold text-white">{isPayPal ? "PayPal" : "Wise"}</h3>
+      <p className="mt-1 text-sm leading-relaxed text-zinc-500">
+        {isPayPal
+          ? "Pay by PayPal email, then notify us after the transfer."
+          : "International transfer option for clients outside Brazil."}
+      </p>
+    </button>
+  )
+}
+
+function OrderSummary({ order }: { order: ServiceOrder }) {
+  const displayName = getOrderDisplayName(order)
+  return (
+    <div className="rounded-2xl border border-white/[0.1] bg-white/[0.04] p-6 shadow-[0_8px_40px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+      <div className="flex items-center gap-3 border-b border-white/[0.06] pb-4">
+        <OrderAvatar order={order} />
+        <div className="min-w-0">
+          <h3 className="truncate text-lg font-semibold text-white">{displayName}</h3>
+          <p className="truncate text-sm text-zinc-500">{order.serviceName}</p>
+        </div>
+        <span className="ml-auto shrink-0 rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-0.5 text-[10px] font-medium text-zinc-300">
+          {PAYMENT_STATUS_LABELS[order.paymentStatus]}
+        </span>
+      </div>
+
+      <div className="space-y-3 py-4 text-sm">
+        <div className="flex items-center gap-3 text-zinc-400">
+          <User size={14} className="shrink-0" />
+          <span className="truncate">{displayName}</span>
+        </div>
+        <div className="flex items-center gap-3 text-zinc-400">
+          <Mail size={14} className="shrink-0" />
+          <span className="truncate">{order.clientEmail}</span>
+        </div>
+        <div className="flex items-center gap-3 text-zinc-400">
+          <span className="text-base leading-none">📞</span>
+          <span>{formatPhoneDisplay(order.clientPhone)}</span>
+        </div>
+      </div>
+
+      <div className="space-y-3 border-t border-white/[0.06] pt-4">
+        <div className="flex items-center justify-between">
+          <span className="text-zinc-500">Total Price</span>
+          <span className="font-semibold text-white">${order.totalPrice}</span>
+        </div>
+        <div className="flex items-center justify-between rounded-lg border border-yellow-500/20 bg-yellow-500/10 px-3 py-2">
+          <span className="flex items-center gap-2 font-semibold text-yellow-300">
+            <DollarSign size={15} />
+            Upfront Payment (50%)
+          </span>
+          <span className="text-lg font-bold text-yellow-300">${order.upfrontAmount}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-zinc-500">Due on Delivery (50%)</span>
+          <span className="text-zinc-400">${order.remainingAmount}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PaymentInstructions({
+  order,
+  method,
+  notifying,
+  onNotify,
+}: {
+  order: ServiceOrder
+  method: PaymentMethod
+  notifying: boolean
+  onNotify: () => Promise<void>
+}) {
+  const isPayPal = method === "paypal"
+  const details = isPayPal
+    ? `PayPal email: ${PAYPAL_EMAIL}\nAmount: $${order.upfrontAmount} USD\nReference: ${order.id}`
+    : `Wise recipient: ${WISE_DETAILS.accountHolder}\nEmail: ${WISE_DETAILS.email}\nCurrency: ${WISE_DETAILS.currency}\nAmount: $${order.upfrontAmount} USD\nReference: ${order.id}`
+
+  return (
+    <div className="rounded-2xl border border-white/[0.1] bg-white/[0.04] p-6 shadow-[0_8px_40px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+      <div className="mb-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-300">Payment confirmation</p>
+        <h3 className="mt-2 text-xl font-semibold text-white">{isPayPal ? "Pay with PayPal" : "Pay with Wise"}</h3>
+        <p className="mt-1 text-sm leading-relaxed text-zinc-500">
+          Notify us only after completing the payment. Your project starts after payment confirmation.
+        </p>
+      </div>
+
+      <div className={cn("space-y-3 rounded-2xl border p-4", isPayPal ? "border-[#0070BA]/30 bg-[#0070BA]/10" : "border-cyan-400/25 bg-cyan-400/8")}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-zinc-500">{isPayPal ? "PayPal email" : "Wise email"}</p>
+            <p className={cn("font-bold", isPayPal ? "text-[#4DB4FF]" : "text-cyan-200")}>{isPayPal ? PAYPAL_EMAIL : WISE_DETAILS.email}</p>
+          </div>
+          <CopyButton value={isPayPal ? PAYPAL_EMAIL : WISE_DETAILS.email} />
+        </div>
+        {!isPayPal && (
+          <div className="grid gap-3 border-t border-white/[0.08] pt-3 text-sm sm:grid-cols-2">
+            <div>
+              <p className="text-xs text-zinc-500">Account holder</p>
+              <p className="font-semibold text-white">{WISE_DETAILS.accountHolder}</p>
+            </div>
+            <div>
+              <p className="text-xs text-zinc-500">Currency</p>
+              <p className="font-semibold text-white">{WISE_DETAILS.currency}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+        <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-4 py-3 text-sm text-zinc-400">
+          Amount to send: <span className="font-semibold text-white">${order.upfrontAmount} USD</span>
+          <br />
+          Reference: <span className="font-mono text-xs text-zinc-300">{order.id}</span>
+        </div>
+        <CopyButton value={details} label="Copy details" />
+      </div>
+
+      <div className="mt-5 rounded-xl border border-amber-400/15 bg-amber-400/8 p-4 text-sm leading-relaxed text-amber-100/80">
+        After paying, click the button below. This is the only manual action that notifies CAFÉ before admin verification.
+      </div>
+
+      <button
+        disabled={notifying}
+        onClick={onNotify}
+        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2563eb] to-[#6d28d9] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(37,99,235,0.24)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {notifying ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+        {notifying ? "Sending notification..." : "I've Paid — Notify CAFÉ"}
+      </button>
     </div>
   )
 }
@@ -85,55 +283,59 @@ export default function CheckoutPage() {
   const { orderId } = useParams<{ orderId: string }>()
   const [order, setOrder] = useState<ServiceOrder | null>(null)
   const [loading, setLoading] = useState(true)
-  const [copied, setCopied] = useState(false)
   const [notifying, setNotifying] = useState(false)
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
     if (!orderId) return
-    setLoading(true)
-    fetchServiceOrder(orderId).then((data) => {
-      setOrder(data)
-      setLoading(false)
+    queueMicrotask(() => {
+      setLoading(true)
+      fetchServiceOrder(orderId).then((data) => {
+        setOrder(data)
+        setLoading(false)
+      })
     })
   }, [orderId])
 
-  // Check for PayPal return
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get("paypal") === "success" && orderId) {
-      toast.success("Payment approved! Processing confirmation...")
-      confirmPayment(orderId, "paypal").then((ok) => {
-        if (ok) {
-          toast.success("Payment confirmed! We'll start your project soon.")
-          fetchServiceOrder(orderId).then(setOrder)
-        }
-      })
-      // Clean URL
+    if (params.get("paypal") === "success") {
+      toast.success("PayPal returned successfully. Final confirmation happens by webhook or admin verification.")
       window.history.replaceState({}, "", `/checkout/${orderId}`)
     }
-    if (params.get("paypal") === "cancel" && orderId) {
+    if (params.get("paypal") === "cancel") {
       toast.error("Payment was cancelled.")
       window.history.replaceState({}, "", `/checkout/${orderId}`)
     }
   }, [orderId])
 
-  const PAYPAL_EMAIL = "gutiajs@gmail.com"
+  const currentStep = useMemo(() => {
+    if (!order) return 1
+    if (order.upfrontPaid || order.projectStatus === "paid") return 3
+    if (order.projectStatus === "payment_claimed") return 3
+    if (selectedMethod) return 2
+    return 1
+  }, [order, selectedMethod])
 
-  const handleCopyEmail = () => {
-    navigator.clipboard.writeText(PAYPAL_EMAIL)
-    setCopied(true)
-    toast.success("PayPal email copied!")
-    setTimeout(() => setCopied(false), 2000)
+  const notifyPaid = async () => {
+    if (!order || !selectedMethod) return
+    setNotifying(true)
+    const ok = await confirmPayment(order.id, selectedMethod)
+    setNotifying(false)
+    if (!ok) return
+    toast.success("Thanks. CAFÉ was notified and will verify your payment.")
+    const refreshed = await fetchServiceOrder(order.id)
+    setOrder(refreshed)
   }
 
   if (loading) {
     return (
-      <div className="relative min-h-screen text-[#f0f0f5] flex items-center justify-center">
+      <div className="relative flex min-h-screen items-center justify-center text-[#f0f0f5]">
         <TechPremiumBackground />
         <div className="relative z-10 text-center">
-          <Loader2 size={32} className="animate-spin text-blue-400 mx-auto mb-4" />
-          <p className="text-zinc-500 text-sm">Loading order...</p>
+          <Loader2 size={32} className="mx-auto mb-4 animate-spin text-blue-400" />
+          <p className="text-sm text-zinc-500">Loading order...</p>
         </div>
       </div>
     )
@@ -141,18 +343,15 @@ export default function CheckoutPage() {
 
   if (!order) {
     return (
-      <div className="relative min-h-screen text-[#f0f0f5] flex items-center justify-center">
+      <div className="relative flex min-h-screen items-center justify-center text-[#f0f0f5]">
         <TechPremiumBackground />
-        <div className="relative z-10 text-center max-w-md px-4">
+        <div className="relative z-10 max-w-md px-4 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/15">
             <AlertCircle size={32} className="text-red-400" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">Order Not Found</h1>
-          <p className="text-zinc-500 mb-6">This order doesn't exist or has been removed.</p>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1d4ed8] transition-colors"
-          >
+          <h1 className="mb-2 text-2xl font-bold">Order Not Found</h1>
+          <p className="mb-6 text-zinc-500">This order doesn't exist or has been removed.</p>
+          <Link to="/" className="inline-flex items-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1d4ed8]">
             <ArrowLeft size={16} />
             Back to Home
           </Link>
@@ -161,17 +360,14 @@ export default function CheckoutPage() {
     )
   }
 
-  const displayName = getOrderDisplayName(order)
-  const currentStep = order.upfrontPaid ? 3 : 2
+  const paid = order.upfrontPaid || order.projectStatus === "paid"
+  const claimed = order.projectStatus === "payment_claimed"
 
   return (
     <div className="relative min-h-screen text-[#f0f0f5]">
       <TechPremiumBackground />
-      <div className="relative z-10 container mx-auto px-4 py-12 max-w-2xl">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white mb-8 transition-colors"
-        >
+      <div className="relative z-10 container mx-auto max-w-3xl px-4 py-12">
+        <Link to="/" className="mb-8 inline-flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-white">
           <ArrowLeft size={15} />
           Back to Home
         </Link>
@@ -179,207 +375,90 @@ export default function CheckoutPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <Stepper currentStep={currentStep} />
 
-          {order.upfrontPaid ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mb-6 rounded-2xl border border-green-500/20 bg-green-500/10 p-5 text-center shadow-[0_0_30px_rgba(34,197,94,0.08)]"
-            >
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-500/15">
-                <Check size={26} className="text-green-400" />
-              </div>
-              <h1 className="text-2xl font-bold mb-2">Payment Confirmed!</h1>
-              <p className="text-sm text-green-200/80 max-w-md mx-auto">
-                Your upfront payment of ${order.upfrontAmount} has been received. We'll start working on your project shortly.
-              </p>
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mb-6 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-5 text-center shadow-[0_0_30px_rgba(234,179,8,0.08)]"
-            >
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-yellow-500/15">
-                <Send size={26} className="text-yellow-400" />
-              </div>
-              <h1 className="text-2xl font-bold mb-2">Order Submitted</h1>
-              <p className="text-sm text-yellow-200/80 mb-1 font-medium">Upfront Payment Required</p>
-              <p className="text-sm text-zinc-400 max-w-md mx-auto">
-                Pay ${order.upfrontAmount} now to start. The remaining ${order.remainingAmount} is due on delivery.
-              </p>
-            </motion.div>
-          )}
-
           <div className="mb-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-400 mb-3">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-300">
               <CreditCard size={12} />
-              {order.upfrontPaid ? "Upfront Paid" : PAYMENT_STATUS_LABELS[order.paymentStatus]}
+              {paid ? "Payment confirmed" : claimed ? "Awaiting verification" : "Secure checkout"}
             </div>
-            <h2 className="text-2xl font-bold mb-2">Review Your Order</h2>
-            <p className="text-zinc-400 text-sm">
-              {order.upfrontPaid
-                ? "Payment confirmed. We'll start your project soon."
-                : "Choose a payment method below to start your project."}
+            <h1 className="mb-2 text-3xl font-bold">
+              {paid ? "Payment confirmed" : claimed ? "Payment notification sent" : "Choose payment method"}
+            </h1>
+            <p className="max-w-xl text-sm leading-relaxed text-zinc-400">
+              {paid
+                ? "Your project is ready to enter production."
+                : claimed
+                  ? "CAFÉ has been notified. We will verify your payment before starting production."
+                  : "Choose how you want to pay. Payment instructions appear only after you select a method."}
             </p>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="rounded-2xl border border-white/[0.1] bg-white/[0.04] backdrop-blur-xl p-6 mb-6 space-y-4 shadow-[0_8px_40px_rgba(0,0,0,0.3)]"
-          >
-            <div className="flex items-center gap-3 pb-4 border-b border-white/[0.06]">
-              <OrderAvatar order={order} />
-              <div className="min-w-0">
-                <h3 className="text-lg font-semibold text-white truncate">{displayName}</h3>
-                <p className="text-sm text-zinc-500 truncate">{order.serviceName}</p>
+          {paid && (
+            <div className="mb-6 rounded-2xl border border-green-500/20 bg-green-500/10 p-5 text-center shadow-[0_0_30px_rgba(34,197,94,0.08)]">
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-500/15">
+                <CheckCircle2 size={26} className="text-green-400" />
               </div>
-              <span className={cn(
-                "ml-auto shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-medium",
-                order.upfrontPaid
-                  ? "border-green-500/20 bg-green-500/10 text-green-400"
-                  : "border-yellow-500/20 bg-yellow-500/10 text-yellow-400",
-              )}>
-                {order.upfrontPaid ? "Upfront Paid" : PAYMENT_STATUS_LABELS[order.paymentStatus]}
-              </span>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-3 text-zinc-400">
-                <User size={14} className="shrink-0" />
-                <span className="truncate">{displayName}</span>
-              </div>
-              <div className="flex items-center gap-3 text-zinc-400">
-                <span className="text-base leading-none shrink-0">✉️</span>
-                <span className="truncate">{order.clientEmail}</span>
-              </div>
-              <div className="flex items-center gap-3 text-zinc-400">
-                <span className="text-base leading-none shrink-0">📞</span>
-                <span>{formatPhoneDisplay(order.clientPhone)}</span>
-              </div>
-              {order.company && (
-                <div className="flex items-center gap-3 text-zinc-400">
-                  <User size={14} className="shrink-0" />
-                  <span className="truncate">{order.company}</span>
-                </div>
-              )}
-              {order.desiredDeadline && (
-                <div className="flex items-center gap-3 text-zinc-400">
-                  <Calendar size={14} className="shrink-0" />
-                  <span>Deadline: {order.desiredDeadline}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-white/[0.06] pt-4 space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-zinc-500">Total Price</span>
-                <span className="text-white font-semibold">${order.totalPrice}</span>
-              </div>
-              <div className={cn(
-                "flex justify-between items-center py-2 px-3 rounded-lg border",
-                order.upfrontPaid
-                  ? "bg-green-500/10 border-green-500/20"
-                  : "bg-yellow-500/10 border-yellow-500/20",
-              )}>
-                <span className={cn(
-                  "font-semibold flex items-center gap-2",
-                  order.upfrontPaid ? "text-green-400" : "text-yellow-400",
-                )}>
-                  <DollarSign size={15} />
-                  Upfront Payment (50%)
-                </span>
-                <span className={cn(
-                  "font-bold text-lg",
-                  order.upfrontPaid ? "text-green-400" : "text-yellow-400",
-                )}>${order.upfrontAmount}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-zinc-500">Due on Delivery (50%)</span>
-                <span className="text-zinc-400">${order.remainingAmount}</span>
-              </div>
-            </div>
-          </motion.div>
-
-          {!order.upfrontPaid && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="rounded-2xl border border-white/[0.1] bg-white/[0.04] backdrop-blur-xl p-6 mb-6"
-            >
-              <h3 className="text-lg font-semibold mb-1">Pay with PayPal</h3>
-              <p className="text-xs text-zinc-500 mb-4">
-                Send the payment to the PayPal email below. After paying, click "I've Paid" to notify us.
+              <h2 className="mb-2 text-2xl font-bold">Your project can start</h2>
+              <p className="mx-auto max-w-md text-sm text-green-100/75">
+                Your upfront payment of ${order.upfrontAmount} has been confirmed.
               </p>
-
-              <div className="flex items-center gap-2 rounded-xl border border-[#0070BA]/30 bg-[#0070BA]/10 px-4 py-3 mb-3">
-                <span className="text-sm font-bold text-[#0070BA] flex-1">gutiajs@gmail.com</span>
-                <button
-                  onClick={handleCopyEmail}
-                  className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] px-2.5 py-1.5 text-xs text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-all"
-                >
-                  {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
-                  {copied ? "Copied" : "Copy"}
-                </button>
-              </div>
-
-              <p className="text-xs text-zinc-500 mb-3">
-                Amount to send: <span className="text-white font-semibold">${order.upfrontAmount} USD</span>
-              </p>
-
-              <button
-                disabled={notifying}
-                onClick={async () => {
-                  setNotifying(true)
-                  await confirmPayment(order.id, "paypal_manual")
-                  setNotifying(false)
-                  toast.success("Thanks! We'll confirm your payment and start your project soon.")
-                  navigate("/profile?tab=orders")
-                }}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#0070BA] hover:bg-[#003087] disabled:opacity-60 disabled:cursor-not-allowed px-5 py-3.5 text-sm font-semibold text-white transition-all shadow-lg"
-              >
-                {notifying ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                {notifying ? "Sending notification..." : "I've Paid — Notify CAFÉ"}
-              </button>
-
-              <div className="mt-4 p-3 rounded-xl border border-white/[0.06] bg-white/[0.02]">
-                <p className="text-xs text-zinc-500 font-medium mb-2">💳 Other payment methods</p>
-                <button
-                  onClick={() => {
-                    toast.success("Request sent! We'll contact you with payment details.")
-                    confirmPayment(order.id, "request_manual")
-                  }}
-                  className="flex items-center gap-2 rounded-lg border border-white/[0.08] px-3 py-2 text-sm text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all w-full"
-                >
-                  <Send size={14} />
-                  Request Manual Invoice
-                </button>
-              </div>
-            </motion.div>
+            </div>
           )}
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Link
-              to="/dashboard/orders"
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1d4ed8] transition-colors"
-            >
+          {claimed && !paid && (
+            <div className="mb-6 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-5 text-center shadow-[0_0_30px_rgba(234,179,8,0.08)]">
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/15">
+                <ShieldCheck size={26} className="text-amber-300" />
+              </div>
+              <h2 className="mb-2 text-2xl font-bold">Awaiting payment verification</h2>
+              <p className="mx-auto max-w-md text-sm text-amber-100/75">
+                We received your notification. Your project starts after payment confirmation.
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-6">
+            <OrderSummary order={order} />
+
+            {!paid && !claimed && (
+              <>
+                <div className="rounded-2xl border border-white/[0.1] bg-white/[0.04] p-6 backdrop-blur-xl">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-300">Step 3</p>
+                  <h2 className="mt-2 text-xl font-semibold text-white">Choose how you want to pay</h2>
+                  <p className="mt-1 text-sm text-zinc-500">Notify us only after completing the payment.</p>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <PaymentMethodCard method="paypal" selected={selectedMethod === "paypal"} onSelect={() => setSelectedMethod("paypal")} />
+                    <PaymentMethodCard method="wise" selected={selectedMethod === "wise"} onSelect={() => setSelectedMethod("wise")} />
+                  </div>
+                </div>
+
+                {selectedMethod && (
+                  <PaymentInstructions
+                    order={order}
+                    method={selectedMethod}
+                    notifying={notifying}
+                    onNotify={notifyPaid}
+                  />
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Link to="/dashboard/orders" className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1d4ed8]">
               View My Orders
             </Link>
-            <Link
-              to="/"
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.03] px-5 py-3 text-sm font-semibold text-zinc-300 hover:text-white hover:bg-white/[0.06] transition-colors"
+            <button
+              onClick={() => navigate("/")}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.03] px-5 py-3 text-sm font-semibold text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
             >
               <ArrowLeft size={16} />
               Back to Home
-            </Link>
+            </button>
           </div>
 
-          <p className="text-xs text-zinc-600 text-center mt-4">
-            {order.upfrontPaid
-              ? "We've received your payment. We'll start your project soon!"
-              : "PayPal is processed securely. No payment data is stored on our servers."}
+          <p className="mt-4 text-center text-xs text-zinc-600">
+            No payment data is stored on our servers. Your project starts after payment confirmation.
           </p>
         </motion.div>
       </div>

@@ -3,6 +3,19 @@ import { supabase, supabaseConfigured } from "../lib/supabase/client"
 
 const BOT_ID = "00000000-0000-0000-0000-000000000001"
 
+function notificationBody(content: string | undefined): string {
+  if (!content) return "New notification"
+  try {
+    const parsed = JSON.parse(content) as { cafeBotNotification?: boolean; title?: string; description?: string }
+    if (parsed.cafeBotNotification) {
+      return [parsed.title, parsed.description].filter(Boolean).join(" — ") || "New CAFÉ Bot alert"
+    }
+  } catch {
+    return content.split("\n").find((line) => line.trim() && !line.includes("━")) || "New notification"
+  }
+  return content.split("\n").find((line) => line.trim() && !line.includes("━")) || "New notification"
+}
+
 export function useBotNotifications(currentUserId: string | undefined) {
   const permissionRef = useRef<NotificationPermission>("default")
 
@@ -42,7 +55,7 @@ export function useBotNotifications(currentUserId: string | undefined) {
           if (document.visibilityState === "visible") return // already looking at the app
 
           new Notification("CAFÉ Bot 🤖", {
-            body: (msg.content as string)?.split("\n").find((l) => l.trim() && !l.includes("━")) || "New notification",
+            body: notificationBody(msg.content as string | undefined),
             icon: "/imgs/img/favicon.png",
             tag: "cafe-bot",
           })
