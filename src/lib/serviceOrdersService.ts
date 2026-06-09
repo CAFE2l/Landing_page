@@ -1,5 +1,5 @@
 import { supabase, supabaseConfigured } from "./supabase/client"
-import type { ServiceOrder, Notification, ProjectStatus, PaymentStatus } from "./types/serviceOrders"
+import type { ServiceOrder, Notification, ProjectStatus, PaymentStatus, PaymentRecord, AuditEntry } from "./types/serviceOrders"
 import type { PhoneFields } from "../components/ui/PhoneInput"
 import { ensureProfileFromAuthUser } from "./supabaseProfile"
 import { isAdminEmail } from "./adminUsers"
@@ -7,6 +7,18 @@ import { createUserNotification } from "./userNotificationService"
 import toast from "react-hot-toast"
 
 type ProfileJoin = { full_name: string | null; avatar_url: string | null } | null
+
+function parsePaymentRecord(val: unknown): PaymentRecord | null {
+  if (!val || typeof val !== "object") return null
+  const r = val as Record<string, unknown>
+  return {
+    amount: Number(r.amount) || 0,
+    method: (r.method as string) || null,
+    status: (r.status as PaymentRecord["status"]) || "pending",
+    paidAt: (r.paidAt as string) || null,
+    transactionId: (r.transactionId as string) || null,
+  }
+}
 
 function mapOrder(row: Record<string, unknown>): ServiceOrder {
   const profileRow = row.profiles as ProfileJoin | ProfileJoin[] | undefined
@@ -39,6 +51,11 @@ function mapOrder(row: Record<string, unknown>): ServiceOrder {
     paymentAmount: row.payment_amount == null ? null : Number(row.payment_amount),
     paymentClaimedAt: (row.payment_claimed_at as string) || null,
     paymentConfirmedAt: (row.payment_confirmed_at as string) || null,
+    upfrontPayment: parsePaymentRecord(row.upfront_payment),
+    remainingPayment: parsePaymentRecord(row.remaining_payment),
+    previewUrl: (row.preview_url as string) || null,
+    deliveryUrl: (row.delivery_url as string) || null,
+    auditLog: (Array.isArray(row.audit_log) ? row.audit_log : []) as AuditEntry[],
     projectType: (row.project_type as string) || null,
     projectGoal: (row.project_goal as string) || null,
     projectDescription: row.project_description as string,
@@ -62,6 +79,11 @@ export function getOrderDisplayName(order: ServiceOrder): string {
 
 export function getOrderAvatarUrl(order: ServiceOrder): string | null {
   return order.profile?.avatarUrl || null
+}
+
+function addAuditEntry(order: ServiceOrder, action: string, details?: string): AuditEntry[] {
+  const entry: AuditEntry = { action, timestamp: new Date().toISOString(), details }
+  return [...(order.auditLog || []), entry]
 }
 
 const ORDER_SELECT = `
@@ -539,6 +561,26 @@ async function sendAdminBotNotification(payload: BotNotificationPayload, preview
     .eq("id", convId)
 }
 
+async function sendBotRemainingPaymentConfirmed(order: ServiceOrder): Promise<void> {
+  const displayName = getOrderDisplayName(order)
+  await sendAdminBotNotification(
+    botPayload({
+      type: "payment_confirmed",
+      title: "Remaining Payment Confirmed — Fully Paid",
+      description: `$${order.remainingAmount} remaining payment confirmed. Final delivery can now be released.`,
+      orderId: order.id,
+      clientName: displayName,
+      serviceName: order.serviceName,
+      amount: order.totalPrice,
+      paymentMethod: order.paymentMethod || "manual",
+      status: "Fully paid",
+      priority: "high",
+      actions: ["view_order", "open_dashboard"],
+    }),
+    `Fully paid - ${displayName} - $${order.totalPrice}`,
+  )
+}
+
 async function sendBotPaymentConfirmation(order: ServiceOrder): Promise<void> {
   const displayName = getOrderDisplayName(order)
   await sendAdminBotNotification(
@@ -648,10 +690,18 @@ export async function updateServiceOrder(
     upfrontPaid: boolean
     remainingPaid: boolean
     adminNotes: string
-    deliveredProjectUrl: string
+    previewUrl: string
+    deliveryUrl: string
   }>,
 ): Promise<boolean> {
   if (!supabase || !supabaseConfigured) return false
+
+  // Fetch current order for validation
+  const current = await fetchServiceOrder(id)
+  if (!current) {
+    toast.error("Order not found")
+    return false
+  }
 
   const dbPayload: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
@@ -662,12 +712,69 @@ export async function updateServiceOrder(
   if (updates.upfrontPaid !== undefined) dbPayload.upfront_paid = updates.upfrontPaid
   if (updates.remainingPaid !== undefined) dbPayload.remaining_paid = updates.remainingPaid
   if (updates.adminNotes !== undefined) dbPayload.admin_notes = updates.adminNotes
-  if (updates.deliveredProjectUrl !== undefined) dbPayload.delivered_project_url = updates.deliveredProjectUrl
+  if (updates.previewUrl !== undefined) dbPayload.preview_url = updates.previewUrl
+  if (updates.deliveryUrl !== undefined) dbPayload.delivery_url = updates.deliveryUrl
 
-  if (updates.projectStatus === "paid_upfront" || updates.projectStatus === "paid") {
+  // Build audit log from current
+  const auditLog = addAuditEntry(current, "order_updated", updates.projectStatus || "")
+  dbPayload.audit_log = auditLog
+
+  // ===== Backend validation of transitions =====
+  const targetStatus = updates.projectStatus || current.projectStatus
+  const actualUpfrontPaid = updates.upfrontPaid ?? current.upfrontPaid
+  const actualRemainingPaid = updates.remainingPaid ?? current.remainingPaid
+  const amountPaid = (actualUpfrontPaid ? current.upfrontAmount : 0) + (actualRemainingPaid ? current.remainingAmount : 0)
+
+  // BLOCK completed if not fully paid
+  if (targetStatus === "completed" && amountPaid < current.totalPrice) {
+    toast.error("Cannot mark completed: remaining balance must be paid first.")
+    return false
+  }
+
+  // BLOCK delivered if not fully paid
+  if (targetStatus === "delivered" && amountPaid < current.totalPrice) {
+    toast.error("Cannot deliver: remaining payment must be confirmed first.")
+    return false
+  }
+
+  // BLOCK delivering without a URL
+  if (targetStatus === "delivered" && !updates.deliveryUrl && !current.deliveryUrl) {
+    toast.error("Provide a delivery URL before marking delivered.")
+    return false
+  }
+
+  // ===== Auto-set side effects based on transition =====
+  const now = new Date().toISOString()
+
+  if (targetStatus === "upfront_paid") {
     dbPayload.upfront_paid = true
-    dbPayload.payment_status = updates.paymentStatus || "paypal_confirmed"
-    dbPayload.payment_confirmed_at = new Date().toISOString()
+    dbPayload.payment_status = "paid_upfront"
+    dbPayload.payment_confirmed_at = now
+    dbPayload.upfront_payment = JSON.stringify({
+      amount: current.upfrontAmount,
+      method: current.paymentMethod,
+      status: "confirmed",
+      paidAt: now,
+      transactionId: current.paypalCaptureId,
+    })
+  }
+
+  if (targetStatus === "remaining_paid") {
+    dbPayload.remaining_paid = true
+    dbPayload.payment_status = "remaining_paid"
+  }
+
+  if (targetStatus === "fully_paid") {
+    dbPayload.remaining_paid = true
+    dbPayload.payment_status = "fully_paid"
+    dbPayload.payment_confirmed_at = now
+    dbPayload.remaining_payment = JSON.stringify({
+      amount: current.remainingAmount,
+      method: current.paymentMethod || "manual",
+      status: "confirmed",
+      paidAt: now,
+      transactionId: null,
+    })
   }
 
   const { error } = await supabase
@@ -681,6 +788,7 @@ export async function updateServiceOrder(
     return false
   }
 
+  // ===== Notifications after successful update =====
   if (updates.projectStatus) {
     await createNotification({
       type: "order_status",
@@ -689,42 +797,98 @@ export async function updateServiceOrder(
       payload: { orderId: id, status: updates.projectStatus },
     })
 
-    if (updates.projectStatus === "paid_upfront" || updates.projectStatus === "paid") {
-      const order = await fetchServiceOrder(id)
-      if (order && order.userId) {
-        await sendBotPaymentConfirmation(order)
-        await createUserNotification({
-          userId: order.userId,
-          type: "payment_confirmed",
-          title: "Payment Confirmed",
-          message: `Your payment of $${order.upfrontAmount} for ${order.serviceName} has been confirmed. Your project is ready to start!`,
-          payload: { orderId: id, amount: order.upfrontAmount, serviceName: order.serviceName },
-          actionUrl: "/dashboard/orders",
-        })
-      }
+    const order = await fetchServiceOrder(id)
+    if (!order) return true
+
+    if (updates.projectStatus === "upfront_paid" && order.userId) {
+      await sendBotPaymentConfirmation(order)
+      await createUserNotification({
+        userId: order.userId,
+        type: "payment_confirmed",
+        title: "Upfront Payment Confirmed",
+        message: `Your payment of $${order.upfrontAmount} for ${order.serviceName} has been confirmed. Your project is starting!`,
+        payload: { orderId: id, amount: order.upfrontAmount, serviceName: order.serviceName },
+        actionUrl: "/dashboard/orders",
+      })
     }
 
-    if (updates.projectStatus === "in_progress") {
-      const order = await fetchServiceOrder(id)
-      if (order && order.userId) {
-        await createUserNotification({
-          userId: order.userId,
-          type: "project_started",
-          title: "Project Started",
-          message: `Your ${order.serviceName} project is now in progress. We'll keep you updated on the progress.`,
-          payload: { orderId: id, serviceName: order.serviceName },
-          actionUrl: "/dashboard/orders",
-        })
-      }
+    if (updates.projectStatus === "in_progress" && order.userId) {
+      await createUserNotification({
+        userId: order.userId,
+        type: "project_started",
+        title: "Project Started",
+        message: `Your ${order.serviceName} project is now in progress. We'll keep you updated.`,
+        payload: { orderId: id, serviceName: order.serviceName },
+        actionUrl: "/dashboard/orders",
+      })
     }
 
-    if (updates.projectStatus === "delivered") {
-      const order = await fetchServiceOrder(id)
-      if (order) await sendBotDeliveryMessage(order, updates.deliveredProjectUrl)
+    if (updates.projectStatus === "ready_for_delivery" && order.userId) {
+      await createNotification({
+        type: "project_ready",
+        title: "Project Ready for Delivery",
+        message: `${order.serviceName} for ${getOrderDisplayName(order)} is ready. Send preview and request remaining payment.`,
+        payload: { orderId: id, serviceName: order.serviceName, clientName: getOrderDisplayName(order) },
+      })
+    }
+
+    if (updates.projectStatus === "remaining_paid" && order.userId) {
+      await createUserNotification({
+        userId: order.userId,
+        type: "remaining_payment_confirmed",
+        title: "Remaining Payment Confirmed",
+        message: `Your final payment of $${order.remainingAmount} for ${order.serviceName} has been confirmed. Final delivery incoming!`,
+        payload: { orderId: id, amount: order.remainingAmount, serviceName: order.serviceName },
+        actionUrl: "/dashboard/orders",
+      })
+    }
+
+    if (updates.projectStatus === "fully_paid" && order.userId) {
+      await sendBotRemainingPaymentConfirmed(order)
+      await createUserNotification({
+        userId: order.userId,
+        type: "remaining_payment_confirmed",
+        title: "Fully Paid — Unlocking Final Delivery",
+        message: `Your ${order.serviceName} project is fully paid. Final delivery will be released shortly.`,
+        payload: { orderId: id, serviceName: order.serviceName },
+        actionUrl: "/dashboard/orders",
+      })
+    }
+
+    if (updates.projectStatus === "delivered" && order.userId) {
+      await sendBotDeliveryMessage(order, updates.deliveryUrl || order.deliveryUrl)
     }
   }
 
   return true
+}
+
+// ========== Send Preview Link ==========
+
+export async function updatePreviewLink(orderId: string, previewUrl: string): Promise<boolean> {
+  return updateServiceOrder(orderId, { previewUrl })
+}
+
+// ========== Send Final Delivery ==========
+
+export async function sendFinalDelivery(
+  orderId: string,
+  deliveryUrl: string,
+): Promise<boolean> {
+  return updateServiceOrder(orderId, { deliveryUrl, projectStatus: "delivered" })
+}
+
+// ========== Confirm Remaining Payment ==========
+
+export async function confirmRemainingPayment(orderId: string): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+  const order = await fetchServiceOrder(orderId)
+  if (!order) { toast.error("Order not found"); return false }
+  if (!order.remainingPaid && !order.remainingPayment) {
+    toast.error("Remaining payment has not been claimed yet.")
+    return false
+  }
+  return updateServiceOrder(orderId, { projectStatus: "fully_paid", remainingPaid: true })
 }
 
 export async function deleteServiceOrder(id: string): Promise<boolean> {

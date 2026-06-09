@@ -14,6 +14,8 @@ import {
   fetchServiceOrders,
   deleteServiceOrder,
   updateServiceOrder,
+  updatePreviewLink,
+  sendFinalDelivery,
   subscribeToServiceOrders,
   getOrderDisplayName,
   getOrderAvatarUrl,
@@ -25,6 +27,9 @@ import {
   PROJECT_STATUS_COLORS,
   PAYMENT_STATUS_LABELS,
   PAYMENT_STATUS_COLORS,
+  calcPaymentProgress,
+  canMarkCompleted,
+  canMarkDelivered,
 } from "../../lib/types/serviceOrders"
 import { cn, timeAgo } from "../../lib/utils"
 import toast from "react-hot-toast"
@@ -35,39 +40,53 @@ type StatusTab = "all" | ProjectStatus
 const TABS: { key: StatusTab; label: string }[] = [
   { key: "all", label: "All" },
   { key: "pending_checkout", label: "Checkout" },
-  { key: "waiting_payment", label: "Awaiting Payment" },
-  { key: "payment_claimed", label: "Claimed Paid" },
-  { key: "paid", label: "Paid" },
+  { key: "awaiting_upfront_payment", label: "Await Upfront" },
+  { key: "upfront_payment_claimed", label: "Claimed" },
+  { key: "upfront_paid", label: "Upfront Paid" },
   { key: "in_progress", label: "In Progress" },
+  { key: "ready_for_delivery", label: "Ready" },
+  { key: "awaiting_remaining_payment", label: "Await Remaining" },
+  { key: "remaining_payment_claimed", label: "Remaining Claimed" },
+  { key: "remaining_paid", label: "Remaining Paid" },
+  { key: "fully_paid", label: "Fully Paid" },
   { key: "delivered", label: "Delivered" },
   { key: "completed", label: "Completed" },
   { key: "cancelled", label: "Cancelled" },
 ]
 
-const STATUS_ACTIONS: { from: ProjectStatus[]; to: ProjectStatus; label: string; icon: typeof ChevronDown; needsUrl?: boolean }[] = [
-  { from: ["draft", "pending_checkout"], to: "awaiting_payment", label: "Mark Awaiting Payment", icon: AlertCircle },
-  { from: ["awaiting_payment", "payment_claimed", "payment_pending", "new_request", "waiting_payment"], to: "paid", label: "Confirm Payment Manually", icon: CheckCircle2 },
-  { from: ["paid", "paid_upfront"], to: "in_progress", label: "Start Project", icon: Rocket },
-  { from: ["in_progress", "waiting_delivery_payment"], to: "delivered", label: "Deliver Project", icon: CheckCircle2, needsUrl: true },
+const STATUS_ACTIONS: { from: ProjectStatus[]; to: ProjectStatus; label: string; icon: typeof ChevronDown; needsUrl?: boolean; isPreview?: boolean }[] = [
+  { from: ["pending_checkout"], to: "awaiting_upfront_payment", label: "Request Upfront Payment", icon: DollarSign },
+  { from: ["awaiting_upfront_payment", "upfront_payment_claimed"], to: "upfront_paid", label: "Confirm Upfront Payment", icon: CheckCircle2 },
+  { from: ["upfront_paid"], to: "in_progress", label: "Start Project", icon: Rocket },
+  { from: ["in_progress", "ready_for_delivery", "awaiting_remaining_payment", "remaining_payment_claimed", "remaining_paid"], to: "in_progress", label: "Send Preview Link", icon: Link2, needsUrl: true, isPreview: true },
+  { from: ["in_progress"], to: "ready_for_delivery", label: "Mark Ready for Delivery", icon: CheckCircle2 },
+  { from: ["ready_for_delivery"], to: "awaiting_remaining_payment", label: "Request Remaining Payment", icon: DollarSign },
+  { from: ["awaiting_remaining_payment", "remaining_payment_claimed"], to: "remaining_paid", label: "Confirm Remaining Payment", icon: CheckCircle2 },
+  { from: ["remaining_paid"], to: "fully_paid", label: "Mark Fully Paid", icon: CheckCircle2 },
+  { from: ["fully_paid"], to: "delivered", label: "Send Final Delivery", icon: CheckCircle2, needsUrl: true },
   { from: ["delivered"], to: "completed", label: "Mark Completed", icon: CheckCircle2 },
-  { from: ["draft", "pending_checkout", "awaiting_payment", "payment_claimed", "payment_pending", "paid", "new_request", "waiting_payment", "paid_upfront", "in_progress", "waiting_delivery_payment"], to: "cancelled", label: "Cancel Order", icon: XCircle },
+  { from: ["pending_checkout", "awaiting_upfront_payment", "upfront_payment_claimed", "upfront_paid", "in_progress", "ready_for_delivery", "awaiting_remaining_payment", "remaining_payment_claimed", "remaining_paid", "fully_paid", "delivered"], to: "cancelled", label: "Cancel Order", icon: XCircle },
 ]
 
-const PIPELINE = ["pending_checkout", "payment_claimed", "paid", "in_progress", "delivered", "completed"] as const
+const PIPELINE = ["pending_checkout", "upfront_paid", "in_progress", "fully_paid", "delivered", "completed"] as const
 
 function StatusBadge({ status }: { status: ProjectStatus }) {
+  const isPaymentStatus = ["pending_checkout", "awaiting_upfront_payment", "upfront_payment_claimed", "upfront_paid", "awaiting_remaining_payment", "remaining_payment_claimed", "remaining_paid", "fully_paid"].includes(status)
   return (
     <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold", PROJECT_STATUS_COLORS[status])}>
-      {status === "new_request" && <AlertCircle size={10} />}
       {status === "cancelled" && <XCircle size={10} />}
       {(status === "completed" || status === "delivered") && <CheckCircle2 size={10} />}
       {status === "in_progress" && <Clock size={10} />}
+      {status === "ready_for_delivery" && <CheckCircle2 size={10} />}
+      {status === "payment_failed" && <AlertCircle size={10} />}
+      {isPaymentStatus && <DollarSign size={10} />}
       {PROJECT_STATUS_LABELS[status]}
     </span>
   )
 }
 
 function AdminPaymentBadge({ order }: { order: ServiceOrder }) {
+  const progress = calcPaymentProgress(order)
   let label = PAYMENT_STATUS_LABELS[order.paymentStatus]
   if (order.paymentStatus === "not_paid") label = "Not paid"
   if (order.paymentStatus === "client_claimed_paid") label = "Client claimed paid"
@@ -75,9 +94,14 @@ function AdminPaymentBadge({ order }: { order: ServiceOrder }) {
   if (order.paymentStatus === "wise_manual_review") {
     label = order.upfrontPaid ? "Wise manually confirmed" : "Wise manual confirmation needed"
   }
+  if (order.projectStatus === "awaiting_remaining_payment" || order.projectStatus === "remaining_payment_claimed") {
+    label = `Remaining payment ${order.projectStatus === "remaining_payment_claimed" ? "claimed" : "required"}`
+  }
+
+  const colorKey = progress.isFullyPaid ? "fully_paid" : order.upfrontPaid ? "paid_upfront" : order.paymentStatus
 
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold", PAYMENT_STATUS_COLORS[order.paymentStatus])}>
+    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold", PAYMENT_STATUS_COLORS[colorKey as keyof typeof PAYMENT_STATUS_COLORS] || "bg-zinc-500/10 text-zinc-300 border-zinc-500/20")}>
       <DollarSign size={10} />
       {label}
     </span>
@@ -98,9 +122,29 @@ function OrderAvatar({ order, size = "md" }: { order: ServiceOrder; size?: "sm" 
   )
 }
 
+function pipelineIndex(status: ProjectStatus): number {
+  const map: Record<ProjectStatus, number> = {
+    pending_checkout: 0,
+    awaiting_upfront_payment: 0,
+    upfront_payment_claimed: 0,
+    upfront_paid: 1,
+    in_progress: 2,
+    ready_for_delivery: 2,
+    awaiting_remaining_payment: 2,
+    remaining_payment_claimed: 2,
+    remaining_paid: 2,
+    fully_paid: 3,
+    delivered: 4,
+    completed: 5,
+    cancelled: -1,
+    payment_failed: -1,
+  }
+  return map[status] ?? -1
+}
+
 function PipelineBar({ status }: { status: ProjectStatus }) {
   const cancelled = status === "cancelled"
-  const currentIdx = PIPELINE.indexOf(status as typeof PIPELINE[number])
+  const currentIdx = pipelineIndex(status)
   return (
     <div className="flex items-center gap-0.5">
       {PIPELINE.map((step, i) => {
@@ -122,17 +166,21 @@ function PipelineBar({ status }: { status: ProjectStatus }) {
 }
 
 // ─── Deliver Modal ────────────────────────────────────────────────
-function DeliverModal({
+function UrlModal({
   order,
+  mode,
   onConfirm,
   onClose,
 }: {
   order: ServiceOrder
+  mode: "preview" | "delivery"
   onConfirm: (url: string) => Promise<void>
   onClose: () => void
 }) {
-  const [url, setUrl] = useState(order.deliveredProjectUrl ?? "")
+  const defaultUrl = mode === "preview" ? (order.previewUrl ?? "") : (order.deliveryUrl ?? order.deliveredProjectUrl ?? "")
+  const [url, setUrl] = useState(defaultUrl)
   const [saving, setSaving] = useState(false)
+  const isDelivery = mode === "delivery"
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -160,8 +208,8 @@ function DeliverModal({
       >
         <div className="flex items-center justify-between mb-5">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-[#4F6EF7]">Deliver Project</p>
-            <h3 className="mt-1 text-lg font-bold text-white">Add the project URL</h3>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-[#4F6EF7]">{isDelivery ? "Final Delivery" : "Preview Link"}</p>
+            <h3 className="mt-1 text-lg font-bold text-white">{isDelivery ? "Send final delivery URL" : "Share a preview link"}</h3>
           </div>
           <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.05] text-white/40 hover:text-white transition-colors">
             <X size={15} />
@@ -179,20 +227,22 @@ function DeliverModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-white/40">
-              Project URL <span className="text-red-400">*</span>
+              {isDelivery ? "Delivery URL" : "Preview URL"} <span className="text-red-400">*</span>
             </label>
             <div className="relative">
               <Link2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
               <input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://your-client-project.com"
+                placeholder={isDelivery ? "https://final-project.com" : "https://preview-project.com"}
                 className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] py-3 pl-9 pr-4 text-sm text-white outline-none transition-all placeholder:text-white/25 focus:border-[#4F6EF7]/50 focus:bg-white/[0.06]"
                 autoFocus
               />
             </div>
             <p className="mt-1.5 text-[11px] text-white/30">
-              This URL will be shown to the client in their profile orders tab with a congrats message.
+              {isDelivery
+                ? "Final URL shown to the client. Order must be fully paid first."
+                : "Preview URL can be shared before remaining payment is complete."}
             </p>
           </div>
 
@@ -207,10 +257,15 @@ function DeliverModal({
             <button
               type="submit"
               disabled={saving || !url.trim()}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] py-2.5 text-sm font-semibold text-white disabled:opacity-50 hover:shadow-[0_0_20px_rgba(37,99,235,0.3)] transition-all"
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50 transition-all",
+                isDelivery
+                  ? "bg-gradient-to-br from-[#2563EB] to-[#6D28D9] hover:shadow-[0_0_20px_rgba(37,99,235,0.3)]"
+                  : "bg-gradient-to-br from-violet-600 to-fuchsia-600 hover:shadow-[0_0_20px_rgba(139,92,246,0.3)]",
+              )}
             >
               {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-              Deliver & Notify Client
+              {isDelivery ? "Send Final Delivery" : "Save Preview"}
             </button>
           </div>
         </form>
@@ -235,24 +290,48 @@ function OrderCard({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [updating, setUpdating] = useState(false)
-  const [deliverTarget, setDeliverTarget] = useState<ServiceOrder | null>(null)
+  const [urlTarget, setUrlTarget] = useState<{ order: ServiceOrder; mode: "preview" | "delivery" } | null>(null)
   const [actionsOpen, setActionsOpen] = useState(false)
   const displayName = getOrderDisplayName(order)
   const availableActions = STATUS_ACTIONS.filter((a) => a.from.includes(order.projectStatus))
 
   const handleStatusUpdate = async (action: typeof STATUS_ACTIONS[number]) => {
     setActionsOpen(false)
+
     if (action.needsUrl) {
-      setDeliverTarget(order)
+      if (action.isPreview) {
+        setUrlTarget({ order, mode: "preview" })
+      } else {
+        setUrlTarget({ order, mode: "delivery" })
+      }
       return
     }
+
+    if (action.to === "completed" && !canMarkCompleted(order)) {
+      toast.error("Cannot mark completed — remaining balance not fully paid")
+      return
+    }
+    if (action.to === "delivered" && !canMarkDelivered(order)) {
+      toast.error("Cannot deliver — remaining balance not fully paid")
+      return
+    }
+
     setUpdating(true)
     const updates: Parameters<typeof updateServiceOrder>[1] = { projectStatus: action.to }
-    if (action.to === "paid" || action.to === "paid_upfront") {
+
+    if (action.to === "upfront_paid") {
       updates.upfrontPaid = true
+      updates.upfrontAmount = order.upfrontAmount
       updates.paymentStatus = order.paymentMethod === "wise" ? "wise_manual_review" : "paypal_confirmed"
       updates.paymentMethod = order.paymentMethod || "manual"
+    } else if (action.to === "remaining_paid") {
+      updates.remainingPaid = true
+      updates.remainingAmount = order.remainingAmount
+    } else if (action.to === "fully_paid") {
+      updates.remainingPaid = true
+      updates.remainingAmount = order.remainingAmount
     }
+
     const ok = await updateServiceOrder(order.id, updates)
     setUpdating(false)
     if (ok) {
@@ -261,16 +340,20 @@ function OrderCard({
     }
   }
 
-  const handleDeliver = async (url: string) => {
-    setDeliverTarget(null)
+  const handleUrlSubmit = async (url: string) => {
+    if (!urlTarget) return
+    const { order: targetOrder, mode } = urlTarget
+    setUrlTarget(null)
     setUpdating(true)
-    const ok = await updateServiceOrder(order.id, {
-      projectStatus: "delivered",
-      deliveredProjectUrl: url,
-    })
+    let ok: boolean
+    if (mode === "preview") {
+      ok = await updatePreviewLink(targetOrder.id, url)
+    } else {
+      ok = await sendFinalDelivery(targetOrder.id, url)
+    }
     setUpdating(false)
     if (ok) {
-      toast.success("Project delivered! Client notified 🎉")
+      toast.success(mode === "preview" ? "Preview link saved!" : "Final delivery sent! 🎉")
       onUpdate()
     }
   }
@@ -319,33 +402,106 @@ function OrderCard({
             <PipelineBar status={order.projectStatus} />
           </div>
 
-          {/* Financials */}
-          <div className="mt-4 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
-            <div className="rounded-xl border border-white/[0.05] bg-white/[0.025] px-3 py-2.5 text-center">
-              <p className="text-[10px] uppercase tracking-wider text-white/30 mb-0.5">Total</p>
-              <p className="text-sm font-bold text-white">${order.totalPrice}</p>
+          {/* Payment breakdown */}
+          <div className="mt-4 space-y-2">
+            <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
+              <div className="rounded-xl border border-white/[0.05] bg-white/[0.025] px-3 py-2.5 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-white/30 mb-0.5">Total</p>
+                <p className="text-sm font-bold text-white">${order.totalPrice}</p>
+              </div>
+              <div className={cn("rounded-xl border px-3 py-2.5 text-center", order.upfrontPaid ? "border-green-500/15 bg-green-500/8" : "border-yellow-500/15 bg-yellow-500/8")}>
+                <p className="text-[10px] uppercase tracking-wider text-white/30 mb-0.5">Upfront Paid</p>
+                <p className={cn("text-sm font-bold", order.upfrontPaid ? "text-green-400" : "text-yellow-400")}>
+                  ${order.upfrontPaid ? order.upfrontAmount : 0} {order.upfrontPaid ? "✓" : ""}
+                </p>
+              </div>
+              <div className={cn("rounded-xl border px-3 py-2.5 text-center", order.remainingPaid ? "border-green-500/15 bg-green-500/8" : "border-white/[0.05] bg-white/[0.025]")}>
+                <p className="text-[10px] uppercase tracking-wider text-white/30 mb-0.5">Remaining</p>
+                <p className={cn("text-sm font-bold", order.remainingPaid ? "text-green-400" : "text-white/50")}>
+                  ${order.remainingPaid ? 0 : order.remainingAmount} {order.remainingPaid ? "✓" : ""}
+                </p>
+              </div>
             </div>
-            <div className={cn("rounded-xl border px-3 py-2.5 text-center", order.upfrontPaid ? "border-green-500/15 bg-green-500/8" : "border-yellow-500/15 bg-yellow-500/8")}>
-              <p className="text-[10px] uppercase tracking-wider text-white/30 mb-0.5">Upfront</p>
-              <p className={cn("text-sm font-bold", order.upfrontPaid ? "text-green-400" : "text-yellow-400")}>
-                ${order.upfrontAmount} {order.upfrontPaid ? "✓" : ""}
-              </p>
+
+            {/* Payment progress bar */}
+            <div className="rounded-xl border border-white/[0.05] bg-white/[0.025] px-3 py-2.5">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[10px] uppercase tracking-wider text-white/30">Payment Progress</p>
+                <p className={cn("text-xs font-bold", (() => {
+                  const p = calcPaymentProgress(order)
+                  return p.isFullyPaid ? "text-emerald-400" : p.amountPaid > 0 ? "text-blue-400" : "text-white/40"
+                })())}>
+                  ${(() => {
+                    const p = calcPaymentProgress(order)
+                    return p.amountPaid
+                  })()} / ${order.totalPrice}
+                </p>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all duration-500",
+                    (() => {
+                      const p = calcPaymentProgress(order)
+                      return p.isFullyPaid ? "bg-gradient-to-r from-emerald-500 to-green-400" : "bg-gradient-to-r from-blue-500 to-violet-500"
+                    })(),
+                  )}
+                  style={{ width: `${calcPaymentProgress(order).paymentProgress}%` }}
+                />
+              </div>
             </div>
-            <div className={cn("rounded-xl border px-3 py-2.5 text-center", order.remainingPaid ? "border-green-500/15 bg-green-500/8" : "border-white/[0.05] bg-white/[0.025]")}>
-              <p className="text-[10px] uppercase tracking-wider text-white/30 mb-0.5">Remaining</p>
-              <p className={cn("text-sm font-bold", order.remainingPaid ? "text-green-400" : "text-white/50")}>
-                ${order.remainingAmount} {order.remainingPaid ? "✓" : ""}
-              </p>
-            </div>
+
+            {/* Remaining balance warning */}
+            {(() => {
+              const p = calcPaymentProgress(order)
+              return !p.isFullyPaid && p.remaining > 0 ? (
+                <div className="flex items-center gap-2 rounded-xl border border-amber-500/15 bg-amber-500/8 px-3 py-2">
+                  <AlertCircle size={12} className="shrink-0 text-amber-400" />
+                  <p className="text-[11px] text-amber-300/90">
+                    Remaining payment required: ${p.remaining}
+                  </p>
+                </div>
+              ) : null
+            })()}
+
+            {/* Fully paid badge */}
+            {calcPaymentProgress(order).isFullyPaid ? (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-500/15 bg-emerald-500/8 px-3 py-2">
+                <CheckCircle2 size={12} className="shrink-0 text-emerald-400" />
+                <p className="text-[11px] text-emerald-300/90">Fully Paid</p>
+              </div>
+            ) : null}
           </div>
 
-          {/* Delivered URL */}
-          {order.deliveredProjectUrl && (
+          {/* Preview + Delivery URLs */}
+          {order.previewUrl && (
+            <a
+              href={order.previewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 flex items-center gap-2 rounded-xl border border-violet-500/20 bg-violet-500/8 px-3 py-2 text-xs font-medium text-violet-300 hover:bg-violet-500/15 transition-colors"
+            >
+              <ExternalLink size={12} />
+              <span className="truncate">Preview: {order.previewUrl}</span>
+            </a>
+          )}
+          {order.deliveryUrl && (
+            <a
+              href={order.deliveryUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 flex items-center gap-2 rounded-xl border border-[#4F6EF7]/20 bg-[#4F6EF7]/8 px-3 py-2 text-xs font-medium text-[#7E95FF] hover:bg-[#4F6EF7]/15 transition-colors"
+            >
+              <ExternalLink size={12} />
+              <span className="truncate">Delivery: {order.deliveryUrl}</span>
+            </a>
+          )}
+          {order.deliveredProjectUrl && !order.deliveryUrl && (
             <a
               href={order.deliveredProjectUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-3 flex items-center gap-2 rounded-xl border border-[#4F6EF7]/20 bg-[#4F6EF7]/8 px-3 py-2 text-xs font-medium text-[#7E95FF] hover:bg-[#4F6EF7]/15 transition-colors"
+              className="mt-2 flex items-center gap-2 rounded-xl border border-[#4F6EF7]/20 bg-[#4F6EF7]/8 px-3 py-2 text-xs font-medium text-[#7E95FF] hover:bg-[#4F6EF7]/15 transition-colors"
             >
               <ExternalLink size={12} />
               <span className="truncate">{order.deliveredProjectUrl}</span>
@@ -464,24 +620,39 @@ function OrderCard({
                     exit={{ opacity: 0, y: 8, scale: 0.98 }}
                     className="absolute right-0 top-full z-20 mt-1.5 w-58 origin-top-right rounded-xl border border-white/[0.08] bg-[#0a0a10] py-1 shadow-2xl"
                   >
-                    {availableActions.map((action) => (
-                      <button
-                        key={action.to}
-                        onClick={() => handleStatusUpdate(action)}
-                        className={cn(
-                          "flex min-h-10 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors",
-                          action.to === "cancelled"
-                            ? "text-red-400/70 hover:bg-red-500/8 hover:text-red-300"
-                            : action.to === "delivered"
-                            ? "text-emerald-400/80 hover:bg-emerald-500/8 hover:text-emerald-300"
-                            : "text-white/50 hover:bg-white/[0.05] hover:text-white",
-                        )}
-                      >
-                        <action.icon size={13} className="shrink-0" />
-                        {action.label}
-                        {action.needsUrl && <Link2 size={11} className="ml-auto opacity-50" />}
-                      </button>
-                    ))}
+                    {availableActions.map((action) => {
+                      const progress = calcPaymentProgress(order)
+                      const isDisabled =
+                        (action.to === "completed" && !canMarkCompleted(order)) ||
+                        (action.to === "delivered" && !canMarkDelivered(order))
+                      return (
+                        <button
+                          key={action.to + (action.label)}
+                          onClick={() => !isDisabled && handleStatusUpdate(action)}
+                          disabled={isDisabled}
+                          className={cn(
+                            "flex min-h-10 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors",
+                            isDisabled
+                              ? "cursor-not-allowed text-white/15"
+                              : action.to === "cancelled"
+                              ? "text-red-400/70 hover:bg-red-500/8 hover:text-red-300"
+                              : action.to === "delivered"
+                              ? "text-emerald-400/80 hover:bg-emerald-500/8 hover:text-emerald-300"
+                              : action.isPreview
+                              ? "text-violet-400/70 hover:bg-violet-500/8 hover:text-violet-300"
+                              : "text-white/50 hover:bg-white/[0.05] hover:text-white",
+                          )}
+                        >
+                          <action.icon size={13} className="shrink-0" />
+                          {action.label}
+                          {(action.needsUrl || isDisabled) && (
+                            <span className="ml-auto">
+                              {isDisabled ? <AlertCircle size={11} className="text-amber-500/50" /> : <Link2 size={11} className="opacity-50" />}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -491,11 +662,12 @@ function OrderCard({
       </motion.div>
 
       <AnimatePresence>
-        {deliverTarget && (
-          <DeliverModal
-            order={deliverTarget}
-            onConfirm={handleDeliver}
-            onClose={() => setDeliverTarget(null)}
+        {urlTarget && (
+          <UrlModal
+            order={urlTarget.order}
+            mode={urlTarget.mode}
+            onConfirm={handleUrlSubmit}
+            onClose={() => setUrlTarget(null)}
           />
         )}
       </AnimatePresence>
@@ -573,7 +745,7 @@ export default function ServiceOrders() {
     revenue: orders.filter(o => o.upfrontPaid).reduce((s, o) => s + o.upfrontAmount, 0)
       + orders.filter(o => o.remainingPaid).reduce((s, o) => s + o.remainingAmount, 0),
     active: orders.filter(o => o.projectStatus === "in_progress").length,
-    pending: orders.filter(o => ["pending_checkout", "awaiting_payment", "payment_claimed", "payment_pending", "new_request", "waiting_payment"].includes(o.projectStatus)).length,
+    pending: orders.filter(o => ["pending_checkout", "awaiting_upfront_payment", "upfront_payment_claimed"].includes(o.projectStatus)).length,
   }), [orders])
 
   const handleDelete = async (order: ServiceOrder) => {
