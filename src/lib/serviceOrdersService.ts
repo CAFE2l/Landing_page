@@ -816,11 +816,11 @@ export function subscribeToNotifications(onNotification: () => void) {
   return () => { client.removeChannel(channel) }
 }
 
-export async function subscribeToServiceOrders(onChange: () => void) {
+export function subscribeToServiceOrders(onChange: () => void) {
   const client = supabase
   if (!client || !supabaseConfigured) return () => {}
   const channel = client
-    .channel("service-orders")
+    .channel(`service-orders:${Date.now()}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "service_orders" }, onChange)
     .subscribe()
   return () => { client.removeChannel(channel) }

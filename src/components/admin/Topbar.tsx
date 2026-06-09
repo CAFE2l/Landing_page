@@ -115,7 +115,7 @@ export default function Topbar({ title, userId, onMenuClick }: TopbarProps) {
 
   // Realtime subscription for new notifications
   useEffect(() => {
-    const sub = subscribeToNotifications(() => {
+    const cleanup = subscribeToNotifications(() => {
       fetchNotifications();
       playNotificationSound();
       toast.custom(
@@ -136,7 +136,7 @@ export default function Topbar({ title, userId, onMenuClick }: TopbarProps) {
       );
     });
     return () => {
-      sub.then((fn) => fn());
+      cleanup();
     };
   }, [fetchNotifications]);
 

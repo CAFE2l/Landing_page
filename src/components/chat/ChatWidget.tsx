@@ -245,7 +245,7 @@ export default function ChatWidget() {
           {!open && (
             <button
               onClick={() => setOpen(true)}
-              className="fixed bottom-5 right-5 z-[9998] safe-bottom flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white shadow-[0_4px_24px_rgba(37,99,235,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_4px_32px_rgba(37,99,235,0.5)]"
+              className="fixed bottom-5 right-5 z-[9998] flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white shadow-[0_4px_24px_rgba(37,99,235,0.35)] transition-all duration-300 hover:scale-105 hover:shadow-[0_4px_32px_rgba(37,99,235,0.5)]"
               aria-label="Open quick communication center"
             >
               <MessageCircle size={24} />

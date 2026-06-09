@@ -3,23 +3,21 @@ import { AnimatePresence, motion } from "framer-motion"
 import {
   AlertCircle,
   ArrowRight,
+  Bookmark,
   BookOpen,
   BriefcaseBusiness,
   Camera,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Eye,
-  EyeOff,
-  Flag,
   Heart,
   ImagePlus,
   Loader2,
   MessageCircle,
   MoreHorizontal,
   Plus,
-  Search,
   Send,
+  Share2,
   Sparkles,
   Target,
   Trash2,
@@ -35,49 +33,32 @@ import UserAvatar from "../components/ui/UserAvatar"
 import { useAuth } from "../contexts/AuthContext"
 import type { SocialPost, SocialStatusCategory } from "../data/feedbackStore"
 import { uploadChatMedia } from "../lib/chatService"
+import { createOrGetConversation } from "../lib/chatService"
+import { sendMessage } from "../lib/chatService"
 import {
   createSocialPost,
   deleteSocialPost,
   fetchFollowCounts,
-  fetchSocialPostReportCounts,
   fetchSocialPosts,
-  hideSocialPost,
   isFollowing,
   recordSocialPostView,
   toggleFollow,
   toggleSocialLike,
+  toggleSocialSave,
+  fetchPostComments,
+  addPostComment,
 } from "../lib/socialService"
 import { cn, timeAgo } from "../lib/utils"
 
-type FeedMode = "all" | "following"
-type CategoryFilter = SocialStatusCategory | "all"
-
-interface StatusFormState {
-  content: string
-  category: SocialStatusCategory
-  image: { url: string; type: "image" } | null
-}
-
-interface StatusGroup {
-  userId: string
-  name: string
-  username: string | null
-  avatarUrl: string | null
-  bio: string | null
-  role: string | null
-  category: SocialStatusCategory
-  posts: SocialPost[]
-  followers: number | null
-  following: number | null
-  followedByMe: boolean
-}
-
 const MAX_STATUS_CHARS = 700
 const MAX_IMAGE_SIZE = 8 * 1024 * 1024
+const STORY_DURATION_SEC = 5
+
+type CategoryId = SocialStatusCategory
 
 const CATEGORY_META: Record<
-  SocialStatusCategory,
-  { name: string; short: string; color: string; ring: string; glow: string; icon: typeof Sparkles }
+  CategoryId,
+  { name: string; short: string; color: string; ring: string; glow: string; icon: typeof Sparkles; bgGlow: string }
 > = {
   business: {
     name: "Business",
@@ -86,6 +67,7 @@ const CATEGORY_META: Record<
     ring: "from-sky-400 via-blue-500 to-cyan-300",
     glow: "shadow-[0_0_34px_rgba(56,189,248,0.18)]",
     icon: BriefcaseBusiness,
+    bgGlow: "bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.12),transparent_70%)]",
   },
   project: {
     name: "Project",
@@ -94,6 +76,7 @@ const CATEGORY_META: Record<
     ring: "from-violet-400 via-fuchsia-500 to-blue-400",
     glow: "shadow-[0_0_34px_rgba(139,92,246,0.18)]",
     icon: Target,
+    bgGlow: "bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,0.12),transparent_70%)]",
   },
   study: {
     name: "Study",
@@ -102,6 +85,7 @@ const CATEGORY_META: Record<
     ring: "from-emerald-300 via-teal-500 to-sky-400",
     glow: "shadow-[0_0_34px_rgba(16,185,129,0.16)]",
     icon: BookOpen,
+    bgGlow: "bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.12),transparent_70%)]",
   },
   lifestyle: {
     name: "Lifestyle",
@@ -110,6 +94,7 @@ const CATEGORY_META: Record<
     ring: "from-orange-300 via-rose-400 to-amber-300",
     glow: "shadow-[0_0_34px_rgba(251,146,60,0.16)]",
     icon: UserRound,
+    bgGlow: "bg-[radial-gradient(ellipse_at_center,rgba(251,146,60,0.12),transparent_70%)]",
   },
   win: {
     name: "Win",
@@ -118,6 +103,7 @@ const CATEGORY_META: Record<
     ring: "from-amber-200 via-yellow-400 to-orange-300",
     glow: "shadow-[0_0_34px_rgba(251,191,36,0.16)]",
     icon: Trophy,
+    bgGlow: "bg-[radial-gradient(ellipse_at_center,rgba(251,191,36,0.12),transparent_70%)]",
   },
   behind_the_scenes: {
     name: "Behind The Scenes",
@@ -126,45 +112,56 @@ const CATEGORY_META: Record<
     ring: "from-slate-200 via-cyan-400 to-blue-500",
     glow: "shadow-[0_0_34px_rgba(148,163,184,0.16)]",
     icon: Camera,
+    bgGlow: "bg-[radial-gradient(ellipse_at_center,rgba(148,163,184,0.10),transparent_70%)]",
   },
 }
 
-const CATEGORIES = Object.entries(CATEGORY_META).map(([id, meta]) => ({ id: id as SocialStatusCategory, ...meta }))
+const CATEGORIES = Object.entries(CATEGORY_META).map(([id, meta]) => ({ id: id as CategoryId, ...meta }))
 
-const FILTERS: Array<{ label: string; value: CategoryFilter | FeedMode; type: "mode" | "category" }> = [
-  { label: "All Status", value: "all", type: "mode" },
-  { label: "Following", value: "following", type: "mode" },
-  { label: "Business", value: "business", type: "category" },
-  { label: "Project", value: "project", type: "category" },
-  { label: "Study", value: "study", type: "category" },
-  { label: "Lifestyle", value: "lifestyle", type: "category" },
-  { label: "Win", value: "win", type: "category" },
-  { label: "Behind The Scenes", value: "behind_the_scenes", type: "category" },
-]
+interface StoryFormState {
+  content: string
+  category: CategoryId
+  image: { url: string; type: "image" } | null
+}
 
-const DEFAULT_FORM: StatusFormState = {
+interface StoryGroup {
+  userId: string
+  name: string
+  username: string | null
+  avatarUrl: string | null
+  bio: string | null
+  role: string | null
+  category: CategoryId
+  posts: SocialPost[]
+  followers: number | null
+  following: number | null
+  followedByMe: boolean
+}
+
+const DEFAULT_FORM: StoryFormState = {
   content: "",
   category: "project",
   image: null,
 }
 
-function validateStatus(form: StatusFormState) {
+function validateStory(form: StoryFormState) {
   const content = form.content.trim()
-  if (!content && !form.image) return "Write a status or add an image before publishing."
-  if (content.length > MAX_STATUS_CHARS) return `Status must be ${MAX_STATUS_CHARS} characters or less.`
+  if (!content && !form.image) return "Write something or add an image."
+  if (content.length > MAX_STATUS_CHARS) return `Must be ${MAX_STATUS_CHARS} characters or less.`
   if (!CATEGORY_META[form.category]) return "Choose a valid category."
   return null
 }
 
-function groupStatus(posts: SocialPost[], followState: Map<string, boolean>, counts: Map<string, { followers: number; following: number }>): StatusGroup[] {
-  const groups = new Map<string, StatusGroup>()
+function groupStories(posts: SocialPost[], followState: Map<string, boolean>, counts: Map<string, { followers: number; following: number }>): StoryGroup[] {
+  const groups = new Map<string, StoryGroup>()
   for (const post of posts) {
     const existing = groups.get(post.userId)
     if (existing) {
       existing.posts.push(post)
+      existing.category = post.category
       continue
     }
-    const followCounts = counts.get(post.userId)
+    const fc = counts.get(post.userId)
     groups.set(post.userId, {
       userId: post.userId,
       name: post.user?.name || "User unavailable",
@@ -174,15 +171,21 @@ function groupStatus(posts: SocialPost[], followState: Map<string, boolean>, cou
       role: post.user?.role || null,
       category: post.category,
       posts: [post],
-      followers: followCounts?.followers ?? null,
-      following: followCounts?.following ?? null,
+      followers: fc?.followers ?? null,
+      following: fc?.following ?? null,
       followedByMe: followState.get(post.userId) || false,
     })
   }
-  return [...groups.values()].sort((a, b) => new Date(b.posts[0]?.createdAt || 0).getTime() - new Date(a.posts[0]?.createdAt || 0).getTime())
+  return [...groups.values()].sort((a, b) => {
+    const aTime = new Date(a.posts[0]?.createdAt || 0).getTime()
+    const bTime = new Date(b.posts[0]?.createdAt || 0).getTime()
+    return bTime - aTime
+  })
 }
 
-function CategoryBadge({ category }: { category: SocialStatusCategory }) {
+// ========== CategoryBadge ==========
+
+function CategoryBadge({ category }: { category: CategoryId }) {
   const meta = CATEGORY_META[category] || CATEGORY_META.business
   const Icon = meta.icon
   return (
@@ -193,12 +196,14 @@ function CategoryBadge({ category }: { category: SocialStatusCategory }) {
   )
 }
 
-function StatusAvatar({
+// ========== StoryAvatar ==========
+
+function StoryAvatar({
   group,
   active,
   onClick,
 }: {
-  group: StatusGroup
+  group: StoryGroup
   active: boolean
   onClick: () => void
 }) {
@@ -206,21 +211,29 @@ function StatusAvatar({
   return (
     <motion.button
       type="button"
-      whileHover={{ y: -3, scale: 1.035 }}
-      whileTap={{ scale: 0.97 }}
+      whileHover={{ y: -4, scale: 1.06 }}
+      whileTap={{ scale: 0.94 }}
       onClick={onClick}
-      className="group w-[78px] shrink-0 text-center sm:w-[86px]"
+      className="group w-[78px] shrink-0 text-center sm:w-[90px]"
     >
       <span
         className={cn(
-          "mx-auto block rounded-full bg-gradient-to-br p-[2px] transition",
+          "relative mx-auto block rounded-full bg-gradient-to-br p-[2.5px] transition duration-300",
           meta.ring,
-          active ? "shadow-[0_0_36px_rgba(126,161,255,0.35)]" : meta.glow,
+          active ? "shadow-[0_0_40px_rgba(79,110,247,0.35)] scale-105" : meta.glow,
+          "group-hover:shadow-[0_0_50px_rgba(79,110,247,0.25)]",
         )}
       >
         <span className="block rounded-full bg-[#07080d] p-[3px]">
-          <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="lg" className="h-[54px] w-[54px] sm:h-[58px] sm:w-[58px]" ring={false} />
+          <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="lg" className="h-[56px] w-[56px] sm:h-[62px] sm:w-[62px]" ring={false} />
         </span>
+        <motion.span
+          initial={false}
+          animate={active ? { scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] } : { scale: 1, opacity: 0 }}
+          transition={{ repeat: Infinity, duration: 2 }}
+          className={cn("absolute inset-0 rounded-full bg-gradient-to-br", meta.ring, "blur-md")}
+          style={{ zIndex: -1 }}
+        />
       </span>
       <span className="mt-2 block truncate text-xs font-semibold text-white/80 transition group-hover:text-white">{group.name}</span>
       <span className="mt-0.5 block truncate text-[10px] text-white/36">{meta.short}</span>
@@ -228,7 +241,9 @@ function StatusAvatar({
   )
 }
 
-function StatusRail({
+// ========== StoryBar ==========
+
+function StoryBar({
   loading,
   groups,
   selectedId,
@@ -237,40 +252,104 @@ function StatusRail({
   onOpenGroup,
 }: {
   loading: boolean
-  groups: StatusGroup[]
+  groups: StoryGroup[]
   selectedId?: string
   signedIn: boolean
   onCreate: () => void
-  onOpenGroup: (group: StatusGroup) => void
+  onOpenGroup: (group: StoryGroup) => void
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 4)
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4)
+  }, [])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    checkScroll()
+    el.addEventListener("scroll", checkScroll, { passive: true })
+    const ro = new ResizeObserver(checkScroll)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener("scroll", checkScroll)
+      ro.disconnect()
+    }
+  }, [groups, checkScroll])
+
+  const scroll = (dir: "left" | "right") => {
+    scrollRef.current?.scrollBy({ left: dir === "left" ? -240 : 240, behavior: "smooth" })
+  }
+
   return (
-    <section className="rounded-[24px] border border-white/[0.08] bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.28)] backdrop-blur-2xl sm:rounded-[30px] sm:p-4">
-      <div className="mobile-scroll-x flex gap-3 pb-1 sm:gap-4">
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="relative rounded-[24px] border border-white/[0.08] bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.28)] backdrop-blur-2xl sm:rounded-[30px] sm:p-4"
+    >
+      <AnimatePresence>
+        {canScrollLeft ? (
+          <motion.button
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            type="button"
+            onClick={() => scroll("left")}
+            className="absolute left-1 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.1] bg-[#090a10]/90 text-white/70 backdrop-blur-xl transition hover:bg-white/[0.1] hover:text-white sm:flex"
+          >
+            <ChevronLeft size={18} />
+          </motion.button>
+        ) : null}
+        {canScrollRight ? (
+          <motion.button
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            type="button"
+            onClick={() => scroll("right")}
+            className="absolute right-1 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.1] bg-[#090a10]/90 text-white/70 backdrop-blur-xl transition hover:bg-white/[0.1] hover:text-white sm:flex"
+          >
+            <ChevronRight size={18} />
+          </motion.button>
+        ) : null}
+      </AnimatePresence>
+
+      <div
+        ref={scrollRef}
+        className="flex gap-3 overflow-x-auto pb-1 scrollbar-none sm:gap-4"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
         <motion.button
           type="button"
-          whileHover={{ y: -3, scale: 1.035 }}
-          whileTap={{ scale: 0.97 }}
+          whileHover={{ y: -4, scale: 1.06 }}
+          whileTap={{ scale: 0.94 }}
           onClick={onCreate}
           disabled={!signedIn}
-          className="group w-[78px] shrink-0 text-center disabled:cursor-not-allowed disabled:opacity-45 sm:w-[86px]"
+          className="group w-[78px] shrink-0 text-center disabled:cursor-not-allowed disabled:opacity-45 sm:w-[90px]"
         >
-          <span className="mx-auto flex h-[62px] w-[62px] items-center justify-center rounded-full border border-dashed border-[#7EA1FF]/50 bg-[#4F6EF7]/12 text-[#B9C8FF] shadow-[0_0_30px_rgba(79,110,247,0.16)] transition group-hover:border-[#9bb3ff]/80 group-hover:bg-[#4F6EF7]/18 sm:h-[66px] sm:w-[66px]">
-            <Plus size={22} />
+          <span className="mx-auto flex h-[62px] w-[62px] items-center justify-center rounded-full border border-dashed border-[#7EA1FF]/50 bg-[#4F6EF7]/12 text-[#B9C8FF] shadow-[0_0_30px_rgba(79,110,247,0.16)] transition group-hover:border-[#9bb3ff]/80 group-hover:bg-[#4F6EF7]/18 sm:h-[70px] sm:w-[70px]">
+            <Plus size={24} />
           </span>
-          <span className="mt-2 block text-xs font-semibold text-white/82">Create</span>
-          <span className="mt-0.5 block text-[10px] text-white/36">Status</span>
+          <span className="mt-2 block text-xs font-semibold text-white/82">Your Story</span>
+          <span className="mt-0.5 block text-[10px] text-white/36">Create</span>
         </motion.button>
 
         {loading
-          ? [0, 1, 2, 3, 4, 5].map((item) => (
-              <div key={item} className="w-[78px] shrink-0 text-center sm:w-[86px]">
-                <div className="mx-auto h-[62px] w-[62px] animate-pulse rounded-full bg-white/[0.06] sm:h-[66px] sm:w-[66px]" />
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="w-[78px] shrink-0 text-center sm:w-[90px]">
+                <div className="mx-auto h-[62px] w-[62px] animate-pulse rounded-full bg-white/[0.06] sm:h-[70px] sm:w-[70px]" />
                 <div className="mx-auto mt-2 h-3 w-14 animate-pulse rounded bg-white/[0.06]" />
                 <div className="mx-auto mt-1 h-2 w-10 animate-pulse rounded bg-white/[0.04]" />
               </div>
             ))
           : groups.map((group) => (
-              <StatusAvatar
+              <StoryAvatar
                 key={group.userId}
                 group={group}
                 active={selectedId === group.userId}
@@ -278,11 +357,13 @@ function StatusRail({
               />
             ))}
       </div>
-    </section>
+    </motion.section>
   )
 }
 
-function StatusComposer({
+// ========== CreateStoryModal (Step-based) ==========
+
+function CreateStoryModal({
   open,
   userId,
   onClose,
@@ -291,68 +372,60 @@ function StatusComposer({
   open: boolean
   userId?: string
   onClose: () => void
-  onSubmit: (state: StatusFormState) => Promise<boolean>
+  onSubmit: (state: StoryFormState) => Promise<boolean>
 }) {
-  const [form, setForm] = useState<StatusFormState>(DEFAULT_FORM)
+  const [step, setStep] = useState(0)
+  const [form, setForm] = useState<StoryFormState>(DEFAULT_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [feedback, setFeedback] = useState<"idle" | "success" | "error">("idle")
   const fileRef = useRef<HTMLInputElement | null>(null)
-  const error = validateStatus(form)
+  const error = validateStory(form)
   const remaining = MAX_STATUS_CHARS - form.content.length
+  const totalSteps = 4
 
-  const update = <Key extends keyof StatusFormState>(key: Key, value: StatusFormState[Key]) => {
-    setForm((current) => ({ ...current, [key]: value }))
-    setFeedback("idle")
+  useEffect(() => {
+    if (!open) {
+      setStep(0)
+      setForm(DEFAULT_FORM)
+      setSubmitting(false)
+      setUploading(false)
+    }
+  }, [open])
+
+  const update = <Key extends keyof StoryFormState>(key: Key, value: StoryFormState[Key]) => {
+    setForm((prev) => ({ ...prev, [key]: value }))
   }
 
   const handleImage = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ""
     if (!file) return
-    if (!userId) {
-      toast.error("Login required to upload an image.")
-      return
-    }
-    if (!file.type.startsWith("image/")) {
-      toast.error("Use a valid image file.")
-      setFeedback("error")
-      return
-    }
-    if (file.size > MAX_IMAGE_SIZE) {
-      toast.error("Image must be under 8MB.")
-      setFeedback("error")
-      return
-    }
-
+    if (!userId) { toast.error("Login required."); return }
+    if (!file.type.startsWith("image/")) { toast.error("Use a valid image."); return }
+    if (file.size > MAX_IMAGE_SIZE) { toast.error("Image must be under 8MB."); return }
     setUploading(true)
     const result = await uploadChatMedia(file, userId)
     setUploading(false)
     if (!result || !result.mimeType.startsWith("image")) {
       toast.error("Could not upload this image.")
-      setFeedback("error")
       return
     }
     update("image", { url: result.url, type: "image" })
   }
 
   const submit = async () => {
-    const validation = validateStatus(form)
-    if (validation) {
-      toast.error(validation)
-      setFeedback("error")
-      return
-    }
+    const validation = validateStory(form)
+    if (validation) { toast.error(validation); return }
     setSubmitting(true)
     const ok = await onSubmit(form)
     setSubmitting(false)
-    setFeedback(ok ? "success" : "error")
     if (ok) {
-      toast.success("Status published.")
-      setForm(DEFAULT_FORM)
-      onClose()
+      setStep(totalSteps - 1)
+      setTimeout(() => { onClose() }, 1400)
     }
   }
+
+  const stepLabels = ["Category", "Content", "Preview", "Publish"]
 
   return (
     <AnimatePresence>
@@ -361,126 +434,243 @@ function StatusComposer({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/76 p-0 backdrop-blur-2xl sm:items-center sm:p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-0 backdrop-blur-2xl sm:items-center sm:p-4"
           onClick={onClose}
         >
           <motion.div
-            initial={{ opacity: 0, y: 26, scale: 0.95 }}
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 18, scale: 0.96 }}
+            exit={{ opacity: 0, y: 20, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 260, damping: 24 }}
-            onClick={(event) => event.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
             className="safe-bottom relative max-h-[94dvh] w-full max-w-2xl overflow-hidden rounded-t-[28px] border border-white/[0.11] bg-[#090a10]/96 shadow-[0_44px_130px_rgba(0,0,0,0.62)] sm:max-h-[92vh] sm:rounded-[32px]"
           >
             <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_26%_0%,rgba(79,110,247,0.22),transparent_42%),radial-gradient(circle_at_82%_8%,rgba(139,92,246,0.14),transparent_36%)]" />
-            <div className="relative max-h-[92dvh] overflow-y-auto p-4 sm:p-5 md:p-6">
-              <div className="mb-5 flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#7EA1FF]">Create Status</p>
-                  <h2 className="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">Share what you are building</h2>
-                  <p className="mt-1 text-sm text-white/46">Progress, projects, wins, lifestyle and behind-the-scenes updates.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="touch-target flex shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.045] text-white/55 transition hover:bg-white/[0.08] hover:text-white"
-                  aria-label="Close status composer"
-                >
-                  <X size={17} />
-                </button>
-              </div>
 
-              <div className="mobile-scroll-x flex gap-2 sm:grid sm:grid-cols-3">
-                {CATEGORIES.map((category) => {
-                  const selected = form.category === category.id
-                  const Icon = category.icon
-                  return (
-                    <motion.button
-                      key={category.id}
-                      type="button"
-                      whileHover={{ y: -1 }}
-                      onClick={() => update("category", category.id)}
-                    className={cn(
-                        "flex min-h-11 shrink-0 items-center gap-2 rounded-2xl border px-3 py-2.5 text-left text-xs font-semibold transition",
-                        selected ? category.color : "border-white/[0.08] bg-white/[0.035] text-white/48 hover:bg-white/[0.055] hover:text-white",
+            {/* Step indicator */}
+            <div className="relative flex items-center justify-between px-4 pt-4 sm:px-6 sm:pt-5">
+              <div className="flex items-center gap-3">
+                {stepLabels.map((label, i) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <motion.div
+                      animate={i === step ? { scale: 1.1 } : { scale: 1 }}
+                      className={cn(
+                        "flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold transition",
+                        i < step ? "bg-[#4F6EF7] text-white" : i === step ? "border-2 border-[#4F6EF7] bg-[#4F6EF7]/15 text-[#7EA1FF]" : "border border-white/[0.1] bg-white/[0.04] text-white/30",
                       )}
                     >
-                      <Icon size={15} />
-                      {category.name}
-                    </motion.button>
-                  )
-                })}
-              </div>
-
-              <div className="mt-4 rounded-[24px] border border-white/[0.08] bg-black/24 p-4">
-                <textarea
-                  value={form.content}
-                  onChange={(event) => update("content", event.target.value)}
-                  placeholder="Share your business, project, study note, win or behind-the-scenes..."
-                  rows={6}
-                  className={cn(
-                    "min-h-36 w-full resize-none bg-transparent text-[15px] leading-relaxed text-white outline-none placeholder:text-white/28",
-                    remaining < 0 && "text-red-100",
-                  )}
-                />
-                {form.image ? (
-                  <div className="relative mt-4 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.035]">
-                    <img src={form.image.url} alt="Status preview" loading="lazy" decoding="async" className="max-h-[340px] w-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => update("image", null)}
-                      className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/72 text-white transition hover:bg-red-500"
-                      aria-label="Remove selected image"
-                    >
-                      <X size={15} />
-                    </button>
+                      {i < step ? <CheckCircle2 size={14} /> : i + 1}
+                    </motion.div>
+                    <span className={cn("hidden text-xs font-semibold sm:block", i === step ? "text-white" : "text-white/30")}>{label}</span>
                   </div>
-                ) : (
-                  <div className="mt-4 rounded-2xl border border-dashed border-white/[0.09] bg-white/[0.025] p-5 text-center">
-                    <ImagePlus className="mx-auto text-white/28" size={22} />
-                    <p className="mt-2 text-xs text-white/38">No image selected. Add one for a richer visual status.</p>
-                  </div>
-                )}
+                ))}
               </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="touch-target flex shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.045] text-white/55 transition hover:bg-white/[0.08] hover:text-white"
+              >
+                <X size={17} />
+              </button>
+            </div>
 
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                <div className="flex items-center justify-between gap-3 sm:justify-start">
-                  <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    disabled={uploading || !userId}
-                    className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.045] px-4 text-sm font-semibold text-white/66 transition hover:border-[#7EA1FF]/45 hover:bg-white/[0.065] hover:text-white disabled:opacity-40"
-                  >
-                    {uploading ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
-                    Add Image
-                  </button>
-                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImage} />
-                  <span className={cn("text-xs", remaining < 0 ? "text-red-300" : remaining < 90 ? "text-amber-300" : "text-white/36")}>{remaining}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={submit}
-                  disabled={submitting || uploading || Boolean(error)}
-                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45 sm:h-11 sm:w-auto"
-                >
-                  {submitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                  Create Status
-                </button>
-              </div>
+            {/* Step progress bar */}
+            <div className="relative mx-4 mt-3 h-1 overflow-hidden rounded-full bg-white/[0.06] sm:mx-6">
+              <motion.div
+                className="h-full rounded-full bg-gradient-to-r from-[#4F6EF7] to-[#6D28D9]"
+                animate={{ width: `${((step + 1) / totalSteps) * 100}%` }}
+                transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              />
+            </div>
 
-              <AnimatePresence>
-                {(feedback !== "idle" || error) && (
+            <div className="relative max-h-[78dvh] overflow-y-auto p-4 sm:p-6">
+              <AnimatePresence mode="wait">
+                {/* Step 0: Category */}
+                {step === 0 ? (
                   <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    className={cn(
-                      "mt-4 flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs",
-                      feedback === "success" ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100" : "border-amber-400/20 bg-amber-400/10 text-amber-100",
-                    )}
+                    key="step-category"
+                    initial={{ opacity: 0, x: 40 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -40 }}
+                    transition={{ type: "spring", stiffness: 220, damping: 24 }}
                   >
-                    {feedback === "success" ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                    {feedback === "success" ? "Status published." : error || "Check the status and try again."}
+                    <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#7EA1FF]">Step 1 of 4</p>
+                    <h2 className="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">Choose a category</h2>
+                    <p className="mt-1 text-sm text-white/46">Pick the category that best fits your story.</p>
+                    <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {CATEGORIES.map((cat) => {
+                        const selected = form.category === cat.id
+                        const Icon = cat.icon
+                        return (
+                          <motion.button
+                            key={cat.id}
+                            type="button"
+                            whileHover={{ y: -2, scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => update("category", cat.id)}
+                            className={cn(
+                              "relative overflow-hidden rounded-2xl border p-4 text-left transition",
+                              selected
+                                ? cat.color + " shadow-lg"
+                                : "border-white/[0.08] bg-white/[0.035] text-white/48 hover:bg-white/[0.055] hover:text-white",
+                            )}
+                          >
+                            {selected ? <div className={cn("absolute inset-0 opacity-20", cat.bgGlow)} /> : null}
+                            <div className="relative flex flex-col items-center gap-2 text-center">
+                              <span className={cn("rounded-full bg-gradient-to-br p-[3px]", cat.ring)}>
+                                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#090a10]">
+                                  <Icon size={20} />
+                                </span>
+                              </span>
+                              <span className="text-xs font-semibold">{cat.name}</span>
+                            </div>
+                          </motion.button>
+                        )
+                      })}
+                    </div>
+                    <div className="mt-6 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setStep(1)}
+                        className="inline-flex h-11 items-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-white/90"
+                      >
+                        Next <ArrowRight size={15} />
+                      </button>
+                    </div>
+                  </motion.div>
+
+                /* Step 1: Content */
+                ) : step === 1 ? (
+                  <motion.div
+                    key="step-content"
+                    initial={{ opacity: 0, x: 40 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -40 }}
+                    transition={{ type: "spring", stiffness: 220, damping: 24 }}
+                  >
+                    <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#7EA1FF]">Step 2 of 4</p>
+                    <h2 className="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">Add your story content</h2>
+                    <p className="mt-1 text-sm text-white/46">Share what you are building, learning or celebrating.</p>
+
+                    <div className="mt-5 rounded-[24px] border border-white/[0.08] bg-black/24 p-4">
+                      <textarea
+                        value={form.content}
+                        onChange={(e) => update("content", e.target.value)}
+                        placeholder="What's on your mind?"
+                        rows={5}
+                        className={cn(
+                          "min-h-28 w-full resize-none bg-transparent text-[15px] leading-relaxed text-white outline-none placeholder:text-white/28",
+                          remaining < 0 && "text-red-100",
+                        )}
+                      />
+                      <div className="mt-2 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => fileRef.current?.click()}
+                          disabled={uploading || !userId}
+                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.045] px-3 text-xs font-semibold text-white/66 transition hover:border-[#7EA1FF]/45 hover:bg-white/[0.065] hover:text-white disabled:opacity-40"
+                        >
+                          {uploading ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+                          {form.image ? "Change Image" : "Add Image"}
+                        </button>
+                        <span className={cn("text-xs", remaining < 0 ? "text-red-300" : remaining < 90 ? "text-amber-300" : "text-white/36")}>{remaining}</span>
+                      </div>
+                      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImage} />
+
+                      {form.image ? (
+                        <div className="relative mt-3 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.035]">
+                          <img src={form.image.url} alt="Preview" loading="lazy" decoding="async" className="max-h-[260px] w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => update("image", null)}
+                            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/72 text-white transition hover:bg-red-500"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-5 flex items-center justify-between">
+                      <button type="button" onClick={() => setStep(0)} className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/[0.08] px-4 text-sm font-semibold text-white/60 transition hover:bg-white/[0.06] hover:text-white">
+                        <ChevronLeft size={15} /> Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep(2)}
+                        disabled={Boolean(error) && !form.content && !form.image}
+                        className="inline-flex h-11 items-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-white/90 disabled:opacity-45"
+                      >
+                        Preview <ArrowRight size={15} />
+                      </button>
+                    </div>
+                  </motion.div>
+
+                /* Step 2: Preview */
+                ) : step === 2 ? (
+                  <motion.div
+                    key="step-preview"
+                    initial={{ opacity: 0, x: 40 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -40 }}
+                    transition={{ type: "spring", stiffness: 220, damping: 24 }}
+                  >
+                    <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#7EA1FF]">Step 3 of 4</p>
+                    <h2 className="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">Preview your story</h2>
+                    <p className="mt-1 text-sm text-white/46">This is how your story will appear.</p>
+
+                    <div className="mt-5 overflow-hidden rounded-[24px] border border-white/[0.12] bg-[linear-gradient(145deg,rgba(255,255,255,0.085),rgba(255,255,255,0.025))] shadow-[0_34px_110px_rgba(0,0,0,0.50)]">
+                      {form.image ? (
+                        <img src={form.image.url} alt="" loading="lazy" decoding="async" className="max-h-[400px] w-full object-cover" />
+                      ) : null}
+                      <div className={cn("p-6", form.image ? "border-t border-white/[0.08]" : "")}>
+                        {form.content ? (
+                          <p className="whitespace-pre-wrap text-lg font-semibold leading-relaxed text-white">{form.content}</p>
+                        ) : (
+                          <p className="text-lg text-white/36 italic">No text content</p>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between border-t border-white/[0.08] bg-black/22 px-5 py-3 text-xs">
+                        <CategoryBadge category={form.category} />
+                        <span className="text-white/38">Just now</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex items-center justify-between">
+                      <button type="button" onClick={() => setStep(1)} className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/[0.08] px-4 text-sm font-semibold text-white/60 transition hover:bg-white/[0.06] hover:text-white">
+                        <ChevronLeft size={15} /> Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={submit}
+                        disabled={submitting || Boolean(error)}
+                        className="inline-flex h-11 items-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-white/90 disabled:opacity-45"
+                      >
+                        {submitting ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                        Publish Story
+                      </button>
+                    </div>
+                  </motion.div>
+
+                /* Step 3: Published Success */
+                ) : (
+                  <motion.div
+                    key="step-publish"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                    className="flex flex-col items-center py-10 text-center"
+                  >
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1, rotate: [0, 10, -10, 0] }}
+                      transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
+                      className="flex h-20 w-20 items-center justify-center rounded-full bg-[#4F6EF7]/20"
+                    >
+                      <CheckCircle2 size={44} className="text-[#4F6EF7]" />
+                    </motion.div>
+                    <h2 className="mt-5 text-2xl font-semibold text-white">Story Published!</h2>
+                    <p className="mt-2 text-sm text-white/48">Your story is now visible to the community.</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -492,7 +682,9 @@ function StatusComposer({
   )
 }
 
-function StatusViewer({
+// ========== StoryViewer ==========
+
+function StoryViewer({
   group,
   currentUserId,
   isAdmin,
@@ -501,56 +693,159 @@ function StatusViewer({
   onOpenProfile,
   onDeleteStatus,
 }: {
-  group: StatusGroup | null
+  group: StoryGroup | null
   currentUserId?: string
   isAdmin: boolean
   onClose: () => void
   onFollowChanged: () => Promise<void>
-  onOpenProfile: (group: StatusGroup) => void
+  onOpenProfile: (group: StoryGroup) => void
   onDeleteStatus: (post: SocialPost) => Promise<void>
 }) {
-  const [busyFollow, setBusyFollow] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [progress, setProgress] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const [busyFollow, setBusyFollow] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [liking, setLiking] = useState<string | null>(null)
+  const [saving, setSaving] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState("")
+  const [sendingReply, setSendingReply] = useState(false)
+  const [comments, setComments] = useState<Array<{ id: string; userId: string; content: string; createdAt: string; user: { name: string; avatarUrl: string | null } | null }>>([])
+  const [showComments, setShowComments] = useState(false)
+  const [commentText, setCommentText] = useState("")
+  const [postingComment, setPostingComment] = useState(false)
   const navigate = useNavigate()
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const posts = group?.posts || []
   const activePost = posts[Math.min(activeIndex, Math.max(0, posts.length - 1))]
+  const meta = group ? CATEGORY_META[group.category] || CATEGORY_META.business : CATEGORY_META.business
+  const ownStory = currentUserId && group?.userId === currentUserId
 
   useEffect(() => {
-    queueMicrotask(() => setActiveIndex(0))
+    setActiveIndex(0)
+    setProgress(0)
+    setPaused(false)
+    setComments([])
+    setShowComments(false)
   }, [group?.userId])
 
-  const handleFollow = async () => {
-    if (!group || !currentUserId) {
-      toast.error("Login required to follow members.")
+  useEffect(() => {
+    if (!activePost || posts.length === 0) return
+    if (currentUserId && activePost && currentUserId !== activePost.userId) {
+      recordSocialPostView(activePost.id, currentUserId)
+    }
+  }, [activePost?.id, currentUserId])
+
+  useEffect(() => {
+    if (paused || posts.length === 0) {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
       return
     }
-    if (currentUserId === group.userId) return
+    const fps = 30
+    const interval = 1000 / fps
+    const increment = 100 / (STORY_DURATION_SEC * fps)
+    timerRef.current = setInterval(() => {
+      setProgress((prev) => {
+        const next = prev + increment
+        if (next >= 100) {
+          if (activeIndex < posts.length - 1) {
+            setActiveIndex((i) => i + 1)
+            return 0
+          }
+          return 100
+        }
+        return next
+      })
+    }, interval)
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [activeIndex, paused, posts.length])
+
+  const goPrev = () => {
+    if (activeIndex > 0) { setActiveIndex((i) => i - 1); setProgress(0) }
+  }
+  const goNext = () => {
+    if (activeIndex < posts.length - 1) { setActiveIndex((i) => i + 1); setProgress(0) }
+  }
+
+  const handleFollow = async () => {
+    if (!group || !currentUserId || currentUserId === group.userId) return
     setBusyFollow(true)
     const ok = await toggleFollow(currentUserId, group.userId)
     setBusyFollow(false)
-    if (!ok) {
-      toast.error("Could not update follow.")
-      return
-    }
+    if (!ok) { toast.error("Could not update follow."); return }
     await onFollowChanged()
   }
 
-  const goPrev = () => setActiveIndex((index) => Math.max(0, index - 1))
-  const goNext = () => setActiveIndex((index) => Math.min(posts.length - 1, index + 1))
-
   const handleDeleteActive = async () => {
     if (!activePost) return
-    const confirmed = window.confirm("Delete this status? This removes it from the community feed.")
-    if (!confirmed) return
+    if (!window.confirm("Delete this story?")) return
     setDeleting(true)
     await onDeleteStatus(activePost)
     setDeleting(false)
-    if (posts.length <= 1) {
-      onClose()
-      return
+    if (posts.length <= 1) { onClose(); return }
+    setActiveIndex((i) => Math.max(0, Math.min(i, posts.length - 2)))
+  }
+
+  const handleLike = async () => {
+    if (!activePost || !currentUserId) { toast.error("Login to like."); return }
+    setLiking(activePost.id)
+    const ok = await toggleSocialLike(activePost.id, currentUserId)
+    setLiking(null)
+    if (!ok) toast.error("Could not update like.")
+  }
+
+  const handleSave = async () => {
+    if (!activePost || !currentUserId) { toast.error("Login to save."); return }
+    setSaving(activePost.id)
+    const ok = await toggleSocialSave(activePost.id, currentUserId)
+    setSaving(null)
+    if (!ok) toast.error("Could not save.")
+  }
+
+  const handleShare = async () => {
+    if (!activePost) return
+    const url = `${window.location.origin}/dashboard/status?story=${activePost.id}`
+    if (navigator.share) {
+      try { await navigator.share({ url }) } catch { /* ignore */ }
+    } else {
+      await navigator.clipboard.writeText(url)
+      toast.success("Story link copied!")
     }
-    setActiveIndex((index) => Math.max(0, Math.min(index, posts.length - 2)))
+  }
+
+  const loadComments = async (postId: string) => {
+    const data = await fetchPostComments(postId)
+    setComments(data)
+    setShowComments(true)
+  }
+
+  const handlePostComment = async () => {
+    if (!activePost || !currentUserId || !commentText.trim()) return
+    setPostingComment(true)
+    const newComment = await addPostComment(activePost.id, currentUserId, commentText.trim())
+    setPostingComment(false)
+    if (newComment) {
+      setComments((prev) => [...prev, newComment])
+      setCommentText("")
+    } else {
+      toast.error("Could not post comment.")
+    }
+  }
+
+  const handleQuickReply = async () => {
+    if (!group || !currentUserId || !replyText.trim() || group.userId === currentUserId) return
+    setSendingReply(true)
+    const convId = await createOrGetConversation(currentUserId, group.userId)
+    if (!convId) { toast.error("Could not open conversation."); setSendingReply(false); return }
+    const sent = await sendMessage(convId, currentUserId, group.userId, replyText.trim())
+    setSendingReply(false)
+    if (sent) {
+      toast.success("Reply sent!")
+      setReplyText("")
+      navigate(`/dashboard/messages?conversation=${convId}`)
+    } else {
+      toast.error("Could not send reply.")
+    }
   }
 
   return (
@@ -560,185 +855,297 @@ function StatusViewer({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/78 p-0 backdrop-blur-2xl sm:items-center sm:p-3 md:p-6"
+          transition={{ duration: 0.25 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-0 backdrop-blur-xl"
           onClick={onClose}
         >
           <motion.div
-            initial={{ opacity: 0, y: 26, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 18, scale: 0.96 }}
-            transition={{ type: "spring", stiffness: 250, damping: 24 }}
-            onClick={(event) => event.stopPropagation()}
-            className="relative h-[96dvh] w-full max-w-6xl overflow-hidden rounded-t-[28px] border border-white/[0.11] bg-[#05060a]/96 shadow-[0_48px_150px_rgba(0,0,0,0.65)] sm:h-[92vh] sm:rounded-[34px]"
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 260, damping: 24 }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative h-full w-full overflow-hidden bg-[#05060a] sm:h-[94vh] sm:max-h-[960px] sm:w-[96vw] sm:max-w-[1400px] sm:rounded-[34px] sm:border sm:border-white/[0.11] sm:shadow-[0_48px_150px_rgba(0,0,0,0.65)]"
           >
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(79,110,247,0.24),transparent_34%),radial-gradient(circle_at_82%_12%,rgba(139,92,246,0.18),transparent_34%)]" />
-            <div className="relative grid h-full lg:grid-cols-[minmax(0,1fr)_310px]">
-              <section className="relative flex min-h-0 flex-col">
-                <div className="absolute inset-x-0 top-0 z-20 p-4">
-                  <div className="mb-4 flex gap-1.5">
-                    {posts.map((post, index) => (
-                      <button
-                        key={post.id}
-                        type="button"
-                        onClick={() => setActiveIndex(index)}
-                        className="flex flex-1 items-center py-2"
-                        aria-label={`Open status ${index + 1}`}
-                      >
-                        <span className="h-1.5 w-full overflow-hidden rounded-full bg-white/16">
-                          <motion.span
-                            className="block h-full rounded-full bg-white"
-                            initial={false}
-                            animate={{ width: index < activeIndex ? "100%" : index === activeIndex ? "100%" : "0%" }}
-                            transition={{ duration: index === activeIndex ? 0.35 : 0.18 }}
-                          />
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/34 px-3 py-2 backdrop-blur-xl">
-                      <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="sm" ring={false} />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">{group.name}</p>
-                        <p className="truncate text-[11px] text-white/46">{activePost ? timeAgo(activePost.createdAt) : "Status"}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isAdmin && activePost ? (
-                        <button
-                          type="button"
-                          onClick={handleDeleteActive}
-                          disabled={deleting}
-                          className="inline-flex h-10 items-center gap-2 rounded-2xl border border-red-400/25 bg-red-500/12 px-3 text-xs font-semibold text-red-100 backdrop-blur-xl transition hover:bg-red-500/18 disabled:opacity-50"
-                        >
-                          {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                          Delete
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={onClose}
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-black/34 text-white/70 backdrop-blur-xl transition hover:bg-white/[0.08] hover:text-white"
-                      >
-                        <X size={17} />
-                      </button>
-                    </div>
-                  </div>
+            {/* Top gradient */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-48 bg-gradient-to-b from-black/60 to-transparent" />
+
+            {/* Progress bar */}
+            <div className="absolute inset-x-0 top-0 z-30 flex gap-1.5 p-3 sm:p-4">
+              {posts.map((post, index) => (
+                <div key={post.id} className="flex-1 overflow-hidden rounded-full bg-white/20">
+                  <motion.div
+                    className="h-1 rounded-full bg-white"
+                    initial={{ width: index < activeIndex ? "100%" : index === activeIndex ? "0%" : "0%" }}
+                    animate={{ width: index < activeIndex ? "100%" : index === activeIndex ? `${progress}%` : "0%" }}
+                    transition={{ duration: 0.1 }}
+                  />
                 </div>
+              ))}
+            </div>
 
-                <div className="relative flex min-h-0 flex-1 items-center justify-center p-3 pt-24 sm:p-4 md:p-8 md:pt-24">
-                  <button
-                    type="button"
-                    onClick={goPrev}
-                    disabled={activeIndex === 0}
-                    className="absolute left-4 top-1/2 z-10 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.1] bg-black/34 text-white/72 backdrop-blur-xl transition hover:bg-white/[0.08] disabled:opacity-25 md:flex"
-                  >
-                    <ChevronLeft size={22} />
+            {/* Header */}
+            <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-3 pt-9 sm:px-5 sm:pt-10">
+              <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/40 px-3 py-2 backdrop-blur-xl">
+                <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="sm" ring={false} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">{group.name}</p>
+                  <p className="truncate text-[11px] text-white/46">{activePost ? timeAgo(activePost.createdAt) : ""}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {isAdmin && activePost ? (
+                  <button type="button" onClick={handleDeleteActive} disabled={deleting} className="flex h-10 items-center gap-2 rounded-2xl border border-red-400/25 bg-red-500/12 px-3 text-xs font-semibold text-red-100 backdrop-blur-xl transition hover:bg-red-500/18 disabled:opacity-50">
+                    {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    <span className="hidden sm:inline">Delete</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={goNext}
-                    disabled={activeIndex >= posts.length - 1}
-                    className="absolute right-4 top-1/2 z-10 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.1] bg-black/34 text-white/72 backdrop-blur-xl transition hover:bg-white/[0.08] disabled:opacity-25 md:flex"
-                  >
-                    <ChevronRight size={22} />
-                  </button>
+                ) : null}
+                <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/[0.08] bg-black/40 text-white/70 backdrop-blur-xl transition hover:bg-white/[0.1] hover:text-white">
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
 
-                  <AnimatePresence mode="wait">
-                    {activePost ? (
-                      <motion.article
-                        key={activePost.id}
-                        initial={{ opacity: 0, scale: 0.96, y: 14 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.98, y: -10 }}
-                        transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                        className="flex h-full max-h-[720px] w-full max-w-[520px] flex-col overflow-hidden rounded-[24px] border border-white/[0.12] bg-[linear-gradient(145deg,rgba(255,255,255,0.085),rgba(255,255,255,0.025))] shadow-[0_34px_110px_rgba(0,0,0,0.50)] backdrop-blur-2xl sm:rounded-[32px]"
-                      >
-                        {activePost.mediaUrl && activePost.mediaType === "image" ? (
-                          <img src={activePost.mediaUrl} alt="" loading="lazy" decoding="async" className="min-h-0 flex-1 object-cover" />
-                        ) : activePost.mediaUrl && activePost.mediaType === "video" ? (
-                          <video src={activePost.mediaUrl} controls preload="metadata" playsInline className="min-h-0 flex-1 bg-black object-contain" />
-                        ) : activePost.mediaUrl && activePost.mediaType === "audio" ? (
-                          <div className="flex flex-1 items-center justify-center bg-black/26 p-8">
-                            <audio src={activePost.mediaUrl} controls className="w-full" />
-                          </div>
-                        ) : (
-                          <div className="flex flex-1 items-center justify-center p-8">
-                            <p className="whitespace-pre-wrap text-center text-xl font-semibold leading-relaxed text-white sm:text-2xl md:text-3xl">{activePost.content}</p>
-                          </div>
-                        )}
-                        {(activePost.mediaUrl && activePost.content) ? (
-                          <div className="border-t border-white/[0.08] bg-black/24 p-5">
-                            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-white/82">{activePost.content}</p>
-                          </div>
-                        ) : null}
-                        <div className="flex items-center justify-between border-t border-white/[0.08] bg-black/22 px-5 py-4 text-xs text-white/48">
-                          <CategoryBadge category={activePost.category} />
-                          <div className="flex items-center gap-4">
-                            <span>{activePost.likesCount} likes</span>
-                            <span>{activePost.viewsCount} views</span>
-                          </div>
+            {/* Navigation arrows - desktop */}
+            <button type="button" onClick={goPrev} disabled={activeIndex === 0} className="absolute left-4 top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.1] bg-black/40 text-white/70 backdrop-blur-xl transition hover:bg-white/[0.1] disabled:opacity-20 md:flex">
+              <ChevronLeft size={22} />
+            </button>
+            <button type="button" onClick={goNext} disabled={activeIndex >= posts.length - 1} className="absolute right-[calc(30%+16px)] top-1/2 z-20 hidden h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.1] bg-black/40 text-white/70 backdrop-blur-xl transition hover:bg-white/[0.1] disabled:opacity-20 md:flex">
+              <ChevronRight size={22} />
+            </button>
+
+            {/* Main layout: 70% content / 30% interactions */}
+            <div className="flex h-full flex-col md:flex-row">
+              {/* Content area (70%) */}
+              <div
+                className="relative flex min-h-0 flex-1 items-center justify-center md:w-[70%]"
+                onMouseEnter={() => setPaused(true)}
+                onMouseLeave={() => setPaused(false)}
+                onTouchStart={() => setPaused(true)}
+                onTouchEnd={() => setPaused(false)}
+              >
+                <AnimatePresence mode="wait">
+                  {activePost ? (
+                    <motion.div
+                      key={activePost.id}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.97 }}
+                      transition={{ type: "spring", stiffness: 280, damping: 25 }}
+                      className="flex h-full w-full max-w-[660px] flex-col items-center justify-center p-3 sm:p-6"
+                    >
+                      {activePost.mediaUrl && activePost.mediaType === "image" ? (
+                        <img src={activePost.mediaUrl} alt="" loading="lazy" decoding="async" className="max-h-full w-full rounded-[20px] object-contain" />
+                      ) : activePost.mediaUrl && activePost.mediaType === "video" ? (
+                        <video src={activePost.mediaUrl} controls preload="metadata" playsInline className="max-h-full w-full rounded-[20px] bg-black object-contain" />
+                      ) : activePost.mediaUrl && activePost.mediaType === "audio" ? (
+                        <div className="flex h-full w-full items-center justify-center bg-black/26 rounded-[20px] p-8">
+                          <audio src={activePost.mediaUrl} controls className="w-full" />
                         </div>
-                      </motion.article>
-                    ) : null}
-                  </AnimatePresence>
-                </div>
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center rounded-[20px] bg-black/20 p-8">
+                          <p className="max-w-lg whitespace-pre-wrap text-center text-2xl font-semibold leading-relaxed text-white sm:text-3xl md:text-4xl">{activePost.content}</p>
+                        </div>
+                      )}
+                      {activePost.mediaUrl && activePost.content ? (
+                        <div className="mt-3 w-full max-w-lg rounded-2xl border border-white/[0.08] bg-black/30 px-5 py-3 backdrop-blur-xl">
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed text-white/82">{activePost.content}</p>
+                        </div>
+                      ) : null}
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
 
-                <div className="flex items-center justify-center gap-3 border-t border-white/[0.07] bg-black/18 px-4 py-3 md:hidden">
-                  <button type="button" onClick={goPrev} disabled={activeIndex === 0} className="touch-target rounded-full border border-white/[0.1] bg-white/[0.04] p-3 text-white disabled:opacity-25">
-                    <ChevronLeft size={18} />
-                  </button>
-                  <span className="text-xs text-white/42">{activeIndex + 1} / {posts.length}</span>
-                  <button type="button" onClick={goNext} disabled={activeIndex >= posts.length - 1} className="touch-target rounded-full border border-white/[0.1] bg-white/[0.04] p-3 text-white disabled:opacity-25">
-                    <ChevronRight size={18} />
-                  </button>
+                {/* Tap zones for mobile prev/next */}
+                <div className="absolute inset-0 z-10 flex md:hidden">
+                  <div className="flex-1" onClick={goPrev} />
+                  <div className="flex-1" onClick={goNext} />
                 </div>
-              </section>
+              </div>
 
-              <aside className="hidden border-l border-white/[0.08] bg-white/[0.035] p-5 backdrop-blur-2xl lg:block">
-                <div className="flex flex-col items-center text-center">
-                  <span className={cn("rounded-full bg-gradient-to-br p-[2px]", CATEGORY_META[group.category].ring)}>
+              {/* Interactions panel (30%) */}
+              <div className="flex shrink-0 flex-col border-white/[0.08] bg-white/[0.025] md:w-[30%] md:border-l md:backdrop-blur-2xl">
+                {/* Profile card */}
+                <div className="flex flex-col items-center border-b border-white/[0.08] px-4 py-5 text-center md:px-6">
+                  <motion.span
+                    whileHover={{ scale: 1.05 }}
+                    className={cn("rounded-full bg-gradient-to-br p-[2.5px]", meta.ring)}
+                  >
                     <span className="block rounded-full bg-[#090a10] p-1">
-                      <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="xl" className="h-24 w-24" ring={false} />
+                      <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="xl" className="h-20 w-20 sm:h-24 sm:w-24" ring={false} />
                     </span>
-                  </span>
-                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                    <h2 className="text-xl font-semibold text-white">{group.name}</h2>
+                  </motion.span>
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                    <h2 className="text-lg font-semibold text-white">{group.name}</h2>
                     {group.role ? <span className="rounded-full border border-white/[0.1] bg-white/[0.05] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/48">{group.role}</span> : null}
                   </div>
-                  <p className="mt-1 text-sm text-white/42">{group.bio || "Sharing progress, projects and updates with the CAFÉ community."}</p>
-                </div>
-                <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-2xl border border-white/[0.07] bg-black/18 p-3">
-                    <p className="text-lg font-semibold text-white">{group.posts.length}</p>
-                    <p className="text-[10px] uppercase tracking-[0.14em] text-white/36">Status</p>
+                  <p className="mt-1 text-xs text-white/42">{group.bio || "CAFÉ community member"}</p>
+
+                  <div className="mt-4 grid w-full grid-cols-3 gap-2 text-center">
+                    <div className="rounded-xl border border-white/[0.07] bg-black/18 p-2">
+                      <p className="text-base font-semibold text-white">{group.posts.length}</p>
+                      <p className="text-[9px] uppercase tracking-[0.14em] text-white/36">Stories</p>
+                    </div>
+                    <div className="rounded-xl border border-white/[0.07] bg-black/18 p-2">
+                      <p className="text-base font-semibold text-white">{group.followers ?? "—"}</p>
+                      <p className="text-[9px] uppercase tracking-[0.14em] text-white/36">Followers</p>
+                    </div>
+                    <div className="rounded-xl border border-white/[0.07] bg-black/18 p-2">
+                      <p className="text-base font-semibold text-white">{group.following ?? "—"}</p>
+                      <p className="text-[9px] uppercase tracking-[0.14em] text-white/36">Following</p>
+                    </div>
                   </div>
-                  <div className="rounded-2xl border border-white/[0.07] bg-black/18 p-3">
-                    <p className="text-lg font-semibold text-white">{group.followers ?? "—"}</p>
-                    <p className="text-[10px] uppercase tracking-[0.14em] text-white/36">Followers</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/[0.07] bg-black/18 p-3">
-                    <p className="text-lg font-semibold text-white">{group.following ?? "—"}</p>
-                    <p className="text-[10px] uppercase tracking-[0.14em] text-white/36">Following</p>
-                  </div>
-                </div>
-                <div className="mt-5 grid gap-2">
-                  <button type="button" onClick={() => onOpenProfile(group)} className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white text-sm font-semibold text-black transition hover:bg-white/90">
-                    View Profile
-                    <ArrowRight size={15} />
-                  </button>
-                  {currentUserId !== group.userId ? (
-                    <button type="button" onClick={handleFollow} disabled={busyFollow || !currentUserId} className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.045] text-sm font-semibold text-white/76 transition hover:bg-white/[0.07] hover:text-white disabled:opacity-45">
-                      {busyFollow ? <Loader2 size={15} className="animate-spin" /> : <UserPlus size={15} />}
-                      {group.followedByMe ? "Following" : "Follow"}
+
+                  <div className="mt-4 grid w-full grid-cols-2 gap-2">
+                    <button type="button" onClick={() => onOpenProfile(group)} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white text-xs font-semibold text-black transition hover:bg-white/90">
+                      Profile <ArrowRight size={13} />
                     </button>
-                  ) : null}
-                  <button type="button" onClick={() => navigate("/dashboard/messages")} className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.045] text-sm font-semibold text-white/76 transition hover:bg-white/[0.07] hover:text-white">
-                    <MessageCircle size={15} />
-                    Send Message
-                  </button>
+                    {!ownStory ? (
+                      <button type="button" onClick={handleFollow} disabled={busyFollow || !currentUserId} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.045] text-xs font-semibold text-white/76 transition hover:bg-white/[0.07] hover:text-white disabled:opacity-45">
+                        {busyFollow ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
+                        {group.followedByMe ? "Following" : "Follow"}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-              </aside>
+
+                {/* Action buttons + Comments */}
+                <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+                  {/* Like, Save, Share, View stats */}
+                  {activePost ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <motion.button
+                          type="button"
+                          whileTap={{ scale: 0.85 }}
+                          onClick={handleLike}
+                          disabled={liking === activePost.id}
+                          className={cn("inline-flex items-center gap-2 text-sm transition", activePost.liked ? "text-[#FF4B6E]" : "text-white/50 hover:text-white")}
+                        >
+                          {liking === activePost.id ? <Loader2 size={18} className="animate-spin" /> : <Heart size={20} className={activePost.liked ? "fill-current" : ""} />}
+                          <span className="font-semibold">{activePost.likesCount}</span>
+                        </motion.button>
+
+                        <motion.button
+                          type="button"
+                          whileTap={{ scale: 0.85 }}
+                          onClick={() => loadComments(activePost.id)}
+                          className="inline-flex items-center gap-2 text-sm text-white/50 transition hover:text-white"
+                        >
+                          <MessageCircle size={20} />
+                          <span className="font-semibold">{activePost.commentsCount}</span>
+                        </motion.button>
+
+                        <motion.button
+                          type="button"
+                          whileTap={{ scale: 0.85 }}
+                          onClick={handleSave}
+                          disabled={saving === activePost.id}
+                          className={cn("inline-flex items-center gap-2 text-sm transition", activePost.saved ? "text-[#FFB800]" : "text-white/50 hover:text-white")}
+                        >
+                          {saving === activePost.id ? <Loader2 size={18} className="animate-spin" /> : <Bookmark size={20} className={activePost.saved ? "fill-current" : ""} />}
+                        </motion.button>
+
+                        <motion.button
+                          type="button"
+                          whileTap={{ scale: 0.85 }}
+                          onClick={handleShare}
+                          className="inline-flex items-center gap-2 text-sm text-white/50 transition hover:text-white"
+                        >
+                          <Share2 size={20} />
+                        </motion.button>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs text-white/36">
+                        <Eye size={14} />
+                        <span>{activePost.viewsCount} views</span>
+                        <CategoryBadge category={activePost.category} />
+                      </div>
+
+                      {/* Comments section */}
+                      <AnimatePresence>
+                        {showComments ? (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="space-y-3 overflow-hidden"
+                          >
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-semibold text-white/60">Comments</p>
+                              <button type="button" onClick={() => setShowComments(false)} className="text-xs text-white/30 hover:text-white">
+                                <X size={14} />
+                              </button>
+                            </div>
+                            <div className="max-h-40 space-y-2 overflow-y-auto">
+                              {comments.length === 0 ? (
+                                <p className="text-xs text-white/30 italic">No comments yet.</p>
+                              ) : (
+                                comments.map((c) => (
+                                  <div key={c.id} className="flex items-start gap-2 rounded-xl bg-white/[0.04] p-2">
+                                    <UserAvatar user={{ name: c.user?.name || "?", avatarUrl: c.user?.avatarUrl }} size="xs" ring={false} />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs font-semibold text-white/70">{c.user?.name || "User"}</p>
+                                      <p className="text-xs text-white/50">{c.content}</p>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                            {currentUserId ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  value={commentText}
+                                  onChange={(e) => setCommentText(e.target.value)}
+                                  placeholder="Write a comment..."
+                                  className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-xs text-white outline-none placeholder:text-white/28"
+                                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handlePostComment() } }}
+                                />
+                                <button type="button" onClick={handlePostComment} disabled={postingComment || !commentText.trim()} className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#4F6EF7] text-white disabled:opacity-40">
+                                  {postingComment ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                                </button>
+                              </div>
+                            ) : null}
+                          </motion.div>
+                        ) : null}
+                      </AnimatePresence>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Quick reply */}
+                {!ownStory && currentUserId ? (
+                  <div className="flex items-center gap-2 border-t border-white/[0.08] bg-black/20 px-4 py-3 md:px-6">
+                    <input
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder={`Reply to ${group?.name || "user"}...`}
+                      className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white outline-none placeholder:text-white/28"
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleQuickReply() } }}
+                    />
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.9 }}
+                      onClick={handleQuickReply}
+                      disabled={sendingReply || !replyText.trim()}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-[#4F6EF7] to-[#6D28D9] text-white shadow-lg disabled:opacity-40"
+                    >
+                      {sendingReply ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                    </motion.button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Mobile bottom nav */}
+            <div className="absolute bottom-0 inset-x-0 flex items-center justify-center gap-4 border-t border-white/[0.07] bg-black/40 px-4 py-3 backdrop-blur-xl md:hidden">
+              <button type="button" onClick={goPrev} disabled={activeIndex === 0} className="rounded-full border border-white/[0.1] bg-white/[0.04] p-2 text-white disabled:opacity-25">
+                <ChevronLeft size={18} />
+              </button>
+              <span className="text-xs text-white/42">{activeIndex + 1} / {posts.length}</span>
+              <button type="button" onClick={goNext} disabled={activeIndex >= posts.length - 1} className="rounded-full border border-white/[0.1] bg-white/[0.04] p-2 text-white disabled:opacity-25">
+                <ChevronRight size={18} />
+              </button>
             </div>
           </motion.div>
         </motion.div>
@@ -747,304 +1154,7 @@ function StatusViewer({
   )
 }
 
-function QuickComposer({ signedIn, onCreate }: { signedIn: boolean; onCreate: () => void }) {
-  return (
-    <div className="rounded-[28px] border border-white/[0.08] bg-white/[0.04] p-4 backdrop-blur-2xl">
-      <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#7EA1FF]">Quick Composer</p>
-      <h3 className="mt-2 text-base font-semibold text-white">Share what you are building, learning or celebrating.</h3>
-      <button
-        type="button"
-        onClick={onCreate}
-        disabled={!signedIn}
-        className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-white text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
-      >
-        <Plus size={16} />
-        Create Status
-      </button>
-    </div>
-  )
-}
-
-function StatusSidebar({
-  mode,
-  category,
-  recent,
-  signedIn,
-  onCreate,
-  onMode,
-  onCategory,
-  onOpen,
-}: {
-  mode: FeedMode
-  category: CategoryFilter
-  recent: StatusGroup[]
-  signedIn: boolean
-  onCreate: () => void
-  onMode: (mode: FeedMode) => void
-  onCategory: (category: CategoryFilter) => void
-  onOpen: (group: StatusGroup) => void
-}) {
-  return (
-    <aside className="hidden space-y-4 xl:block">
-      <QuickComposer signedIn={signedIn} onCreate={onCreate} />
-      <div className="rounded-[28px] border border-white/[0.08] bg-white/[0.04] p-4 backdrop-blur-2xl">
-        <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-white/38">Discovery Filters</p>
-        <div className="mt-3 space-y-1.5">
-          {FILTERS.map((filter) => {
-            const active = filter.type === "mode" ? mode === filter.value && category === "all" : category === filter.value
-            return (
-              <button
-                key={`${filter.type}-${filter.value}`}
-                type="button"
-                onClick={() => {
-                  if (filter.type === "mode") {
-                    onMode(filter.value as FeedMode)
-                    onCategory("all")
-                  } else {
-                    onCategory(filter.value as CategoryFilter)
-                  }
-                }}
-                className={cn(
-                  "flex h-10 w-full items-center justify-between rounded-2xl px-3 text-left text-sm font-semibold transition",
-                  active ? "bg-white text-black" : "text-white/50 hover:bg-white/[0.055] hover:text-white",
-                )}
-              >
-                {filter.label}
-                {active ? <CheckCircle2 size={14} /> : null}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-      <div className="rounded-[28px] border border-white/[0.08] bg-white/[0.04] p-4 backdrop-blur-2xl">
-        <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-white/38">Recent Status</p>
-        {recent.length === 0 ? (
-          <p className="mt-3 text-sm leading-5 text-white/42">No recent status yet.</p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {recent.slice(0, 5).map((group) => (
-              <button key={group.userId} type="button" onClick={() => onOpen(group)} className="flex w-full items-center gap-3 rounded-2xl p-2 text-left transition hover:bg-white/[0.055]">
-                <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="sm" ring={false} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-white/82">{group.name}</span>
-                  <span className="block truncate text-xs text-white/34">{group.posts[0]?.content || CATEGORY_META[group.category].name}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </aside>
-  )
-}
-
-function MobileFilters({
-  mode,
-  category,
-  onMode,
-  onCategory,
-}: {
-  mode: FeedMode
-  category: CategoryFilter
-  onMode: (mode: FeedMode) => void
-  onCategory: (category: CategoryFilter) => void
-}) {
-  return (
-    <div className="mobile-scroll-x flex gap-2 pb-1 xl:hidden">
-      {FILTERS.map((filter) => {
-        const active = filter.type === "mode" ? mode === filter.value && category === "all" : category === filter.value
-        return (
-          <button
-            key={`${filter.type}-${filter.value}`}
-            type="button"
-            onClick={() => {
-              if (filter.type === "mode") {
-                onMode(filter.value as FeedMode)
-                onCategory("all")
-              } else {
-                onCategory(filter.value as CategoryFilter)
-              }
-            }}
-            className={cn(
-              "touch-target shrink-0 rounded-full border px-4 text-xs font-semibold transition",
-              active ? "border-white/20 bg-white text-black" : "border-white/[0.08] bg-white/[0.04] text-white/52 hover:text-white",
-            )}
-          >
-            {filter.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-function StatusCard({
-  post,
-  liked,
-  isAdmin,
-  reportCount,
-  onLike,
-  onOpenViewer,
-  onOpenProfile,
-  onDelete,
-  onHide,
-}: {
-  post: SocialPost
-  liked: boolean
-  isAdmin: boolean
-  reportCount: number
-  onLike: () => void
-  onOpenViewer: () => void
-  onOpenProfile: () => void
-  onDelete: () => void
-  onHide: () => void
-}) {
-  const [adminOpen, setAdminOpen] = useState(false)
-  const hasImage = post.mediaUrl && post.mediaType === "image"
-  const compactText = !hasImage && post.content.length < 160
-
-  return (
-    <motion.article
-      layout
-      variants={{ hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0 } }}
-      whileHover={{ y: -3 }}
-      className="group overflow-hidden rounded-[28px] border border-white/[0.08] bg-[linear-gradient(145deg,rgba(255,255,255,0.065),rgba(255,255,255,0.025))] shadow-[0_28px_90px_rgba(0,0,0,0.24)] backdrop-blur-2xl transition hover:border-white/[0.15]"
-    >
-      {hasImage ? (
-        <button type="button" onClick={onOpenViewer} className="block w-full overflow-hidden bg-white/[0.025]">
-          <img src={post.mediaUrl || ""} alt="" loading="lazy" decoding="async" className="max-h-[360px] w-full object-cover transition duration-500 group-hover:scale-[1.025] sm:max-h-[420px]" />
-        </button>
-      ) : null}
-      <div className={cn("p-5", compactText && "p-6")}>
-        <div className="flex items-start justify-between gap-3">
-          <button type="button" onClick={onOpenViewer} className="flex min-w-0 items-center gap-3 text-left">
-            <UserAvatar user={{ name: post.user?.name || "User unavailable", avatarUrl: post.user?.avatarUrl }} size="md" ring={false} />
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-white">{post.user?.name || "User unavailable"}</span>
-              <span className="block truncate text-xs text-white/38">{post.user?.username ? `@${post.user.username}` : "Community"} · {timeAgo(post.createdAt)}</span>
-            </span>
-          </button>
-          <div className="relative flex items-center gap-2">
-            <span className="inline-flex shrink-0"><CategoryBadge category={post.category} /></span>
-            {isAdmin ? (
-              <button
-                type="button"
-                onClick={() => setAdminOpen((value) => !value)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl text-white/40 transition hover:bg-white/[0.06] hover:text-white sm:h-8 sm:w-8"
-              >
-                <MoreHorizontal size={15} />
-              </button>
-            ) : null}
-            <AnimatePresence>
-              {adminOpen ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                className="absolute right-0 top-10 z-10 w-44 overflow-hidden rounded-2xl border border-white/[0.09] bg-[#101018] shadow-2xl"
-                >
-                  <button type="button" onClick={onHide} className="flex w-full items-center gap-2 px-3 py-3 text-left text-xs text-white/70 hover:bg-white/[0.06]">
-                    <EyeOff size={13} />
-                    Hide status
-                  </button>
-                  <button type="button" onClick={onDelete} className="flex w-full items-center gap-2 px-3 py-3 text-left text-xs text-red-200 hover:bg-red-500/10">
-                    <Trash2 size={13} />
-                    Remove status
-                  </button>
-                  <div className="flex items-center gap-2 border-t border-white/[0.06] px-3 py-3 text-xs text-white/38">
-                    <Flag size={13} />
-                    {reportCount} reports
-                  </div>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {post.content ? (
-          <button type="button" onClick={onOpenViewer} className="mt-4 block w-full text-left">
-            <p className={cn("whitespace-pre-wrap leading-relaxed text-white/78", compactText ? "text-[17px]" : "text-[15px]")}>{post.content}</p>
-          </button>
-        ) : null}
-
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onLike}
-              className={cn(
-                "inline-flex h-11 items-center gap-2 rounded-xl px-3 text-sm transition",
-                liked ? "bg-[#4F6EF7]/15 text-[#8FB0FF]" : "text-white/48 hover:bg-white/[0.06] hover:text-white",
-              )}
-            >
-              <Heart size={16} className={liked ? "fill-current" : ""} />
-              {post.likesCount}
-            </button>
-            <span className="inline-flex h-11 items-center gap-2 rounded-xl px-3 text-sm text-white/42">
-              <MessageCircle size={16} />
-              {post.commentsCount}
-            </span>
-            <span className="inline-flex h-11 items-center gap-2 rounded-xl px-3 text-sm text-white/42">
-              <Eye size={16} />
-              {post.viewsCount}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenProfile}
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 text-sm font-semibold text-white/68 transition hover:border-[#4F6EF7]/45 hover:text-white"
-          >
-            View Profile
-          </button>
-        </div>
-      </div>
-    </motion.article>
-  )
-}
-
-function LoadingState() {
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {[0, 1, 2, 3].map((item) => (
-        <div key={item} className="rounded-[28px] border border-white/[0.07] bg-white/[0.035] p-5">
-          <div className="mb-5 flex items-center gap-3">
-            <div className="h-11 w-11 animate-pulse rounded-full bg-white/[0.08]" />
-            <div className="space-y-2">
-              <div className="h-3 w-32 animate-pulse rounded bg-white/[0.08]" />
-              <div className="h-2.5 w-20 animate-pulse rounded bg-white/[0.06]" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <div className="h-3 w-full animate-pulse rounded bg-white/[0.07]" />
-            <div className="h-3 w-5/6 animate-pulse rounded bg-white/[0.06]" />
-          </div>
-          <div className="mt-4 h-44 animate-pulse rounded-2xl bg-white/[0.05]" />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function EmptyState({ mode, onCreate }: { mode: FeedMode; onCreate: () => void }) {
-  const following = mode === "following"
-  return (
-    <div className="rounded-[30px] border border-white/[0.08] bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-8 text-center backdrop-blur-2xl">
-      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#4F6EF7]/14 text-[#8FB0FF]">
-        <Sparkles size={24} />
-      </div>
-      <h3 className="text-xl font-semibold text-white">{following ? "No following status yet" : "No community status yet"}</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-white/48">
-        {following
-          ? "Follow community members to build a focused discovery feed."
-          : "Share progress, projects, wins, lifestyle or behind-the-scenes updates from the CAFÉ community."}
-      </p>
-      <button type="button" onClick={onCreate} className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-semibold text-black transition hover:bg-white/90">
-        <Plus size={16} />
-        Create Status
-      </button>
-    </div>
-  )
-}
+// ========== StatusPage (Main) ==========
 
 export default function StatusPage() {
   const { user, isAdmin } = useAuth()
@@ -1052,15 +1162,12 @@ export default function StatusPage() {
   const uid = user?.id
   const [posts, setPosts] = useState<SocialPost[]>([])
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set())
-  const [reportCounts, setReportCounts] = useState<Map<string, number>>(new Map())
+  const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set())
   const [followState, setFollowState] = useState<Map<string, boolean>>(new Map())
   const [followCounts, setFollowCounts] = useState<Map<string, { followers: number; following: number }>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showComposer, setShowComposer] = useState(false)
-  const [feedMode, setFeedMode] = useState<FeedMode>("all")
-  const [activeCategory, setActiveCategory] = useState<CategoryFilter>("all")
-  const [query, setQuery] = useState("")
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const viewedRef = useRef<Set<string>>(new Set())
 
@@ -1068,261 +1175,199 @@ export default function StatusPage() {
     setLoading(true)
     setError(null)
     try {
-      const data = await fetchSocialPosts(feedMode, uid)
+      const data = await fetchSocialPosts("all", uid)
       setPosts(data)
-      setLikedPosts(new Set(data.filter((post) => post.liked).map((post) => post.id)))
+      setLikedPosts(new Set(data.filter((p) => p.liked).map((p) => p.id)))
+      setSavedPosts(new Set(data.filter((p) => p.saved).map((p) => p.id)))
 
-      const userIds = [...new Set(data.map((post) => post.userId))]
-      const [countsEntries, followingEntries, reports] = await Promise.all([
+      const userIds = [...new Set(data.map((p) => p.userId))]
+      const [countsEntries, followingEntries] = await Promise.all([
         Promise.all(userIds.map(async (id) => [id, await fetchFollowCounts(id)] as const)),
         uid ? Promise.all(userIds.map(async (id) => [id, id === uid ? false : await isFollowing(uid, id)] as const)) : Promise.resolve([]),
-        isAdmin ? fetchSocialPostReportCounts(data.map((post) => post.id)) : Promise.resolve(new Map<string, number>()),
       ])
-
       setFollowCounts(new Map(countsEntries))
       setFollowState(new Map(followingEntries))
-      setReportCounts(reports)
     } catch {
-      setError("Could not load community status.")
+      setError("Could not load stories.")
     } finally {
       setLoading(false)
     }
-  }, [feedMode, uid, isAdmin])
+  }, [uid])
+
+  useEffect(() => { queueMicrotask(() => { void loadPosts() }) }, [loadPosts])
 
   useEffect(() => {
-    queueMicrotask(() => {
-      void loadPosts()
-    })
-  }, [loadPosts])
-
-  useEffect(() => {
-    const unseen = posts.filter((post) => !viewedRef.current.has(post.id)).slice(0, 20)
+    const unseen = posts.filter((p) => !viewedRef.current.has(p.id)).slice(0, 20)
     for (const post of unseen) {
       viewedRef.current.add(post.id)
       void recordSocialPostView(post.id, uid)
     }
   }, [posts, uid])
 
-  const groups = useMemo(() => groupStatus(posts, followState, followCounts), [posts, followState, followCounts])
-  const selectedGroup = useMemo(() => groups.find((group) => group.userId === selectedGroupId) || null, [groups, selectedGroupId])
+  const groups = useMemo(() => groupStories(posts, followState, followCounts), [posts, followState, followCounts])
+  const selectedGroup = useMemo(() => groups.find((g) => g.userId === selectedGroupId) || null, [groups, selectedGroupId])
 
-  const filteredPosts = useMemo(() => {
-    const normalized = query.trim().toLowerCase()
-    return posts.filter((post) => {
-      const matchesCategory = activeCategory === "all" || post.category === activeCategory
-      const matchesQuery =
-        !normalized ||
-        [post.content, post.user?.name, post.user?.username, CATEGORY_META[post.category]?.name]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(normalized)
-      return matchesCategory && matchesQuery
-    })
-  }, [posts, activeCategory, query])
-
-  const handleCreate = async (state: StatusFormState) => {
-    if (!uid) {
-      toast.error("Login required to create a status.")
-      return false
-    }
-    const validation = validateStatus(state)
-    if (validation) {
-      toast.error(validation)
-      return false
-    }
+  const handleCreate = async (state: StoryFormState) => {
+    if (!uid) { toast.error("Login required."); return false }
+    const validation = validateStory(state)
+    if (validation) { toast.error(validation); return false }
     const post = await createSocialPost(uid, state.content.trim(), state.image?.url, state.image?.type, state.category)
-    if (!post) {
-      toast.error("Could not publish status.")
-      return false
-    }
-    await loadPosts()
+    if (!post) { toast.error("Could not publish story."); return false }
+    setPosts((prev) => [post, ...prev])
+    setLikedPosts((prev) => { const n = new Set(prev); if (post.liked) n.add(post.id); return n })
+    setSavedPosts((prev) => { const n = new Set(prev); if (post.saved) n.add(post.id); return n })
     return true
   }
 
-  const handleLike = async (post: SocialPost) => {
-    if (!uid) {
-      toast.error("Login required to like status.")
-      return
-    }
-    const wasLiked = likedPosts.has(post.id)
-    setLikedPosts((current) => {
-      const next = new Set(current)
-      if (wasLiked) next.delete(post.id)
-      else next.add(post.id)
-      return next
-    })
-    setPosts((current) =>
-      current.map((item) =>
-        item.id === post.id
-          ? { ...item, liked: !wasLiked, likesCount: Math.max(0, item.likesCount + (wasLiked ? -1 : 1)) }
-          : item,
-      ),
-    )
-    const ok = await toggleSocialLike(post.id, uid)
-    if (!ok) {
-      toast.error("Could not update like.")
-      await loadPosts()
-    }
-  }
-
-  const openProfile = (post: SocialPost) => {
-    navigate(post.user?.username ? `/u/${post.user.username}` : `/profile/${post.userId}`)
-  }
-
-  const openGroupProfile = (group: StatusGroup) => {
-    navigate(group.username ? `/u/${group.username}` : `/profile/${group.userId}`)
+  const handleLike = async (postId: string) => {
+    if (!uid) { toast.error("Login to like."); return }
+    const wasLiked = likedPosts.has(postId)
+    setLikedPosts((prev) => { const n = new Set(prev); wasLiked ? n.delete(postId) : n.add(postId); return n })
+    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, liked: !wasLiked, likesCount: Math.max(0, p.likesCount + (wasLiked ? -1 : 1)) } : p))
+    const ok = await toggleSocialLike(postId, uid)
+    if (!ok) { await loadPosts() }
   }
 
   const handleDelete = async (post: SocialPost) => {
     if (!isAdmin) return
     const ok = await deleteSocialPost(post.id)
     if (ok) {
-      toast.success("Status removed.")
-      await loadPosts()
-    } else {
-      toast.error("Could not remove status.")
-    }
+      setPosts((prev) => prev.filter((p) => p.id !== post.id))
+      toast.success("Story removed.")
+    } else { toast.error("Could not remove story.") }
   }
 
-  const handleHide = async (post: SocialPost) => {
-    if (!isAdmin) return
-    const ok = await hideSocialPost(post.id, true)
-    if (ok) {
-      toast.success("Status hidden.")
-      await loadPosts()
-    } else {
-      toast.error("Could not hide status.")
-    }
+  const openGroupProfile = (group: StoryGroup) => {
+    navigate(group.username ? `/u/${group.username}` : `/profile/${group.userId}`)
   }
 
   return (
     <PageShell
-      eyebrow="Community Showcase"
-      title="Community Status"
-      subtitle="Share progress, projects, wins, lifestyle and behind-the-scenes updates from the CAFÉ community."
+      eyebrow="Community"
+      title="Stories"
+      subtitle="Quick, immersive updates from the CAFÉ community."
     >
       <div className="relative">
-        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] rounded-[36px] bg-[radial-gradient(circle_at_18%_6%,rgba(79,110,247,0.18),transparent_34%),radial-gradient(circle_at_82%_14%,rgba(139,92,246,0.10),transparent_30%),radial-gradient(circle_at_54%_32%,rgba(14,165,233,0.08),transparent_28%)] blur-3xl sm:h-[560px] sm:rounded-[56px]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[360px] rounded-[36px] bg-[radial-gradient(circle_at_18%_6%,rgba(79,110,247,0.18),transparent_34%),radial-gradient(circle_at_82%_14%,rgba(139,92,246,0.10),transparent_30%)] blur-3xl sm:h-[480px] sm:rounded-[56px]" />
 
-        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#7EA1FF]">Discovery feed</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">Explore what the community is building</h2>
-            <p className="mt-2 text-sm leading-6 text-white/48">Status updates stay published until the user or an admin removes them.</p>
+        {!uid ? (
+          <div className="mb-5 rounded-2xl border border-amber-300/18 bg-amber-300/8 p-4 text-sm text-amber-100/78">
+            Login to publish stories, like, save and reply.
           </div>
-          <button
-            type="button"
-            onClick={() => setShowComposer(true)}
-            disabled={!uid}
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black shadow-[0_18px_50px_rgba(255,255,255,0.10)] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
-          >
-            <Plus size={16} />
-            Create Status
-          </button>
-        </div>
+        ) : null}
 
-        <div className="space-y-5">
-          <StatusRail
-            loading={loading}
-            groups={groups}
-            selectedId={selectedGroupId || undefined}
-            signedIn={Boolean(uid)}
-            onCreate={() => setShowComposer(true)}
-            onOpenGroup={(group) => setSelectedGroupId(group.userId)}
-          />
+        <StoryBar
+          loading={loading}
+          groups={groups}
+          selectedId={selectedGroupId || undefined}
+          signedIn={Boolean(uid)}
+          onCreate={() => setShowComposer(true)}
+          onOpenGroup={(group) => setSelectedGroupId(group.userId)}
+        />
 
-          <MobileFilters
-            mode={feedMode}
-            category={activeCategory}
-            onMode={setFeedMode}
-            onCategory={setActiveCategory}
-          />
-
-          <div className="grid gap-5 xl:grid-cols-[290px_minmax(0,1fr)]">
-            <StatusSidebar
-              mode={feedMode}
-              category={activeCategory}
-              recent={groups}
-              signedIn={Boolean(uid)}
-              onCreate={() => setShowComposer(true)}
-              onMode={setFeedMode}
-              onCategory={setActiveCategory}
-              onOpen={(group) => setSelectedGroupId(group.userId)}
-            />
-
-            <main className="min-w-0 space-y-4">
-              <section className="rounded-[28px] border border-white/[0.08] bg-white/[0.04] p-4 backdrop-blur-2xl">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/36">Live discovery</p>
-                    <h3 className="mt-1 text-lg font-semibold text-white">Community updates</h3>
+        {loading ? (
+          <div className="mt-10 grid gap-4 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-[28px] border border-white/[0.07] bg-white/[0.035] p-5">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="h-12 w-12 animate-pulse rounded-full bg-white/[0.08]" />
+                  <div className="space-y-2">
+                    <div className="h-3 w-28 animate-pulse rounded bg-white/[0.08]" />
+                    <div className="h-2.5 w-16 animate-pulse rounded bg-white/[0.06]" />
                   </div>
-                  <label className="flex h-11 min-w-0 items-center gap-2 rounded-2xl border border-white/[0.08] bg-black/20 px-3 text-sm text-white/44 md:w-80">
-                    <Search size={16} />
-                    <input
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Search status, people or categories"
-                      className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/32"
-                    />
-                  </label>
                 </div>
-              </section>
-
-              {!uid ? (
-                <div className="rounded-2xl border border-amber-300/18 bg-amber-300/8 p-4 text-sm text-amber-100/78">
-                  Login to publish, follow and like community status updates.
-                </div>
-              ) : null}
-
-              {loading ? (
-                <LoadingState />
-              ) : error ? (
-                <div className="rounded-[30px] border border-red-400/20 bg-red-400/10 p-8 text-center">
-                  <AlertCircle size={26} className="mx-auto mb-3 text-red-200" />
-                  <p className="text-sm text-red-100">{error}</p>
-                  <button type="button" onClick={loadPosts} className="mt-4 rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-black">
-                    Try again
-                  </button>
-                </div>
-              ) : filteredPosts.length === 0 ? (
-                <EmptyState mode={feedMode} onCreate={() => setShowComposer(true)} />
-              ) : (
-                <motion.div className="grid gap-4 lg:grid-cols-2" initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: 0.045 } } }}>
-                  {filteredPosts.map((post) => (
-                    <StatusCard
-                      key={post.id}
-                      post={post}
-                      liked={likedPosts.has(post.id)}
-                      isAdmin={isAdmin}
-                      reportCount={reportCounts.get(post.id) || 0}
-                      onLike={() => handleLike(post)}
-                      onOpenViewer={() => setSelectedGroupId(post.userId)}
-                      onOpenProfile={() => openProfile(post)}
-                      onDelete={() => handleDelete(post)}
-                      onHide={() => handleHide(post)}
-                    />
-                  ))}
-                </motion.div>
-              )}
-            </main>
+                <div className="h-40 animate-pulse rounded-2xl bg-white/[0.05]" />
+              </div>
+            ))}
           </div>
-        </div>
+        ) : error ? (
+          <div className="mt-10 rounded-[30px] border border-red-400/20 bg-red-400/10 p-8 text-center">
+            <AlertCircle size={26} className="mx-auto mb-3 text-red-200" />
+            <p className="text-sm text-red-100">{error}</p>
+            <button type="button" onClick={loadPosts} className="mt-4 rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-black">Try again</button>
+          </div>
+        ) : groups.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-10 rounded-[30px] border border-white/[0.08] bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-10 text-center backdrop-blur-2xl"
+          >
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#4F6EF7]/14 text-[#8FB0FF]">
+              <Sparkles size={28} />
+            </div>
+            <h3 className="text-xl font-semibold text-white">No stories yet</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-white/48">
+              Share progress, projects, wins, lifestyle or behind-the-scenes updates with the CAFÉ community.
+            </p>
+            <button type="button" onClick={() => setShowComposer(true)} disabled={!uid} className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-semibold text-black transition hover:bg-white/90 disabled:opacity-45">
+              <Plus size={16} />
+              Create Your First Story
+            </button>
+          </motion.div>
+        ) : (
+          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+            {groups.map((group) => {
+              const catMeta = CATEGORY_META[group.category] || CATEGORY_META.business
+              const Icon = catMeta.icon
+              const latest = group.posts[0]
+              const isLiked = latest ? likedPosts.has(latest.id) : false
+              return (
+                <motion.button
+                  key={group.userId}
+                  type="button"
+                  whileHover={{ y: -4, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setSelectedGroupId(group.userId)}
+                  className="group relative overflow-hidden rounded-[24px] border border-white/[0.08] bg-[linear-gradient(145deg,rgba(255,255,255,0.065),rgba(255,255,255,0.025))] text-left shadow-[0_28px_90px_rgba(0,0,0,0.24)] backdrop-blur-2xl transition hover:border-white/[0.15] hover:shadow-[0_28px_90px_rgba(79,110,247,0.12)]"
+                >
+                  <div className={cn("absolute inset-0 opacity-[0.06]", catMeta.bgGlow)} />
+                  <div className="relative p-4">
+                    <div className="flex items-center gap-3">
+                      <span className={cn("shrink-0 rounded-full bg-gradient-to-br p-[2px]", catMeta.ring)}>
+                        <span className="block rounded-full bg-[#07080d] p-[2px]">
+                          <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="sm" className="h-10 w-10" ring={false} />
+                        </span>
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-white transition group-hover:text-white/90">{group.name}</p>
+                        <p className="truncate text-xs text-white/34">{group.posts.length} {group.posts.length === 1 ? "story" : "stories"}</p>
+                      </div>
+                    </div>
+                    {latest?.content ? (
+                      <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-white/50">{latest.content}</p>
+                    ) : null}
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-semibold", catMeta.color)}>
+                        <Icon size={10} />
+                        {catMeta.short}
+                      </span>
+                      <span className="flex items-center gap-1 text-[10px] text-white/30">
+                        <Heart size={10} className={isLiked ? "fill-[#FF4B6E] text-[#FF4B6E]" : ""} />
+                        {latest ? latest.likesCount : 0}
+                      </span>
+                    </div>
+                  </div>
+                </motion.button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
-      <button
+      <motion.button
         type="button"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
         onClick={() => setShowComposer(true)}
         disabled={!uid}
-        className="fixed bottom-5 right-5 z-40 inline-flex h-13 w-13 items-center justify-center rounded-full bg-white text-black shadow-[0_22px_70px_rgba(0,0,0,0.42)] transition hover:scale-105 disabled:opacity-45 xl:hidden"
-        aria-label="Create status"
+        className="fixed bottom-5 right-5 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-[#4F6EF7] to-[#6D28D9] text-white shadow-[0_22px_70px_rgba(79,110,247,0.42)] transition disabled:opacity-45"
+        aria-label="Create story"
       >
-        <Plus size={22} />
-      </button>
+        <Plus size={24} />
+      </motion.button>
 
-      <StatusComposer open={showComposer} onClose={() => setShowComposer(false)} onSubmit={handleCreate} userId={uid} />
-      <StatusViewer
+      <CreateStoryModal open={showComposer} onClose={() => setShowComposer(false)} onSubmit={handleCreate} userId={uid} />
+      <StoryViewer
         group={selectedGroup}
         currentUserId={uid}
         isAdmin={isAdmin}

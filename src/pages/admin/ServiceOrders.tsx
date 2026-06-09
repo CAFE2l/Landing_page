@@ -541,7 +541,7 @@ export default function ServiceOrders() {
       void load()
     })
     const unsub = subscribeToServiceOrders(load)
-    return () => { unsub.then((fn) => fn()) }
+    return () => { unsub() }
   }, [load])
 
   const filtered = useMemo(() => {

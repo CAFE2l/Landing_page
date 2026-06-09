@@ -425,6 +425,57 @@ export async function fetchFollowingList(
   }))
 }
 
+// ========== Saves / Bookmarks ==========
+
+export async function toggleSocialSave(
+  postId: string,
+  userId: string,
+): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+
+  const { data: existing } = await supabase
+    .from("social_post_saves")
+    .select("id")
+    .eq("post_id", postId)
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (existing) {
+    const { error } = await supabase
+      .from("social_post_saves")
+      .delete()
+      .eq("id", (existing as { id: string }).id)
+    return !error
+  }
+
+  const { error } = await supabase
+    .from("social_post_saves")
+    .insert({ post_id: postId, user_id: userId })
+
+  return !error
+}
+
+export async function fetchUserSaves(
+  postIds: string[],
+  userId: string,
+): Promise<Set<string>> {
+  const result = new Set<string>()
+  if (!supabase || !supabaseConfigured || postIds.length === 0 || !userId) return result
+
+  const { data } = await supabase
+    .from("social_post_saves")
+    .select("post_id")
+    .in("post_id", postIds)
+    .eq("user_id", userId)
+
+  if (data) {
+    for (const row of data as { post_id: string }[]) {
+      result.add(row.post_id)
+    }
+  }
+  return result
+}
+
 // ========== Helpers ==========
 
 function mapPost(row: Record<string, unknown>): SocialPost {
@@ -443,6 +494,7 @@ function mapPost(row: Record<string, unknown>): SocialPost {
     updatedAt: (row.updated_at as string) || row.created_at as string,
     user: null,
     liked: false,
+    saved: false,
     comments: [],
   }
 }
@@ -475,15 +527,17 @@ async function enrichPosts(
   const userIds = [...new Set(posts.map((p) => p.userId))]
   const postIds = posts.map((p) => p.id)
 
-  const [profileMap, likedSet] = await Promise.all([
+  const [profileMap, likedSet, savedSet] = await Promise.all([
     fetchProfiles(userIds),
     currentUserId ? fetchUserLikes(postIds, currentUserId) : Promise.resolve(new Set<string>()),
+    currentUserId ? fetchUserSaves(postIds, currentUserId) : Promise.resolve(new Set<string>()),
   ])
 
   return posts.map((post) => ({
     ...post,
     user: profileMap.get(post.userId) || null,
     liked: likedSet.has(post.id),
+    saved: savedSet.has(post.id),
   }))
 }
 

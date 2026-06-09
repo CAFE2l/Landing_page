@@ -246,6 +246,14 @@ export default function FeedbackPage() {
       toast.error("You must be logged in");
       return;
     }
+
+    const launchDate = "2026-06-06";
+    const today = new Date().toISOString().split("T")[0];
+    if (data.serviceDate && (data.serviceDate < launchDate || data.serviceDate > today)) {
+      toast.error("Feedback date must be between June 6, 2026 and today.");
+      return;
+    }
+
     setSubmitting(true);
 
     const displayName = getUserDisplayName(loggedProfile || userProfile);

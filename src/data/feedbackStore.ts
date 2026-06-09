@@ -290,6 +290,7 @@ export interface SocialPost {
   updatedAt: string
   user: { id: string; name: string; avatarUrl: string | null; username: string | null; bio?: string | null; role?: string | null } | null
   liked: boolean
+  saved: boolean
   comments: SocialComment[]
 }
 

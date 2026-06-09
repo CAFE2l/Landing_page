@@ -27,6 +27,7 @@ import { uploadFeedbackMedia } from "../../lib/cloudinary";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import UserAvatar from "../ui/UserAvatar";
 import { cn } from "../../lib/utils";
+import toast from "react-hot-toast";
 
 interface FeedbackFormProps {
   open: boolean;
@@ -84,7 +85,7 @@ export default function FeedbackForm({
   const [hoverRating, setHoverRating] = useState(0);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [serviceDate, setServiceDate] = useState("");
+  const [serviceDate, setServiceDate] = useState(today);
   const [improvementSuggestion, setImprovementSuggestion] = useState("");
   const [media, setMedia] = useState<FeedbackMedia[]>([]);
   const [uploadStates, setUploadStates] = useState<
@@ -242,15 +243,24 @@ export default function FeedbackForm({
     });
   };
 
+  const dateError = serviceDate
+    ? serviceDate < launchDate || serviceDate > today
+    : false;
   const canProceed = () => {
     if (step === 0)
-      return rating > 0 && title.trim().length > 0 && content.trim().length > 0;
+      return (
+        rating > 0 &&
+        title.trim().length > 0 &&
+        content.trim().length > 0 &&
+        !dateError
+      );
     return true;
   };
 
   const handleSubmit = () => {
     if (serviceDate && (serviceDate < launchDate || serviceDate > today)) {
-      setServiceDate("");
+      toast.error("Feedback date must be between June 6, 2026 and today.");
+      setServiceDate(today);
       return;
     }
     onSubmit({
@@ -490,8 +500,18 @@ export default function FeedbackForm({
                             onChange={(e) => setServiceDate(e.target.value)}
                             min={launchDate}
                             max={today}
-                            className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-5 py-3 text-sm text-white outline-none focus:border-[#4F6EF7]/50 transition-all [color-scheme:dark]"
+                            className={cn(
+                              "w-full bg-white/[0.03] border rounded-xl px-5 py-3 text-sm text-white outline-none transition-all [color-scheme:dark]",
+                              dateError
+                                ? "border-red-500/50 focus:border-red-500"
+                                : "border-white/[0.08] focus:border-[#4F6EF7]/50",
+                            )}
                           />
+                          {dateError && (
+                            <p className="mt-1.5 text-xs text-red-400">
+                              Feedback date must be between June 6, 2026 and today.
+                            </p>
+                          )}
                         </div>
                         <div className="space-y-2">
                           <label className="flex items-center gap-2 text-[10px] font-bold text-white/30 uppercase tracking-widest">

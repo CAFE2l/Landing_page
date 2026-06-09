@@ -229,6 +229,16 @@ export async function createFeedbackPost(
     console.error("createFeedbackPost: Supabase not configured");
     return null;
   }
+
+  if (post.serviceDate) {
+    const launchDate = "2026-06-06";
+    const today = new Date().toISOString().split("T")[0];
+    if (post.serviceDate < launchDate || post.serviceDate > today) {
+      console.error("createFeedbackPost: invalid serviceDate", post.serviceDate);
+      return null;
+    }
+  }
+
   try {
     const dbData = toSnake(post);
     dbData.helpful_count = 0;
