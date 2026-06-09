@@ -1100,7 +1100,16 @@ export default function MessagesPage() {
         ]).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
-            onClick={() => { setTab(key); setActiveConv(null); setActiveGroup(null); setMobileView("list") }}
+            onClick={() => {
+              if (key === "status") {
+                navigate("/dashboard/status")
+                return
+              }
+              setTab(key)
+              setActiveConv(null)
+              setActiveGroup(null)
+              setMobileView("list")
+            }}
             className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-all ${
               tab === key
                 ? "text-[#4F6EF7] border-b-2 border-[#4F6EF7] bg-[#4F6EF7]/5"

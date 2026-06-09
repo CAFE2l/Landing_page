@@ -16,7 +16,13 @@ const navItems = [
   { path: "/admin/settings", label: "Settings", icon: Settings },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({
+  mobile = false,
+  onNavigate,
+}: {
+  mobile?: boolean
+  onNavigate?: () => void
+}) {
   const collapsed = useAdminStore((s) => s.ui.sidebarCollapsed)
   const location = useLocation()
   const navigate = useNavigate()
@@ -34,21 +40,27 @@ export default function Sidebar() {
   }, [])
 
   const handleLogout = async () => {
+    onNavigate?.()
     await signOut()
     navigate("/admin/login")
   }
 
+  const compact = mobile ? false : collapsed
+
   return (
     <motion.aside
       initial={false}
-      animate={{ width: collapsed ? 64 : 240 }}
+      animate={{ width: compact ? 64 : 240 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="fixed left-0 top-0 z-30 flex h-screen flex-col border-r border-white/5 bg-[#0a0a0f] overflow-hidden"
+      className={cn(
+        "flex h-full flex-col overflow-hidden border-r border-white/5 bg-[#0a0a0f]",
+        mobile ? "relative w-60" : "fixed left-0 top-0 z-30 h-screen",
+      )}
     >
       <div className="flex h-16 items-center gap-3 px-4 shrink-0">
         <a href="/" className="flex items-center gap-3">
           <img src="/favicon.png" alt="CAFÉ" className="h-7 w-7 rounded-lg" />
-          {!collapsed && (
+          {!compact && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -71,6 +83,7 @@ export default function Sidebar() {
             <NavLink
               key={item.path}
               to={item.path}
+              onClick={onNavigate}
               className="relative block"
             >
               <div
@@ -82,7 +95,7 @@ export default function Sidebar() {
                 )}
               >
                 <Icon size={18} className="shrink-0" />
-                {!collapsed && (
+                {!compact && (
                   <span>{item.label}</span>
                 )}
                 {showBadge && (
@@ -103,18 +116,18 @@ export default function Sidebar() {
           rel="noopener noreferrer"
           className={cn(
             "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 text-white/50 hover:bg-white/5 hover:text-white",
-            collapsed && "justify-center px-0",
+            compact && "justify-center px-0",
           )}
         >
           <ExternalLink size={18} className="shrink-0" />
-          {!collapsed && <span>View Site</span>}
+          {!compact && <span>View Site</span>}
         </a>
         <button
           onClick={handleLogout}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/50 transition-colors duration-150 hover:bg-white/5 hover:text-red-400"
         >
           <LogOut size={18} className="shrink-0" />
-          {!collapsed && <span>Logout</span>}
+          {!compact && <span>Logout</span>}
         </button>
       </div>
     </motion.aside>

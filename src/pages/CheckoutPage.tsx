@@ -369,8 +369,8 @@ export default function CheckoutPage() {
   return (
     <div className="relative min-h-screen text-[#f0f0f5]">
       <TechPremiumBackground />
-      <div className="relative z-10 container mx-auto max-w-3xl px-4 py-12">
-        <Link to="/" className="mb-8 inline-flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-white">
+      <div className="container relative z-10 mx-auto max-w-3xl px-4 py-6 sm:py-12">
+        <Link to="/" className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-white sm:mb-8">
           <ArrowLeft size={15} />
           Back to Home
         </Link>
@@ -378,12 +378,12 @@ export default function CheckoutPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <Stepper currentStep={currentStep} />
 
-          <div className="mb-6">
+          <div className="mb-5 sm:mb-6">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-300">
               <CreditCard size={12} />
               {paid ? "Payment confirmed" : claimed ? "Awaiting verification" : "Secure checkout"}
             </div>
-            <h1 className="mb-2 text-3xl font-bold">
+            <h1 className="mb-2 text-2xl font-bold sm:text-3xl">
               {paid ? "Payment confirmed" : claimed ? "Payment notification sent" : "Choose payment method"}
             </h1>
             <p className="max-w-xl text-sm leading-relaxed text-zinc-400">
@@ -424,7 +424,7 @@ export default function CheckoutPage() {
 
             {!paid && !claimed && (
               <>
-                <div className="rounded-2xl border border-white/[0.1] bg-white/[0.04] p-6 backdrop-blur-xl">
+                <div className="rounded-2xl border border-white/[0.1] bg-white/[0.04] p-4 backdrop-blur-xl sm:p-6">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-300">Step 3</p>
                   <h2 className="mt-2 text-xl font-semibold text-white">Choose how you want to pay</h2>
                   <p className="mt-1 text-sm text-zinc-500">Notify us only after completing the payment.</p>
@@ -447,13 +447,13 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link to="/dashboard/orders" className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1d4ed8]">
+          <div className="safe-bottom sticky bottom-0 z-20 -mx-4 mt-6 flex flex-col gap-3 border-t border-white/[0.06] bg-[#020408]/88 px-4 py-3 backdrop-blur-xl sm:static sm:mx-0 sm:flex-row sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
+            <Link to="/dashboard/orders" className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1d4ed8]">
               View My Orders
             </Link>
             <button
               onClick={() => navigate("/")}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.03] px-5 py-3 text-sm font-semibold text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.03] px-5 py-3 text-sm font-semibold text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
             >
               <ArrowLeft size={16} />
               Back to Home

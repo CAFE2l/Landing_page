@@ -53,6 +53,8 @@ export default function UserAvatar({ user, size = "md", className, ring = true }
         <img
           src={avatarUrl}
           alt={displayName}
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover"
           onError={() => setImgError(true)}
         />

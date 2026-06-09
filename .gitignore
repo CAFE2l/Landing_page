@@ -29,5 +29,6 @@ supabase/*
 supabase/migrations/*
 !supabase/migrations/016_feedback_social_comments_reactions_admin.sql
 !supabase/migrations/017_service_orders_admin_delete.sql
+!supabase/migrations/037_admin_delete_feedback_post_rpc.sql
 # Stakpak session files
 .stakpak/session*

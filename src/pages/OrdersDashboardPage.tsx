@@ -116,7 +116,7 @@ export default function OrdersDashboardPage() {
   if (!user) return <Navigate to="/login" replace />
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#020408] px-6 pb-8 pt-28 text-white">
+    <main className="relative min-h-screen overflow-hidden bg-[#020408] px-4 pb-8 pt-24 text-white sm:px-6 sm:pt-28">
       <TechPremiumBackground />
       <Navbar />
 
@@ -144,7 +144,7 @@ export default function OrdersDashboardPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl p-12 text-center"
+            className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-6 text-center backdrop-blur-xl sm:p-12"
           >
             <Package size={40} className="mx-auto mb-4 text-zinc-600" />
             <h2 className="text-lg font-semibold text-zinc-400 mb-2">No orders yet</h2>
@@ -167,7 +167,7 @@ export default function OrdersDashboardPage() {
           </div>
         )}
 
-        <div className="mt-8 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 flex items-start gap-4">
+        <div className="mt-8 flex items-start gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-5">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-500/10 text-yellow-400">
             <DollarSign size={18} />
           </div>

@@ -515,7 +515,7 @@ function StatusViewer({
   const activePost = posts[Math.min(activeIndex, Math.max(0, posts.length - 1))]
 
   useEffect(() => {
-    setActiveIndex(0)
+    queueMicrotask(() => setActiveIndex(0))
   }, [group?.userId])
 
   const handleFollow = async () => {
@@ -653,7 +653,7 @@ function StatusViewer({
                         {activePost.mediaUrl && activePost.mediaType === "image" ? (
                           <img src={activePost.mediaUrl} alt="" className="min-h-0 flex-1 object-cover" />
                         ) : activePost.mediaUrl && activePost.mediaType === "video" ? (
-                          <video src={activePost.mediaUrl} controls className="min-h-0 flex-1 bg-black object-contain" />
+                          <video src={activePost.mediaUrl} controls preload="metadata" playsInline className="min-h-0 flex-1 bg-black object-contain" />
                         ) : activePost.mediaUrl && activePost.mediaType === "audio" ? (
                           <div className="flex flex-1 items-center justify-center bg-black/26 p-8">
                             <audio src={activePost.mediaUrl} controls className="w-full" />
@@ -908,7 +908,7 @@ function StatusCard({
     >
       {hasImage ? (
         <button type="button" onClick={onOpenViewer} className="block w-full overflow-hidden bg-white/[0.025]">
-          <img src={post.mediaUrl || ""} alt="" className="max-h-[420px] w-full object-cover transition duration-500 group-hover:scale-[1.025]" />
+          <img src={post.mediaUrl || ""} alt="" loading="lazy" decoding="async" className="max-h-[420px] w-full object-cover transition duration-500 group-hover:scale-[1.025]" />
         </button>
       ) : null}
       <div className={cn("p-5", compactText && "p-6")}>
@@ -969,18 +969,18 @@ function StatusCard({
               type="button"
               onClick={onLike}
               className={cn(
-                "inline-flex h-9 items-center gap-2 rounded-xl px-3 text-sm transition",
+                "inline-flex h-11 items-center gap-2 rounded-xl px-3 text-sm transition",
                 liked ? "bg-[#4F6EF7]/15 text-[#8FB0FF]" : "text-white/48 hover:bg-white/[0.06] hover:text-white",
               )}
             >
               <Heart size={16} className={liked ? "fill-current" : ""} />
               {post.likesCount}
             </button>
-            <span className="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-sm text-white/42">
+            <span className="inline-flex h-11 items-center gap-2 rounded-xl px-3 text-sm text-white/42">
               <MessageCircle size={16} />
               {post.commentsCount}
             </span>
-            <span className="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-sm text-white/42">
+            <span className="inline-flex h-11 items-center gap-2 rounded-xl px-3 text-sm text-white/42">
               <Eye size={16} />
               {post.viewsCount}
             </span>
@@ -988,7 +988,7 @@ function StatusCard({
           <button
             type="button"
             onClick={onOpenProfile}
-            className="inline-flex h-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 text-sm font-semibold text-white/68 transition hover:border-[#4F6EF7]/45 hover:text-white"
+            className="inline-flex h-11 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 text-sm font-semibold text-white/68 transition hover:border-[#4F6EF7]/45 hover:text-white"
           >
             View Profile
           </button>
@@ -1312,6 +1312,7 @@ export default function StatusPage() {
         onClick={() => setShowComposer(true)}
         disabled={!uid}
         className="fixed bottom-5 right-5 z-40 inline-flex h-13 w-13 items-center justify-center rounded-full bg-white text-black shadow-[0_22px_70px_rgba(0,0,0,0.42)] transition hover:scale-105 disabled:opacity-45 xl:hidden"
+        aria-label="Create status"
       >
         <Plus size={22} />
       </button>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Menu, MessageCircle, X } from "lucide-react"
+import { ArrowRight, Menu, MessageCircle, X } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import WhatsAppIcon from "./WhatsAppIcon"
 import UserMenu from "../auth/UserMenu"
@@ -92,17 +92,17 @@ export default function Navbar() {
           : "bg-transparent py-4 md:py-5"
       }`}
     >
-      <div className="container mx-auto px-4 sm:px-6 flex items-center justify-between">
+      <div className="container mx-auto flex items-center justify-between px-4 sm:px-6">
         <motion.div
           whileHover={{ scale: 1.02 }}
         >
-        <Link to="/" className="flex items-center gap-2.5">
+        <Link to="/" className="flex min-w-0 items-center gap-2.5" onClick={() => setOpen(false)}>
           <img
             src="/favicon.png"
             alt="CAFÉ SERVICES"
-            className="w-8 h-8 rounded-lg"
+            className="h-8 w-8 shrink-0 rounded-lg"
           />
-          <span className="text-xl font-bold text-white tracking-tight">
+          <span className="truncate text-lg font-bold tracking-tight text-white sm:text-xl">
             CAFÉ<span className="text-[#3b82f6]"> SERVICES</span>
           </span>
         </Link>
@@ -161,99 +161,151 @@ export default function Navbar() {
           </motion.a>
         </div>
 
+        <div className="flex items-center gap-2 lg:hidden">
+          {user && (
+            <Link
+              to="/dashboard/messages"
+              className="touch-target relative flex items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-zinc-300"
+              aria-label="Messages"
+              onClick={() => setOpen(false)}
+            >
+              <MessageCircle size={18} />
+              {unreadMessages > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadMessages > 9 ? "9+" : unreadMessages}
+                </span>
+              )}
+            </Link>
+          )}
           <button
-            className="lg:hidden text-zinc-400 p-3 -mr-2"
+            className="touch-target flex items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-zinc-300"
             onClick={() => setOpen(!open)}
-            aria-label="Menu"
+            aria-label={open ? "Close menu" : "Open menu"}
+            aria-expanded={open}
           >
-          {open ? <X size={22} /> : <Menu size={22} />}
-        </button>
+            {open ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden bg-[#020408]/95 backdrop-blur-xl border-t border-white/[0.08] overflow-hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 top-[64px] z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+            onClick={() => setOpen(false)}
           >
-            <div className="container mx-auto px-4 sm:px-6 py-6 flex flex-col gap-3">
-              {links.map((link) => {
-                const isActive = isLanding && active === link.href.slice(1)
-                return (
+            <motion.div
+              initial={{ y: 28, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 28, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 28 }}
+              className="safe-bottom absolute inset-x-3 top-3 overflow-hidden rounded-3xl border border-white/[0.1] bg-[#05070c]/95 shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:inset-x-auto sm:right-4 sm:w-[390px]"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Mobile navigation"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="border-b border-white/[0.08] px-5 py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white">CAFÉ SERVICES</p>
+                    <p className="truncate text-xs text-zinc-500">Mobile command menu</p>
+                  </div>
                   <button
-                    key={link.href}
-                    onClick={() => handleClick(link.href)}
-                    className={`text-left text-base font-medium transition-colors py-2 ${
-                      isActive ? "text-white" : "text-zinc-500 hover:text-zinc-200"
-                    }`}
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="touch-target flex items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-zinc-400"
+                    aria-label="Close menu"
                   >
-                    {link.name}
+                    <X size={18} />
                   </button>
-                )
-              })}
-
-              <div className="mt-4 border-t border-white/[0.08] pt-4">
-                {user ? (
-                  <div className="space-y-2">
-                    {[
-                      { label: "My Profile", href: "/dashboard/profile" },
-                      { label: unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages", href: "/dashboard/messages" },
-                      { label: "My Posts", href: "/dashboard/posts" },
-                      { label: "Saved Posts", href: "/dashboard/saved" },
-                      { label: "Settings", href: "/dashboard/settings" },
-                      ...(isAdmin ? [{ label: "Admin Panel", href: "/admin" }] : []),
-                    ].map((item) => (
-                      <Link
-                        key={item.label}
-                        to={item.href}
-                        onClick={() => setOpen(false)}
-                        className={`block text-left text-base font-medium transition-colors py-2 ${
-                          item.label === "Admin Panel" ? "text-[#3b82f6]" : "text-zinc-500 hover:text-zinc-200"
-                        }`}
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                    <button
-                      onClick={() => { setOpen(false); signOut(); navigate("/") }}
-                      className="block text-left text-base font-medium text-zinc-500 hover:text-red-400 transition-colors py-2"
-                    >
-                      Logout
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <Link
-                      to="/login"
-                      onClick={() => setOpen(false)}
-                      className="block text-center text-base font-medium text-zinc-300 hover:text-white border border-white/[0.08] rounded-xl px-6 py-3 transition-colors"
-                    >
-                      Login
-                    </Link>
-                    <Link
-                      to="/signup"
-                      onClick={() => setOpen(false)}
-                      className="block text-center text-base font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-xl px-6 py-3 border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
-                    >
-                      Sign Up
-                    </Link>
-                  </div>
-                )}
+                </div>
               </div>
 
-              <motion.a
-          href={wa(WA_MESSAGES.general)}
-          target="_blank"
-          rel="noopener noreferrer"
-              whileTap={{ scale: 0.97 }}
-              className="inline-flex items-center justify-center gap-2 text-center bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-6 py-3 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] mt-2"
-              >
-              <WhatsAppIcon />
-              Talk to me
-              </motion.a>
-            </div>
+              <div className="max-h-[calc(100dvh-150px)] overflow-y-auto px-3 py-3">
+                <div className="grid gap-1">
+                  {links.map((link) => {
+                    const isActive = isLanding && active === link.href.slice(1)
+                    return (
+                      <button
+                        key={link.href}
+                        onClick={() => handleClick(link.href)}
+                        className={`flex min-h-12 items-center justify-between rounded-2xl px-4 text-left text-base font-semibold transition-colors ${
+                          isActive ? "bg-[#3b82f6]/14 text-white" : "text-zinc-300 hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        {link.name}
+                        <ArrowRight size={16} className="text-white/30" />
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="mt-3 border-t border-white/[0.08] pt-3">
+                  {user ? (
+                    <div className="grid gap-1">
+                      {[
+                        { label: "My Profile", href: "/dashboard/profile" },
+                        { label: unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages", href: "/dashboard/messages" },
+                        { label: "My Posts", href: "/dashboard/posts" },
+                        { label: "Saved Posts", href: "/dashboard/saved" },
+                        { label: "Settings", href: "/dashboard/settings" },
+                        ...(isAdmin ? [{ label: "Admin Panel", href: "/admin" }] : []),
+                      ].map((item) => (
+                        <Link
+                          key={item.label}
+                          to={item.href}
+                          onClick={() => setOpen(false)}
+                          className={`flex min-h-12 items-center justify-between rounded-2xl px-4 text-base font-semibold transition-colors ${
+                            item.label === "Admin Panel" ? "bg-[#3b82f6]/10 text-[#7EA1FF]" : "text-zinc-300 hover:bg-white/[0.05]"
+                          }`}
+                        >
+                          {item.label}
+                          <ArrowRight size={16} className="text-white/30" />
+                        </Link>
+                      ))}
+                      <button
+                        onClick={() => { setOpen(false); signOut(); navigate("/") }}
+                        className="flex min-h-12 items-center rounded-2xl px-4 text-left text-base font-semibold text-red-300/80 hover:bg-red-500/10"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid gap-2">
+                      <Link
+                        to="/login"
+                        onClick={() => setOpen(false)}
+                        className="flex min-h-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] px-5 text-base font-semibold text-zinc-200"
+                      >
+                        Login
+                      </Link>
+                      <Link
+                        to="/signup"
+                        onClick={() => setOpen(false)}
+                        className="flex min-h-12 items-center justify-center rounded-2xl bg-[#2563eb] px-5 text-base font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.28)]"
+                      >
+                        Sign Up
+                      </Link>
+                    </div>
+                  )}
+                </div>
+
+                <motion.a
+                  href={wa(WA_MESSAGES.general)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileTap={{ scale: 0.97 }}
+                  className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#3b82f6]/40 bg-[#2563eb] px-5 text-base font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.3)]"
+                >
+                  <WhatsAppIcon />
+                  Talk to me
+                </motion.a>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -169,12 +169,12 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#020408] px-6 pb-8 pt-28 text-white">
+    <main className="relative min-h-screen overflow-hidden bg-[#020408] px-4 pb-8 pt-24 text-white sm:px-6 sm:pt-28">
       <AuthBackground />
       <Navbar />
 
       <div className="relative z-10 mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-6xl flex-col">
-        <section className="grid flex-1 items-center gap-10 py-10 lg:grid-cols-[1fr_460px]">
+        <section className="grid flex-1 items-center gap-8 py-6 sm:py-10 lg:grid-cols-[1fr_460px]">
           <motion.div
             initial={{ opacity: 0, x: -24 }}
             animate={{ opacity: 1, x: 0 }}
@@ -218,7 +218,7 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
             className="relative mx-auto w-full max-w-[460px]"
           >
             <div className="absolute -inset-px rounded-[28px] bg-gradient-to-b from-[#3b82f6]/50 via-white/[0.08] to-transparent opacity-80" />
-            <div className="relative overflow-hidden rounded-[28px] border border-white/[0.1] bg-[#050a12]/80 p-6 shadow-[0_24px_90px_rgba(0,0,0,0.5),0_0_60px_rgba(37,99,235,0.14)] backdrop-blur-2xl sm:p-8">
+            <div className="relative overflow-hidden rounded-[24px] border border-white/[0.1] bg-[#050a12]/80 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.5),0_0_60px_rgba(37,99,235,0.14)] backdrop-blur-2xl sm:rounded-[28px] sm:p-8">
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#60a5fa]/70 to-transparent" />
               <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-[#2563eb]/10 blur-3xl" />
 
@@ -229,7 +229,7 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
                 <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-[#60a5fa]">
                   {isSignup ? "Client access" : "Secure area"}
                 </p>
-                <h2 className="text-3xl font-bold tracking-tight text-white">
+                <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
                   {isSignup ? "Create account" : "Welcome back"}
                 </h2>
                 <p className="mt-3 text-sm leading-relaxed text-zinc-500">

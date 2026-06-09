@@ -316,6 +316,15 @@ export async function deleteFeedbackPost(id: string): Promise<boolean> {
     p_feedback_id: id,
   });
   if (error) {
+    if ((error as { code?: string }).code === "PGRST202") {
+      const { error: deleteError } = await supabase
+        .from(POSTS_TABLE)
+        .delete()
+        .eq("id", id);
+      if (!deleteError) return true;
+      console.error("deleteFeedbackPost fallback failed", deleteError);
+      return false;
+    }
     console.error("deleteFeedbackPost failed", error);
     return false;
   }

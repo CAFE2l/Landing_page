@@ -98,12 +98,12 @@ export default function Hero() {
   }, [])
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center pt-24 md:pt-32 pb-16 md:pb-24 overflow-hidden">
+    <section className="relative flex min-h-[100svh] items-center justify-center overflow-hidden pt-24 pb-14 md:pt-32 md:pb-24">
       <div className="absolute inset-0 bg-dot-grid" />
 
       <motion.div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px] sm:w-[450px] sm:h-[450px] lg:w-[600px] lg:h-[600px] bg-[#2563eb] rounded-full pointer-events-none"
-        style={{ filter: "blur(150px)" }}
+        className="pointer-events-none absolute top-1/2 left-1/2 h-[220px] w-[220px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#2563eb] sm:h-[450px] sm:w-[450px] lg:h-[600px] lg:w-[600px]"
+        style={{ filter: "blur(110px)" }}
         animate={
           !reduceMotion
             ? { scale: [1, 1.1, 1], opacity: [0.15, 0.25, 0.15] }
@@ -173,12 +173,12 @@ export default function Hero() {
 
         <motion.div
           {...fadeUp(0.75)}
-          className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-10 md:mb-16"
+          className="mx-auto mb-10 flex w-full max-w-sm flex-col items-stretch justify-center gap-3 sm:max-w-none sm:flex-row sm:items-center sm:gap-4 md:mb-16"
         >
           <Magnetic strength={0.12}>
             <a
               href="#contact"
-              className="inline-flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-8 py-3.5 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#3b82f6]/40 bg-[#2563eb] px-8 py-3.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300 hover:bg-[#1d4ed8]"
             >
               Start a Project
             </a>
@@ -186,7 +186,7 @@ export default function Hero() {
           <Magnetic strength={0.12}>
             <a
               href="#work"
-              className="glass glass-hover text-zinc-300 px-8 py-3.5 rounded-xl text-sm font-semibold transition-all duration-200"
+              className="glass glass-hover inline-flex min-h-12 items-center justify-center rounded-xl px-8 py-3.5 text-sm font-semibold text-zinc-300 transition-all duration-200"
             >
               View My Work
             </a>

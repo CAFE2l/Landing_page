@@ -13,6 +13,7 @@ import {
   Users as UsersIcon,
   Star,
   ClipboardList,
+  Menu,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn, timeAgo } from "../../lib/utils";
@@ -27,6 +28,7 @@ import toast from "react-hot-toast";
 interface TopbarProps {
   title: string;
   userId?: string;
+  onMenuClick?: () => void;
 }
 
 interface SearchResult {
@@ -44,7 +46,7 @@ interface SearchResult {
   }[];
 }
 
-export default function Topbar({ title, userId }: TopbarProps) {
+export default function Topbar({ title, userId, onMenuClick }: TopbarProps) {
   const navigate = useNavigate();
   const { user: authUser, signOut } = useAuth();
   const { profile } = useUserProfile(userId || authUser?.id);
@@ -224,15 +226,23 @@ export default function Topbar({ title, userId }: TopbarProps) {
   return (
     <header
       className={cn(
-        "fixed right-0 top-0 z-20 flex h-16 items-center gap-4 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-md px-6 transition-all duration-300",
-        collapsed ? "left-16" : "left-60",
+        "fixed right-0 top-0 z-20 flex h-16 items-center gap-3 border-b border-white/5 bg-[#0a0a0f]/90 px-3 backdrop-blur-md transition-all duration-300 sm:px-4 md:gap-4 md:px-6",
+        collapsed ? "left-0 md:left-16" : "left-0 md:left-60",
       )}
     >
+      <button
+        type="button"
+        onClick={onMenuClick}
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-white/70 md:hidden"
+        aria-label="Open admin menu"
+      >
+        <Menu size={18} />
+      </button>
       <motion.h1
         key={title}
         initial={{ opacity: 0, y: -4 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-lg font-semibold text-[#f0f0f5]"
+        className="min-w-0 truncate text-base font-semibold text-[#f0f0f5] sm:text-lg"
       >
         {title}
       </motion.h1>
@@ -266,7 +276,7 @@ export default function Topbar({ title, userId }: TopbarProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -4 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className="absolute right-0 top-full mt-2 w-80 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl"
+              className="absolute right-0 top-full mt-2 w-[calc(100vw-1rem)] max-w-80 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl"
             >
               {searching ? (
                 <div className="flex items-center justify-center py-8">
@@ -350,7 +360,8 @@ export default function Topbar({ title, userId }: TopbarProps) {
       <div ref={notifRef} className="relative">
         <button
           onClick={() => setNotifOpen(!notifOpen)}
-          className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-white/8 bg-white/5 text-white/50 transition-colors hover:text-white"
+          className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-white/50 transition-colors hover:text-white"
+          aria-label="Notifications"
         >
           <Bell size={16} />
           {notifications.length > 0 && (
@@ -367,7 +378,7 @@ export default function Topbar({ title, userId }: TopbarProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -4 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className="absolute right-0 top-full mt-2 w-80 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl"
+              className="absolute right-0 top-full mt-2 w-[calc(100vw-1rem)] max-w-80 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl"
             >
               <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
                 <span className="text-sm font-semibold text-white">
@@ -431,7 +442,9 @@ export default function Topbar({ title, userId }: TopbarProps) {
       <div ref={profileRef} className="relative">
         <button
           onClick={() => setProfileOpen(!profileOpen)}
-          className="flex items-center gap-2 rounded-lg border border-white/8 bg-white/5 px-3 py-1.5 text-sm text-[#f0f0f5] transition-colors hover:bg-white/[0.08]"
+          className="flex h-10 items-center gap-2 rounded-xl border border-white/8 bg-white/5 px-2 text-sm text-[#f0f0f5] transition-colors hover:bg-white/[0.08] sm:px-3"
+          aria-label="Admin profile menu"
+          aria-expanded={profileOpen}
         >
           <UserAvatar user={profile} size="sm" className="h-6 w-6" ring={false} />
           <span className="hidden md:inline">{name}</span>
@@ -448,7 +461,7 @@ export default function Topbar({ title, userId }: TopbarProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -4 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className="absolute right-0 top-full mt-2 w-56 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl"
+              className="absolute right-0 top-full mt-2 w-[calc(100vw-1rem)] max-w-64 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl"
             >
               <div className="border-b border-white/[0.06] px-4 py-3">
                 <div className="flex items-center gap-3">

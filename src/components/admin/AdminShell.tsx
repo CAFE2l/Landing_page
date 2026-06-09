@@ -1,5 +1,7 @@
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
+import { AnimatePresence, motion } from "framer-motion";
+import { useState } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import { useAdminStore } from "../../lib/store/adminStore";
@@ -23,6 +25,7 @@ export default function AdminShell() {
   const location = useLocation();
   const title = pageTitles[location.pathname] || "Admin";
   const { user, isAdmin, loading: authLoading } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   if (authLoading) {
     return (
@@ -38,13 +41,39 @@ export default function AdminShell() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-[#f0f0f5]">
-      <Sidebar />
-      <Topbar title={title} userId={user.id} />
+      <div className="hidden md:block">
+        <Sidebar />
+      </div>
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <motion.div
+              initial={{ x: -260 }}
+              animate={{ x: 0 }}
+              exit={{ x: -260 }}
+              transition={{ type: "spring", stiffness: 280, damping: 30 }}
+              className="h-full w-60 max-w-[82vw]"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Admin navigation"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Sidebar mobile onNavigate={() => setMobileMenuOpen(false)} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <Topbar title={title} userId={user.id} onMenuClick={() => setMobileMenuOpen(true)} />
       <main
-        className="pt-16 pb-12 transition-all duration-300"
-        style={{ marginLeft: collapsed ? 64 : 240 }}
+        className={`pt-16 pb-12 transition-all duration-300 ${collapsed ? "md:ml-16" : "md:ml-60"}`}
       >
-        <div className="p-6">
+        <div className="min-w-0 p-4 sm:p-5 md:p-6">
           <Outlet />
         </div>
       </main>

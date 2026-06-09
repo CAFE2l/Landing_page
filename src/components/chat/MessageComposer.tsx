@@ -227,7 +227,7 @@ export default function MessageComposer({
   }
 
   return (
-    <div className="border-t border-white/[0.06] bg-[#0A0A0F]/90 px-3 py-3 backdrop-blur-md shrink-0 sm:px-4">
+    <div className="safe-bottom shrink-0 border-t border-white/[0.06] bg-[#0A0A0F]/90 px-3 py-3 backdrop-blur-md sm:px-4">
       <AnimatePresence>
         {showAudioRecorder && (
           <div className="mb-2">
@@ -247,13 +247,13 @@ export default function MessageComposer({
             onKeyDown={handleKeyDown}
             placeholder={`Message ${otherUserName}...`}
             rows={1}
-            className="w-full min-h-[42px] max-h-[120px] resize-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 pr-36 text-sm text-white outline-none transition-all placeholder:text-[#4A4A5A] focus:border-[#4F6EF7]/40"
+            className="w-full min-h-[44px] max-h-[120px] resize-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-base text-white outline-none transition-all placeholder:text-[#4A4A5A] focus:border-[#4F6EF7]/40 sm:py-2.5 sm:pr-36 sm:text-sm"
           />
-          <div className="absolute bottom-1.5 right-2 flex items-center gap-0.5">
+          <div className="mt-2 flex items-center justify-between gap-1 sm:absolute sm:bottom-1.5 sm:right-2 sm:mt-0 sm:justify-start sm:gap-0.5">
             <button
               type="button"
               onClick={() => { closePanels(); mediaFileRef.current?.click() }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7] sm:h-8 sm:w-8 sm:text-[#4A4A5A]"
               title="Attach image or video"
               aria-label="Attach image or video"
             >
@@ -269,7 +269,7 @@ export default function MessageComposer({
             <button
               type="button"
               onClick={() => { closePanels(); docFileRef.current?.click() }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7] sm:h-8 sm:w-8 sm:text-[#4A4A5A]"
               title="Attach file"
               aria-label="Attach file"
             >
@@ -285,7 +285,7 @@ export default function MessageComposer({
             <button
               type="button"
               onClick={() => { setShowStickers(!showStickers); setShowEmoji(false); setShowAudioRecorder(false) }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7] sm:h-8 sm:w-8 sm:text-[#4A4A5A]"
               title="Sticker"
               aria-label="Open stickers"
             >
@@ -294,7 +294,7 @@ export default function MessageComposer({
             <button
               type="button"
               onClick={() => { setShowEmoji(!showEmoji); setShowStickers(false); setShowAudioRecorder(false) }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7] sm:h-8 sm:w-8 sm:text-[#4A4A5A]"
               title="Emoji"
               aria-label="Open emoji picker"
             >
@@ -303,7 +303,7 @@ export default function MessageComposer({
             <button
               type="button"
               onClick={() => { setShowAudioRecorder(!showAudioRecorder); setShowEmoji(false); setShowStickers(false) }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7] sm:h-8 sm:w-8 sm:text-[#4A4A5A]"
               title="Record audio"
               aria-label="Record audio"
             >
@@ -316,7 +316,7 @@ export default function MessageComposer({
           type="button"
           onClick={handleSend}
           disabled={sending || !input.trim() || !!pendingMedia}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white transition-all hover:shadow-[0_0_16px_rgba(37,99,235,0.3)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white transition-all hover:shadow-[0_0_16px_rgba(37,99,235,0.3)] disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-10"
           title="Send"
           aria-label="Send message"
         >

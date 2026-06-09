@@ -317,7 +317,7 @@ function OrderCard({
           </div>
 
           {/* Financials */}
-          <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
             <div className="rounded-xl border border-white/[0.05] bg-white/[0.025] px-3 py-2.5 text-center">
               <p className="text-[10px] uppercase tracking-wider text-white/30 mb-0.5">Total</p>
               <p className="text-sm font-bold text-white">${order.totalPrice}</p>
@@ -413,7 +413,7 @@ function OrderCard({
         </AnimatePresence>
 
         {/* Footer actions */}
-        <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-white/[0.05] px-4 py-3">
+        <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-white/[0.05] px-3 py-3 sm:px-4">
           <button
             onClick={() => setExpanded(!expanded)}
             className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-white/35 hover:text-white hover:bg-white/[0.05] transition-colors"
@@ -443,13 +443,14 @@ function OrderCard({
             <div className="relative group/actions ml-auto">
               <button
                 disabled={updating}
-                className="flex items-center gap-1.5 rounded-lg border border-[#4F6EF7]/20 bg-[#4F6EF7]/10 px-3 py-1.5 text-xs font-semibold text-[#7E95FF] hover:bg-[#4F6EF7]/18 transition-colors disabled:opacity-50"
+                className="flex min-h-9 items-center gap-1.5 rounded-lg border border-[#4F6EF7]/20 bg-[#4F6EF7]/10 px-3 py-1.5 text-xs font-semibold text-[#7E95FF] transition-colors hover:bg-[#4F6EF7]/18 disabled:opacity-50"
+                aria-label="Update order status"
               >
                 {updating ? <Loader2 size={12} className="animate-spin" /> : <Edit3 size={12} />}
                 Update
                 <ChevronDown size={11} />
               </button>
-              <div className="absolute right-0 top-full mt-1.5 w-58 origin-top-right rounded-xl border border-white/[0.08] bg-[#0a0a10] shadow-2xl opacity-0 invisible group-hover/actions:opacity-100 group-hover/actions:visible transition-all duration-150 z-20 py-1">
+              <div className="invisible absolute right-0 top-full z-20 mt-1.5 w-58 origin-top-right rounded-xl border border-white/[0.08] bg-[#0a0a10] py-1 opacity-0 shadow-2xl transition-all duration-150 group-focus-within/actions:visible group-focus-within/actions:opacity-100 group-hover/actions:visible group-hover/actions:opacity-100">
                 {availableActions.map((action) => (
                   <button
                     key={action.to}
