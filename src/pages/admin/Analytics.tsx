@@ -65,7 +65,7 @@ export default function Analytics() {
       className="space-y-6"
     >
       {/* Period Selector */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="mobile-scroll-x flex items-center gap-2 pb-1">
         <div className="flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl p-1 w-fit">
           {ranges.map((r) => (
             <button
@@ -85,19 +85,19 @@ export default function Analytics() {
 
       {/* Custom Date Range */}
       {range === "Custom" && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
             type="date"
             value={customRange.from}
             onChange={(e) => setCustomRange((prev) => ({ ...prev, from: e.target.value }))}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white outline-none"
+            className="touch-target rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white outline-none"
           />
           <span className="text-white/30 text-sm">até</span>
           <input
             type="date"
             value={customRange.to}
             onChange={(e) => setCustomRange((prev) => ({ ...prev, to: e.target.value }))}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white outline-none"
+            className="touch-target rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white outline-none"
           />
         </div>
       )}

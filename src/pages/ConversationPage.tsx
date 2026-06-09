@@ -66,7 +66,7 @@ export default function ConversationPage() {
       <div className="flex items-center gap-3 mb-4">
         <Link
           to="/dashboard/messages"
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.06] text-white/50 hover:text-white hover:bg-white/[0.06] transition-all"
+          className="touch-target flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.06] text-white/50 hover:text-white hover:bg-white/[0.06] transition-all"
         >
           <ArrowLeft size={16} />
         </Link>

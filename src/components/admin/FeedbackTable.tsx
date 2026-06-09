@@ -56,6 +56,7 @@ export default function FeedbackTable({ feedbacks, onApprove, onReject, onDelete
         </motion.div>
       )}
 
+      {/* Desktop grid header */}
       <div className="hidden lg:grid lg:grid-cols-[36px_1fr_0.7fr_0.5fr_0.5fr_0.5fr_0.5fr_1fr] gap-4 border-b border-white/[0.08] bg-white/[0.02] px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-[#6b6b80]">
         <div className="flex items-center">
           <input
@@ -86,12 +87,84 @@ export default function FeedbackTable({ feedbacks, onApprove, onReject, onDelete
             const expanded = expandedId === feedback.id
             return (
               <div key={feedback.id}>
+                {/* Mobile card layout */}
+                <div className="lg:hidden border-b border-white/[0.04] p-4 transition-colors hover:bg-white/[0.02]">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(feedback.id)}
+                      onChange={() => toggleSelect(feedback.id)}
+                      className="mt-1 h-4 w-4 shrink-0 rounded border-white/[0.08] bg-white/[0.04] accent-[#4f6ef7]"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <UserAvatar user={{ name: feedback.userName }} size="sm" ring={false} />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[#f0f0f5] truncate">{feedback.userName}</p>
+                          {feedback.userEmail && <p className="text-xs text-[#6b6b80] truncate">{feedback.userEmail}</p>}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setExpandedId(expanded ? null : feedback.id)}
+                        className="mt-2 flex items-center gap-1.5 text-sm text-[#f0f0f5] hover:text-[#4f6ef7] transition-colors"
+                      >
+                        <ChevronDown size={14} className={cn("shrink-0 transition-transform", expanded && "rotate-180")} />
+                        <span className="truncate">{feedback.title || "Untitled"}</span>
+                      </button>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-[#6b6b80] capitalize">{feedback.channel}</span>
+                        <StatusBadge status={feedback.status} />
+                        {feedback.mediaCount > 0 && (
+                          <span className="inline-flex items-center gap-1 text-xs text-[#6b6b80]">
+                            <ImageIcon size={12} />
+                            {feedback.mediaCount}
+                          </span>
+                        )}
+                        <span className="text-xs text-[#6b6b80]">
+                          {formatDate(feedback.createdAt, "MMM dd")}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          onClick={() => openFeedbackDrawer(feedback.id)}
+                          className="touch-target flex items-center justify-center rounded-lg p-2 text-[#6b6b80] hover:bg-white/[0.06] hover:text-[#f0f0f5] transition-colors"
+                          title="View details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          onClick={() => onApprove(feedback.id)}
+                          className="touch-target flex items-center justify-center rounded-lg p-2 text-[#6b6b80] hover:bg-green-500/10 hover:text-green-400 transition-colors"
+                          title="Approve"
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button
+                          onClick={() => onReject(feedback.id)}
+                          className="touch-target flex items-center justify-center rounded-lg p-2 text-[#6b6b80] hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                          title="Reject"
+                        >
+                          <X size={16} />
+                        </button>
+                        <button
+                          onClick={() => showConfirm("Delete feedback?", "This action cannot be undone.", () => onDelete(feedback.id))}
+                          className="touch-target flex items-center justify-center rounded-lg p-2 text-[#6b6b80] hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Desktop grid row */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: i * 0.03 }}
                   className={cn(
-                    "grid lg:grid-cols-[36px_1fr_0.7fr_0.5fr_0.5fr_0.5fr_0.5fr_1fr] gap-4 border-b border-white/[0.04] px-5 py-3.5 transition-colors hover:bg-white/[0.02] items-center",
+                    "hidden lg:grid lg:grid-cols-[36px_1fr_0.7fr_0.5fr_0.5fr_0.5fr_0.5fr_1fr] gap-4 border-b border-white/[0.04] px-5 py-3.5 transition-colors hover:bg-white/[0.02] items-center",
                     expanded && "bg-white/[0.02]",
                   )}
                 >
@@ -143,34 +216,36 @@ export default function FeedbackTable({ feedbacks, onApprove, onReject, onDelete
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => openFeedbackDrawer(feedback.id)}
-                      className="rounded-lg p-1.5 text-[#6b6b80] hover:bg-white/[0.06] hover:text-[#f0f0f5] transition-colors"
+                      className="touch-target flex items-center justify-center rounded-lg p-1.5 text-[#6b6b80] hover:bg-white/[0.06] hover:text-[#f0f0f5] transition-colors"
                       title="View details"
                     >
                       <Eye size={15} />
                     </button>
                     <button
                       onClick={() => onApprove(feedback.id)}
-                      className="rounded-lg p-1.5 text-[#6b6b80] hover:bg-green-500/10 hover:text-green-400 transition-colors"
+                      className="touch-target flex items-center justify-center rounded-lg p-1.5 text-[#6b6b80] hover:bg-green-500/10 hover:text-green-400 transition-colors"
                       title="Approve"
                     >
                       <Check size={15} />
                     </button>
                     <button
                       onClick={() => onReject(feedback.id)}
-                      className="rounded-lg p-1.5 text-[#6b6b80] hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                      className="touch-target flex items-center justify-center rounded-lg p-1.5 text-[#6b6b80] hover:bg-red-500/10 hover:text-red-400 transition-colors"
                       title="Reject"
                     >
                       <X size={15} />
                     </button>
                     <button
                       onClick={() => showConfirm("Delete feedback?", "This action cannot be undone.", () => onDelete(feedback.id))}
-                      className="rounded-lg p-1.5 text-[#6b6b80] hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                      className="touch-target flex items-center justify-center rounded-lg p-1.5 text-[#6b6b80] hover:bg-red-500/10 hover:text-red-400 transition-colors"
                       title="Delete"
                     >
                       <Trash2 size={15} />
                     </button>
                   </div>
                 </motion.div>
+
+                {/* Expanded details (shared mobile + desktop) */}
                 <AnimatePresence>
                   {expanded && (
                     <motion.div
@@ -180,7 +255,7 @@ export default function FeedbackTable({ feedbacks, onApprove, onReject, onDelete
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden border-b border-white/[0.04]"
                     >
-                      <div className="px-5 py-4 bg-white/[0.01]">
+                      <div className="px-4 py-4 bg-white/[0.01] lg:px-5">
                         <p className="text-sm text-[#6b6b80] leading-relaxed">{feedback.body}</p>
                         {feedback.verifiedResult && (
                           <div className="mt-3 rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2">
@@ -188,7 +263,7 @@ export default function FeedbackTable({ feedbacks, onApprove, onReject, onDelete
                           </div>
                         )}
                         {feedback.metrics && Object.keys(feedback.metrics).length > 0 && (
-                          <div className="mt-3 flex gap-4">
+                          <div className="mt-3 flex flex-wrap gap-4">
                             {Object.entries(feedback.metrics).map(([key, val]) => (
                               <div key={key} className="text-center">
                                 <p className="text-sm font-semibold text-[#f0f0f5]">{val}</p>

@@ -3,6 +3,7 @@ import type { ServiceOrder, Notification, ProjectStatus, PaymentStatus } from ".
 import type { PhoneFields } from "../components/ui/PhoneInput"
 import { ensureProfileFromAuthUser } from "./supabaseProfile"
 import { isAdminEmail } from "./adminUsers"
+import { createUserNotification } from "./userNotificationService"
 import toast from "react-hot-toast"
 
 type ProfileJoin = { full_name: string | null; avatar_url: string | null } | null
@@ -247,6 +248,18 @@ export async function createServiceOrder(
   }
 
   const order = mapOrder(data as Record<string, unknown>)
+
+  if (order.userId) {
+    await createUserNotification({
+      userId: order.userId,
+      type: "order_created",
+      title: "Order Created",
+      message: `Your ${order.serviceName} order has been created. Proceed to checkout to confirm.`,
+      payload: { orderId: order.id, serviceName: order.serviceName },
+      actionUrl: `/checkout/${order.id}`,
+    })
+  }
+
   return order
 }
 
@@ -360,6 +373,14 @@ export async function confirmPayment(
       `Our team will verify and confirm your payment shortly. You can track your order status in your profile under "My Orders".`,
     ].join("\n")
     await sendBotMessageToUser(order.userId, userMsg, `✅ Payment notification received for ${order.serviceName}`)
+    await createUserNotification({
+      userId: order.userId,
+      type: "payment_claimed",
+      title: "Payment Claimed",
+      message: `Your payment of $${order.upfrontAmount} via ${normalizedMethod.toUpperCase()} has been received and is being verified.`,
+      payload: { orderId, method: normalizedMethod, amount: order.upfrontAmount },
+      actionUrl: "/dashboard/orders",
+    })
   }
 
   // Get the real admin user ID to send the bot message to
@@ -555,7 +576,32 @@ async function sendBotDeliveryMessage(order: ServiceOrder, projectUrl?: string):
     }),
     `Project delivered - ${order.serviceName} - ${displayName}`,
   )
-  void projectUrl
+
+  if (order.userId) {
+    const userMsg = [
+      `🎉 Your project has been delivered!`,
+      ``,
+      `Service: ${order.serviceName}`,
+      ...(projectUrl ? [`Project link: ${projectUrl}`] : []),
+      ``,
+      `━━ How to access ━━`,
+      `1. Go to your Profile page`,
+      `2. Open "My Orders"`,
+      `3. Find the "${order.serviceName}" order`,
+      `4. Click "Access your project"`,
+      ``,
+      `Or click here to go directly: Profile > My Orders`,
+    ].join("\n")
+    await sendBotMessageToUser(order.userId, userMsg, `🎉 ${order.serviceName} has been delivered! Check your profile → My Orders.`)
+    await createUserNotification({
+      userId: order.userId,
+      type: "project_delivered",
+      title: "Project Delivered",
+      message: `Your ${order.serviceName} project has been delivered! Check your orders to access it.`,
+      payload: { orderId: order.id, serviceName: order.serviceName },
+      actionUrl: projectUrl || undefined,
+    })
+  }
 }
 
 export async function sendBotPaymentNotification(order: ServiceOrder, event: string): Promise<void> {
@@ -645,7 +691,31 @@ export async function updateServiceOrder(
 
     if (updates.projectStatus === "paid_upfront" || updates.projectStatus === "paid") {
       const order = await fetchServiceOrder(id)
-      if (order) await sendBotPaymentConfirmation(order)
+      if (order && order.userId) {
+        await sendBotPaymentConfirmation(order)
+        await createUserNotification({
+          userId: order.userId,
+          type: "payment_confirmed",
+          title: "Payment Confirmed",
+          message: `Your payment of $${order.upfrontAmount} for ${order.serviceName} has been confirmed. Your project is ready to start!`,
+          payload: { orderId: id, amount: order.upfrontAmount, serviceName: order.serviceName },
+          actionUrl: "/dashboard/orders",
+        })
+      }
+    }
+
+    if (updates.projectStatus === "in_progress") {
+      const order = await fetchServiceOrder(id)
+      if (order && order.userId) {
+        await createUserNotification({
+          userId: order.userId,
+          type: "project_started",
+          title: "Project Started",
+          message: `Your ${order.serviceName} project is now in progress. We'll keep you updated on the progress.`,
+          payload: { orderId: id, serviceName: order.serviceName },
+          actionUrl: "/dashboard/orders",
+        })
+      }
     }
 
     if (updates.projectStatus === "delivered") {
@@ -736,11 +806,11 @@ export async function markNotificationsRead(): Promise<void> {
   await supabase.from("notifications").update({ is_read: true }).eq("is_read", false)
 }
 
-export async function subscribeToNotifications(onNotification: () => void) {
+export function subscribeToNotifications(onNotification: () => void) {
   const client = supabase
   if (!client || !supabaseConfigured) return () => {}
   const channel = client
-    .channel("notifications")
+    .channel(`notifications:${Date.now()}`)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, onNotification)
     .subscribe()
   return () => { client.removeChannel(channel) }

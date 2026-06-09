@@ -27,8 +27,8 @@ export default function FilterBar() {
 
   return (
     <div className="mb-6 rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl p-4 space-y-4">
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6b6b80]" />
           <input
             value={filters.search}
@@ -38,13 +38,13 @@ export default function FilterBar() {
           />
         </div>
 
-        <div className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] p-1">
+        <div className="mobile-scroll-x flex w-full gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] p-1 sm:w-auto">
           {statusFilters.map((f) => (
             <button
               key={f.value}
               onClick={() => setFilter("status", f.value)}
               className={cn(
-                "relative px-3 py-1.5 text-sm rounded-md transition-all",
+                "relative shrink-0 px-3 py-1.5 text-sm rounded-md transition-all",
                 filters.status === f.value
                   ? "text-[#f0f0f5]"
                   : "text-[#6b6b80] hover:text-[#f0f0f5]",
@@ -57,7 +57,7 @@ export default function FilterBar() {
                   transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 />
               )}
-              <span className="relative z-10">{f.label}</span>
+              <span className="relative z-10 whitespace-nowrap">{f.label}</span>
             </button>
           ))}
         </div>
@@ -65,7 +65,7 @@ export default function FilterBar() {
         <select
           value={filters.channel}
           onChange={(e) => setFilter("channel", e.target.value as FeedbackChannel | "all")}
-          className="h-9 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-sm text-[#f0f0f5] outline-none focus:border-[#4f6ef7]/50 transition-all"
+          className="w-full h-9 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-sm text-[#f0f0f5] outline-none focus:border-[#4f6ef7]/50 transition-all sm:w-auto"
         >
           {channelOptions.map((o) => (
             <option key={o.value} value={o.value} className="bg-[#050508]">{o.label}</option>
@@ -75,14 +75,14 @@ export default function FilterBar() {
         <select
           value={filters.sort}
           onChange={(e) => setFilter("sort", e.target.value as "newest" | "oldest" | "upvoted")}
-          className="h-9 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-sm text-[#f0f0f5] outline-none focus:border-[#4f6ef7]/50 transition-all"
+          className="w-full h-9 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-sm text-[#f0f0f5] outline-none focus:border-[#4f6ef7]/50 transition-all sm:w-auto"
         >
           <option value="newest" className="bg-[#050508]">Newest</option>
           <option value="oldest" className="bg-[#050508]">Oldest</option>
           <option value="upvoted" className="bg-[#050508]">Most Upvoted</option>
         </select>
 
-        <button className="flex h-9 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-sm text-[#6b6b80] hover:text-[#f0f0f5] transition-colors">
+        <button className="flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-sm text-[#6b6b80] hover:text-[#f0f0f5] transition-colors sm:w-auto">
           <Download size={14} />
           Export CSV
         </button>

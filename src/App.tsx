@@ -29,6 +29,7 @@ import { listPublicFeedbacks } from "./data/firestoreStore";
 import { Toaster } from "react-hot-toast";
 import ChatWidget from "./components/chat/ChatWidget";
 import ChatErrorBoundary from "./components/chat/ChatErrorBoundary";
+import NotificationsPage from "./pages/NotificationsPage";
 
 function App() {
   const [feedbacks, setFeedbacks] = useState<FeedbackEntry[]>(() =>
@@ -133,6 +134,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <OrdersDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/notifications"
+            element={
+              <ProtectedRoute>
+                <NotificationsPage />
               </ProtectedRoute>
             }
           />

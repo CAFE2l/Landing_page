@@ -101,7 +101,7 @@ export default function Process() {
               <div className="w-12" />
             </div>
 
-            <div className="p-4 sm:p-6 font-mono text-sm leading-relaxed space-y-6 md:space-y-8">
+            <div className="p-4 sm:p-6 font-mono text-xs sm:text-sm leading-relaxed space-y-6 md:space-y-8 overflow-x-hidden">
               {steps.map((step, i) => (
                 <motion.div
                   key={step.id}
@@ -110,7 +110,7 @@ export default function Process() {
                   viewport={{ once: true, amount: 0.4 }}
                   transition={{ delay: i * 0.3, duration: 0.4 }}
                 >
-                  <p className="text-white font-semibold mb-2">
+                  <p className="text-white font-semibold mb-2 break-words">
                     <span className="text-[#3b82f6]">$</span> {step.command}
                   </p>
 

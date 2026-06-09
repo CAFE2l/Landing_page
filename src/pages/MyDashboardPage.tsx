@@ -194,7 +194,7 @@ export default function MyDashboardPage() {
               </h2>
               <Link
                 to="/feedback"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#3b82f6]/20 bg-[#2563eb]/10 px-3 py-1.5 text-xs font-medium text-[#60a5fa] transition-all duration-200 hover:bg-[#2563eb]/20"
+                className="touch-target inline-flex items-center gap-1.5 rounded-lg border border-[#3b82f6]/20 bg-[#2563eb]/10 px-3 py-2 text-xs font-medium text-[#60a5fa] transition-all duration-200 hover:bg-[#2563eb]/20"
               >
                 <Plus size={13} />
                 New Feedback

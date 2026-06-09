@@ -15,14 +15,14 @@ export default function PageShell({ eyebrow, title, subtitle, children }: PageSh
     <>
       <FloatingOrbs />
       <Navbar />
-      <main className="min-h-screen pt-24 pb-14 sm:pt-32 sm:pb-20">
+      <main className="mobile-page pt-22 pb-14 sm:pt-32 sm:pb-20">
         <section className="container mx-auto px-4 sm:px-6">
           <div className="mb-7 max-w-3xl sm:mb-10">
-            <Link to="/" className="mb-5 inline-flex min-h-11 items-center text-sm font-medium text-[#60a5fa] hover:text-white sm:mb-6">
+            <Link to="/" className="touch-target mb-5 inline-flex min-h-11 items-center text-sm font-medium text-[#60a5fa] hover:text-white sm:mb-6">
               Back to site
             </Link>
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0ea5e9] sm:mb-4 sm:tracking-[0.32em]">{eyebrow}</p>
-            <h1 className="mb-4 text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-6xl">{title}</h1>
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0ea5e9] sm:mb-4 sm:text-[11px] sm:tracking-[0.32em]">{eyebrow}</p>
+            <h1 className="mb-4 break-words text-balance text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-6xl">{title}</h1>
             <p className="max-w-2xl text-sm leading-relaxed text-zinc-500 sm:text-base">{subtitle}</p>
           </div>
           {children}

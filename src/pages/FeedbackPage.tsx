@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Star, PenLine } from "lucide-react";
+import { Star, PenLine, SlidersHorizontal, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getUserDisplayName, getUserAvatar } from "../lib/utils";
 import UserAvatar from "../components/ui/UserAvatar";
@@ -56,6 +56,7 @@ export default function FeedbackPage() {
   const [reactionLoading, setReactionLoading] = useState<Set<string>>(new Set());
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [selectedPost, setSelectedPost] = useState<FeedbackPost | null>(null);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
@@ -303,29 +304,42 @@ export default function FeedbackPage() {
         <UserAvatar user={loggedProfile || userProfile} size="md" />
         <button
           onClick={() => (uid ? setShowForm(true) : setShowLoginPrompt(true))}
-          className="flex-1 rounded-xl border border-white/[0.08] bg-black/20 px-4 py-2.5 text-left text-sm text-[#6B6B80] transition-colors hover:border-[#4F6EF7]/30 hover:text-[#F0F0F5]"
+          className="touch-target flex-1 rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-left text-sm text-[#6B6B80] transition-colors hover:border-[#4F6EF7]/30 hover:text-[#F0F0F5]"
         >
           Share your feedback...
         </button>
         <button
           onClick={() => (uid ? setShowForm(true) : setShowLoginPrompt(true))}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#4F6EF7] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#6B85FF] shadow-[0_0_20px_rgba(79,110,247,0.15)] transition-all"
+          className="touch-target inline-flex items-center gap-2 rounded-xl bg-[#4F6EF7] px-4 py-3 text-sm font-semibold text-white hover:bg-[#6B85FF] shadow-[0_0_20px_rgba(79,110,247,0.15)] transition-all"
         >
           <PenLine size={16} />
           <span className="hidden sm:inline">Share Your Feedback</span>
         </button>
       </div>
 
-      <div className="flex gap-6">
-        <FeedbackSidebar
-          category={category}
-          onCategoryChange={setCategory}
-          rating={rating}
-          onRatingChange={setRating}
-          search={searchInput}
-          onSearch={setSearchInput}
-          categoryCounts={categoryCounts}
-        />
+      {/* Mobile filter toggle */}
+      <div className="mb-4 lg:hidden">
+        <button
+          onClick={() => setShowMobileFilters(!showMobileFilters)}
+          className="touch-target flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-white/[0.08]"
+        >
+          {showMobileFilters ? <X size={16} /> : <SlidersHorizontal size={16} />}
+          {showMobileFilters ? "Close filters" : "Filters & search"}
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <div className={`${showMobileFilters ? 'block' : 'hidden'} lg:block lg:w-72 lg:shrink-0`}>
+          <FeedbackSidebar
+            category={category}
+            onCategoryChange={(val) => { setCategory(val); setShowMobileFilters(false) }}
+            rating={rating}
+            onRatingChange={(val) => { setRating(val); setShowMobileFilters(false) }}
+            search={searchInput}
+            onSearch={setSearchInput}
+            categoryCounts={categoryCounts}
+          />
+        </div>
 
         <FeedbackFeed
           posts={posts}

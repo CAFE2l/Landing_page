@@ -77,7 +77,7 @@ export default function SavedPostsPage() {
           </p>
           <Link
             to="/feedback"
-            className="inline-flex items-center gap-2 rounded-xl bg-[#4F6EF7] px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#6B85FF]"
+            className="touch-target inline-flex items-center gap-2 rounded-xl bg-[#4F6EF7] px-5 py-3 text-sm font-semibold text-white transition-all hover:bg-[#6B85FF]"
           >
             <MessageCircle size={16} />
             Open feedback forum

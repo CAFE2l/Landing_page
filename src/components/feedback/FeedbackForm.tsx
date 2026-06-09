@@ -94,6 +94,8 @@ export default function FeedbackForm({
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadIdRef = useRef(0);
+  const launchDate = "2026-06-06";
+  const today = new Date().toISOString().split("T")[0];
 
   const reset = () => {
     setStep(0);
@@ -247,6 +249,10 @@ export default function FeedbackForm({
   };
 
   const handleSubmit = () => {
+    if (serviceDate && (serviceDate < launchDate || serviceDate > today)) {
+      setServiceDate("");
+      return;
+    }
     onSubmit({
       serviceCategory,
       projectTitle: projectTitle.trim(),
@@ -482,6 +488,8 @@ export default function FeedbackForm({
                             type="date"
                             value={serviceDate}
                             onChange={(e) => setServiceDate(e.target.value)}
+                            min={launchDate}
+                            max={today}
                             className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-5 py-3 text-sm text-white outline-none focus:border-[#4F6EF7]/50 transition-all [color-scheme:dark]"
                           />
                         </div>

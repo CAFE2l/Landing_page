@@ -102,8 +102,8 @@ export default function Hero() {
       <div className="absolute inset-0 bg-dot-grid" />
 
       <motion.div
-        className="pointer-events-none absolute top-1/2 left-1/2 h-[220px] w-[220px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#2563eb] sm:h-[450px] sm:w-[450px] lg:h-[600px] lg:w-[600px]"
-        style={{ filter: "blur(110px)" }}
+        className="pointer-events-none absolute top-1/2 left-1/2 h-[180px] w-[180px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#2563eb] sm:h-[450px] sm:w-[450px] lg:h-[600px] lg:w-[600px]"
+        style={{ filter: "blur(80px)" }}
         animate={
           !reduceMotion
             ? { scale: [1, 1.1, 1], opacity: [0.15, 0.25, 0.15] }
@@ -138,7 +138,7 @@ export default function Hero() {
           initial="hidden"
           animate="visible"
         >
-          <span className="block text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-white leading-[1.05] tracking-tight">
+          <span className="block text-xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-white leading-[1.05] tracking-tight">
             {titleLine1.split(" ").map((word, i) => (
               <motion.span
                 key={`l1-${i}`}
@@ -195,7 +195,7 @@ export default function Hero() {
 
         <motion.div
           {...fadeUp(0.9)}
-          className="flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-8 gap-y-2 text-xs sm:text-sm text-zinc-600"
+          className="flex flex-wrap items-center justify-center gap-x-3 sm:gap-x-8 gap-y-1.5 text-xs sm:text-sm text-zinc-600"
         >
           {statLabels.map((s, i) => (
             <span key={s.key} className="flex items-center gap-1.5">

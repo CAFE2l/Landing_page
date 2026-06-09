@@ -107,7 +107,7 @@ function CopyButton({ value, label = "Copy" }: { value: string; label?: string }
     <button
       type="button"
       onClick={copy}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] px-2.5 py-1.5 text-xs text-zinc-400 transition-all hover:bg-white/[0.06] hover:text-white"
+      className="touch-target inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.08] px-3 py-1.5 text-xs text-zinc-400 transition-all hover:bg-white/[0.06] hover:text-white"
     >
       {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
       {copied ? "Copied" : label}
@@ -236,10 +236,10 @@ function PaymentInstructions({
       </div>
 
       <div className={cn("space-y-3 rounded-2xl border p-4", isPayPal ? "border-[#0070BA]/30 bg-[#0070BA]/10" : "border-cyan-400/25 bg-cyan-400/8")}>
-        <div className="flex items-center justify-between gap-3">
-          <div>
+        <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between">
+          <div className="min-w-0">
             <p className="text-xs text-zinc-500">{isPayPal ? "PayPal email" : "Wise email"}</p>
-            <p className={cn("font-bold", isPayPal ? "text-[#4DB4FF]" : "text-cyan-200")}>{isPayPal ? PAYPAL_EMAIL : WISE_DETAILS.email}</p>
+            <p className={cn("break-all font-bold", isPayPal ? "text-[#4DB4FF]" : "text-cyan-200")}>{isPayPal ? PAYPAL_EMAIL : WISE_DETAILS.email}</p>
           </div>
           <CopyButton value={isPayPal ? PAYPAL_EMAIL : WISE_DETAILS.email} />
         </div>
@@ -258,10 +258,10 @@ function PaymentInstructions({
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
-        <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-4 py-3 text-sm text-zinc-400">
+        <div className="min-w-0 rounded-xl border border-white/[0.07] bg-white/[0.03] px-4 py-3 text-sm text-zinc-400">
           Amount to send: <span className="font-semibold text-white">${order.upfrontAmount} USD</span>
           <br />
-          Reference: <span className="font-mono text-xs text-zinc-300">{order.id}</span>
+          Reference: <span className="break-all font-mono text-xs text-zinc-300">{order.id}</span>
         </div>
         <CopyButton value={details} label="Copy details" />
       </div>
@@ -369,7 +369,7 @@ export default function CheckoutPage() {
   return (
     <div className="relative min-h-screen text-[#f0f0f5]">
       <TechPremiumBackground />
-      <div className="container relative z-10 mx-auto max-w-3xl px-4 py-6 sm:py-12">
+      <div className="container relative z-10 mx-auto max-w-3xl px-4 pb-28 pt-6 sm:py-12">
         <Link to="/" className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-white sm:mb-8">
           <ArrowLeft size={15} />
           Back to Home

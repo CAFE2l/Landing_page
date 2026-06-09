@@ -271,8 +271,8 @@ export default function Clients() {
       </div>
 
       {/* Search + Filters + Add */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-[220px] flex-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative min-w-0 flex-1">
           <Search
             size={16}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6b6b80]"
@@ -284,12 +284,12 @@ export default function Clients() {
             className="h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] pl-9 pr-3 text-sm text-[#f0f0f5] outline-none transition-all placeholder:text-[#6b6b80] focus:border-[#4f6ef7]/50"
           />
         </div>
-        <div className="flex gap-1.5">
+        <div className="mobile-scroll-x flex w-full gap-1.5 sm:w-auto">
           {(["all", "active", "new", "inactive"] as const).map((s) => (
             <button
               key={s}
               onClick={() => setFilterStatus(s)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+              className={`min-h-10 shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
                 filterStatus === s
                   ? "bg-[#4f6ef7] text-white"
                   : "border border-white/[0.08] text-[#6b6b80] hover:border-white/[0.15] hover:text-[#f0f0f5]"
@@ -301,7 +301,7 @@ export default function Clients() {
         </div>
         <button
           onClick={() => setInviteOpen(true)}
-          className="flex items-center gap-2 rounded-xl bg-[#4f6ef7] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#6b85ff]"
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#4f6ef7] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#6b85ff] sm:w-auto"
         >
           <Plus size={16} />
           Add Client
@@ -389,15 +389,16 @@ export default function Clients() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4"
             onClick={() => setInviteOpen(false)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, y: 26 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 18 }}
+              transition={{ type: "spring", stiffness: 260, damping: 24 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md rounded-2xl border border-white/[0.08] bg-[#050508] p-6 shadow-2xl"
+              className="safe-bottom w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border border-white/[0.08] bg-[#050508] p-6 shadow-2xl"
             >
               <h2 className="text-lg font-semibold text-[#f0f0f5]">
                 Invite client
@@ -411,7 +412,7 @@ export default function Clients() {
                 </span>
                 <button
                   onClick={handleCopy}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#6b6b80] transition-colors hover:bg-white/[0.06] hover:text-[#f0f0f5]"
+                  className="touch-target flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[#6b6b80] transition-colors hover:bg-white/[0.06] hover:text-[#f0f0f5]"
                 >
                   {copied ? (
                     <Check size={15} className="text-green-400" />
@@ -426,7 +427,7 @@ export default function Clients() {
                     setInviteOpen(false);
                     setCopied(false);
                   }}
-                  className="rounded-xl border border-white/[0.08] px-4 py-2 text-sm text-[#6b6b80] hover:text-[#f0f0f5]"
+                  className="touch-target rounded-xl border border-white/[0.08] px-4 py-2 text-sm text-[#6b6b80] hover:text-[#f0f0f5]"
                 >
                   Close
                 </button>
@@ -600,37 +601,40 @@ function ClientCard({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.03 }}
-      className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 transition-colors hover:bg-white/[0.04]"
+      className="min-w-0 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 transition-colors hover:bg-white/[0.04]"
     >
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <UserAvatar user={client} size="md" ring={false} />
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <p className="text-sm font-medium text-[#f0f0f5]">
+              <p className="truncate text-sm font-medium text-[#f0f0f5]">
                 {client.name}
               </p>
               <StatusBadge status={client.status} />
             </div>
-            <p className="text-xs text-[#6b6b80]">{client.email}</p>
+            <p className="truncate text-xs text-[#6b6b80]">{client.email}</p>
           </div>
         </div>
-        <div className="flex gap-1">
+        <div className="flex shrink-0 gap-1">
           <button
             onClick={onView}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] text-[#6b6b80] hover:text-[#f0f0f5]"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.06] text-[#6b6b80] hover:text-[#f0f0f5]"
+            aria-label={`View ${client.name}`}
           >
             <FileText size={13} />
           </button>
           <button
             onClick={onMessage}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] text-[#6b6b80] hover:text-[#4f6ef7]"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.06] text-[#6b6b80] hover:text-[#4f6ef7]"
+            aria-label={`Message ${client.name}`}
           >
             <MessageCircle size={13} />
           </button>
           <button
             onClick={onDelete}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] text-[#6b6b80] hover:border-red-500/20 hover:text-red-400"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.06] text-[#6b6b80] hover:border-red-500/20 hover:text-red-400"
+            aria-label={`Delete ${client.name}`}
           >
             <Trash2 size={13} />
           </button>
@@ -662,9 +666,9 @@ function ClientCard({
           <p className="text-[9px] text-[#6b6b80]">Msgs</p>
         </div>
       </div>
-      <div className="mt-2 flex items-center justify-between text-[10px] text-[#4a4a5a]">
-        <span>{client.company || "No company"}</span>
-        <span>{client.lastActivity ? timeAgo(client.lastActivity) : "—"}</span>
+      <div className="mt-2 flex items-center justify-between gap-3 text-[10px] text-[#4a4a5a]">
+        <span className="min-w-0 truncate">{client.company || "No company"}</span>
+        <span className="shrink-0">{client.lastActivity ? timeAgo(client.lastActivity) : "—"}</span>
       </div>
     </motion.div>
   );
@@ -745,6 +749,15 @@ function ClientDrawer({
     followers: 0,
     following: 0,
   });
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   useEffect(() => {
     setAvatarUrl(client.avatarUrl || "");
@@ -811,15 +824,15 @@ function ClientDrawer({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={onClose}
-      className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-stretch sm:justify-end"
     >
       <motion.aside
-        initial={{ x: "100%" }}
-        animate={{ x: 0 }}
-        exit={{ x: "100%" }}
+        initial={isMobile ? { y: "100%" } : { x: "100%" }}
+        animate={isMobile ? { y: 0 } : { x: 0 }}
+        exit={isMobile ? { y: "100%" } : { x: "100%" }}
         transition={{ type: "spring", stiffness: 400, damping: 40 }}
         onClick={(e) => e.stopPropagation()}
-        className="fixed right-0 top-0 z-50 flex h-full w-full max-w-[480px] flex-col border-l border-white/[0.08] bg-[#050508]/95 shadow-[-20px_0_60px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+        className="safe-bottom relative z-50 flex w-full flex-col overflow-hidden rounded-t-2xl border border-white/[0.08] bg-[#050508]/95 shadow-[-20px_0_60px_rgba(0,0,0,0.5)] backdrop-blur-xl sm:fixed sm:right-0 sm:top-0 sm:h-full sm:w-full sm:max-w-[480px] sm:rounded-none sm:border-l"
       >
         {/* Fixed close button */}
         <button

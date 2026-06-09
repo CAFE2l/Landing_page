@@ -233,7 +233,7 @@ export default function Topbar({ title, userId, onMenuClick }: TopbarProps) {
       <button
         type="button"
         onClick={onMenuClick}
-        className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-white/70 md:hidden"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-white/70 md:hidden touch-target"
         aria-label="Open admin menu"
       >
         <Menu size={18} />
@@ -250,7 +250,7 @@ export default function Topbar({ title, userId, onMenuClick }: TopbarProps) {
       <div className="flex-1" />
 
       {/* — Global Search — */}
-      <div ref={searchRef} className="relative hidden sm:block">
+      <div ref={searchRef} className="relative hidden min-[390px]:block">
         <Search
           size={16}
           className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
@@ -265,7 +265,7 @@ export default function Topbar({ title, userId, onMenuClick }: TopbarProps) {
             if (e.key === "Escape") setSearchOpen(false);
           }}
           placeholder="Search..."
-          className="h-9 w-64 rounded-lg border border-white/8 bg-white/5 pl-9 pr-3 text-sm text-[#f0f0f5] placeholder:text-white/30 outline-none focus:border-[#4f6ef7]/50 transition-all"
+          className="h-9 w-full rounded-lg border border-white/8 bg-white/5 pl-9 pr-3 text-sm text-[#f0f0f5] placeholder:text-white/30 outline-none transition-all focus:border-[#4f6ef7]/50 sm:w-56 lg:w-64"
         />
 
         {/* Search results dropdown */}
@@ -276,7 +276,7 @@ export default function Topbar({ title, userId, onMenuClick }: TopbarProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -4 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className="absolute right-0 top-full mt-2 w-[calc(100vw-1rem)] max-w-80 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl"
+              className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-80 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl sm:w-80"
             >
               {searching ? (
                 <div className="flex items-center justify-center py-8">
@@ -360,7 +360,7 @@ export default function Topbar({ title, userId, onMenuClick }: TopbarProps) {
       <div ref={notifRef} className="relative">
         <button
           onClick={() => setNotifOpen(!notifOpen)}
-          className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-white/50 transition-colors hover:text-white"
+          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-white/50 transition-colors hover:text-white touch-target"
           aria-label="Notifications"
         >
           <Bell size={16} />
@@ -378,7 +378,7 @@ export default function Topbar({ title, userId, onMenuClick }: TopbarProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -4 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className="absolute right-0 top-full mt-2 w-[calc(100vw-1rem)] max-w-80 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl"
+              className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-80 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl sm:w-80"
             >
               <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
                 <span className="text-sm font-semibold text-white">
@@ -442,7 +442,7 @@ export default function Topbar({ title, userId, onMenuClick }: TopbarProps) {
       <div ref={profileRef} className="relative">
         <button
           onClick={() => setProfileOpen(!profileOpen)}
-          className="flex h-10 items-center gap-2 rounded-xl border border-white/8 bg-white/5 px-2 text-sm text-[#f0f0f5] transition-colors hover:bg-white/[0.08] sm:px-3"
+          className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-white/8 bg-white/5 px-2 text-sm text-[#f0f0f5] transition-colors hover:bg-white/[0.08] sm:px-3 touch-target"
           aria-label="Admin profile menu"
           aria-expanded={profileOpen}
         >
@@ -461,7 +461,7 @@ export default function Topbar({ title, userId, onMenuClick }: TopbarProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -4 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className="absolute right-0 top-full mt-2 w-[calc(100vw-1rem)] max-w-64 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl"
+              className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-64 origin-top-right overflow-hidden rounded-xl border border-white/[0.08] bg-[#0a0a0f] shadow-2xl sm:w-64"
             >
               <div className="border-b border-white/[0.06] px-4 py-3">
                 <div className="flex items-center gap-3">

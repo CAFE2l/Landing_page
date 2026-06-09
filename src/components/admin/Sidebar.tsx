@@ -88,7 +88,8 @@ export default function Sidebar({
             >
               <div
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-150",
+                  "flex items-center gap-3 rounded-lg px-3 text-sm transition-all duration-150 min-h-[44px]",
+                  mobile ? "py-3" : "py-2.5",
                   isActive
                     ? "bg-white/[0.08] text-white border-l-2 border-blue-500 rounded-none pl-[10px]"
                     : "text-white/50 hover:bg-white/5 hover:text-white",
@@ -115,7 +116,8 @@ export default function Sidebar({
           target="_blank"
           rel="noopener noreferrer"
           className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 text-white/50 hover:bg-white/5 hover:text-white",
+            "flex items-center gap-3 rounded-lg px-3 text-sm transition-colors duration-150 text-white/50 hover:bg-white/5 hover:text-white min-h-[44px]",
+            mobile ? "py-3" : "py-2.5",
             compact && "justify-center px-0",
           )}
         >
@@ -124,7 +126,7 @@ export default function Sidebar({
         </a>
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/50 transition-colors duration-150 hover:bg-white/5 hover:text-red-400"
+          className="flex w-full items-center gap-3 rounded-lg px-3 text-sm text-white/50 transition-colors duration-150 hover:bg-white/5 hover:text-red-400 min-h-[44px]"
         >
           <LogOut size={18} className="shrink-0" />
           {!compact && <span>Logout</span>}

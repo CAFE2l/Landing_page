@@ -56,7 +56,7 @@ return (
       className="space-y-6"
     >
       {/* Tab Bar */}
-      <div className="flex items-center gap-1 rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl p-1 w-fit overflow-x-auto">
+      <div className="mobile-scroll-x flex items-center gap-1 rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl p-1 w-fit">
         {TABS.map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id

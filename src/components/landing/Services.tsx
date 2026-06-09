@@ -83,7 +83,7 @@ export default function Services() {
                   <service.icon className="text-zinc-400 group-hover:text-[#0ea5e9] transition-colors duration-300" size={20} />
                 </div>
 
-                <h3 className="text-base font-semibold text-white mb-2.5">
+                <h3 className="text-[15px] sm:text-base font-semibold text-white mb-2.5">
                   {service.title}
                 </h3>
                 <p className="text-sm text-zinc-500 leading-relaxed mb-4">
@@ -91,7 +91,7 @@ export default function Services() {
                 </p>
                 <a
                   href="#contact"
-                  className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 group-hover:text-[#0ea5e9] transition-colors duration-200"
+                  className="touch-target inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 group-hover:text-[#0ea5e9] transition-colors duration-200"
                 >
                   Learn more
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>

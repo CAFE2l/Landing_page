@@ -134,7 +134,7 @@ export default function AdminFeedbackManagement() {
       className="space-y-6"
     >
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-white/[0.06] pb-4">
+      <div className="mobile-scroll-x flex gap-2 border-b border-white/[0.06] pb-4">
         {(["posts", "categories", "stats"] as AdminTab[]).map((t) => (
           <button
             key={t}
@@ -153,21 +153,21 @@ export default function AdminFeedbackManagement() {
       {tab === "posts" && (
         <div>
           {/* Filters */}
-          <div className="flex flex-wrap gap-3 mb-5">
-            <div className="relative flex-1 min-w-[200px]">
+          <div className="flex flex-col gap-3 mb-5 sm:flex-row sm:flex-wrap">
+            <div className="relative flex-1 min-w-0">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B80]" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search feedbacks..."
-                className="w-full bg-[#0A0A0F] border border-[#1E1E2A] rounded-xl pl-9 pr-4 py-2.5 text-sm text-[#F0F0F5] placeholder-[#6B6B80] focus:outline-none focus:border-[#4F6EF7]/50 transition-all"
+                className="w-full bg-[#0A0A0F] border border-[#1E1E2A] rounded-xl pl-9 pr-4 py-3 text-sm text-[#F0F0F5] placeholder-[#6B6B80] focus:outline-none focus:border-[#4F6EF7]/50 transition-all"
               />
             </div>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as FeedbackStatus | "all")}
-              className="bg-[#0A0A0F] border border-[#1E1E2A] rounded-xl px-4 py-2.5 text-sm text-[#F0F0F5] focus:outline-none focus:border-[#4F6EF7]/50 transition-all"
+              className="touch-target w-full sm:w-auto bg-[#0A0A0F] border border-[#1E1E2A] rounded-xl px-4 py-3 text-sm text-[#F0F0F5] focus:outline-none focus:border-[#4F6EF7]/50 transition-all"
             >
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
@@ -271,8 +271,21 @@ export default function AdminFeedbackManagement() {
       {/* Reply Modal */}
       <AnimatePresence>
         {showReplyModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowReplyModal(false)}>
-            <div className="relative w-full max-w-lg rounded-2xl border border-white/[0.08] bg-[#0A0A0F] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+            onClick={() => setShowReplyModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 26 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 18 }}
+              transition={{ type: "spring", stiffness: 260, damping: 24 }}
+              onClick={(e) => e.stopPropagation()}
+              className="safe-bottom w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-white/[0.08] bg-[#0A0A0F] p-6 shadow-2xl"
+            >
               <h3 className="text-sm font-bold text-[#F0F0F5] mb-3">Official Reply</h3>
               <textarea
                 value={replyText}
@@ -281,20 +294,20 @@ export default function AdminFeedbackManagement() {
                 rows={4}
                 className="w-full bg-[#0A0A0F] border border-[#1E1E2A] rounded-xl px-4 py-3 text-sm text-[#F0F0F5] placeholder-[#6B6B80] focus:outline-none focus:border-[#4F6EF7]/50 transition-all resize-none mb-4"
               />
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setShowReplyModal(false)} className="px-4 py-2 rounded-xl text-xs font-medium text-[#6B6B80] border border-[#1E1E2A] hover:text-[#F0F0F5] transition-all">
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button onClick={() => setShowReplyModal(false)} className="touch-target w-full sm:w-auto rounded-xl border border-[#1E1E2A] px-4 py-2 text-xs font-medium text-[#6B6B80] hover:text-[#F0F0F5] transition-all">
                   Cancel
                 </button>
                 <button
                   onClick={handleReply}
                   disabled={replying || !replyText.trim()}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#4F6EF7] text-white hover:bg-[#6B85FF] transition-all disabled:opacity-50"
+                  className="touch-target w-full sm:w-auto rounded-xl bg-[#4F6EF7] px-4 py-2 text-xs font-semibold text-white hover:bg-[#6B85FF] transition-all disabled:opacity-50"
                 >
                   {replying ? "Posting..." : "Post Reply"}
                 </button>
               </div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </motion.div>

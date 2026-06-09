@@ -256,7 +256,7 @@ export default function FeaturedWork() {
                       href={wa(plan.waMessage)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-300 ${
+                      className={`touch-target inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-300 ${
                         plan.featured
                           ? "bg-[#2563eb] text-white border border-[#3b82f6]/50 shadow-[0_0_20px_rgba(37,99,235,0.35)] hover:bg-[#1d4ed8]"
                           : "border border-white/[0.1] text-white hover:border-[#3b82f6]/40 hover:bg-[#2563eb]/10"
@@ -269,7 +269,7 @@ export default function FeaturedWork() {
                   ) : (
                     <Link
                       to={`/hire/${plan.preview === "landing" ? "landing-page" : "website"}`}
-                      className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-300 ${
+                      className={`touch-target inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-300 ${
                         plan.featured
                           ? "bg-[#2563eb] text-white border border-[#3b82f6]/50 shadow-[0_0_20px_rgba(37,99,235,0.35)] hover:bg-[#1d4ed8]"
                           : "border border-white/[0.1] text-white hover:border-[#3b82f6]/40 hover:bg-[#2563eb]/10"

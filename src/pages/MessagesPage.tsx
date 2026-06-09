@@ -496,6 +496,7 @@ export default function MessagesPage() {
 
   const handleDelete = async (msg: ChatMessage) => {
     if (msg.senderId !== uid) return
+    if (!window.confirm("Delete this message? This action cannot be undone.")) return
     const ok = await softDeleteMessage(msg.id)
     if (ok) {
       setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, content: "[deleted]", deletedAt: new Date().toISOString() } : m))
@@ -756,6 +757,8 @@ export default function MessagesPage() {
 
   const handleRemoveMemberFromGroup = async (group: Group, userId: string) => {
     if (!uid) return
+    const removingSelf = userId === uid
+    if (!window.confirm(removingSelf ? `Leave ${group.name}?` : "Remove this member from the group?")) return
     const ok = userId === uid
       ? await leaveGroup(group.id)
       : await removeGroupMember(group.id, userId)
@@ -791,6 +794,7 @@ export default function MessagesPage() {
 
   const handleDeleteGroup = async (group: Group) => {
     if (!isGroupAdmin(group)) return
+    if (!window.confirm(`Delete ${group.name}? This cannot be undone.`)) return
     const ok = await deleteGroup(group.id)
     if (!ok) return
     toast.success("Group deleted")
@@ -897,7 +901,7 @@ export default function MessagesPage() {
         id={`message-${msg.id}`}
         className={`group relative flex mb-3 ${isOwn ? "justify-end" : "justify-start"}`}
       >
-        <div className={`relative max-w-[75%] rounded-2xl px-4 py-2.5 pr-8 text-sm leading-relaxed transition-shadow ${
+        <div className={`relative max-w-[86%] break-words rounded-2xl px-3.5 py-2.5 pr-8 text-sm leading-relaxed transition-shadow sm:max-w-[75%] sm:px-4 ${
           isOwn
             ? "bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white rounded-br-md"
             : "bg-white/[0.06] text-[#F0F0F5] rounded-bl-md"
@@ -911,7 +915,7 @@ export default function MessagesPage() {
             <button
               type="button"
               onClick={() => scrollToMessage(replyPreview.id)}
-              className={`mb-1.5 block w-full rounded-lg p-2 text-left text-xs border-l-2 transition-all hover:bg-white/[0.1] ${
+              className={`touch-target mb-1.5 block w-full rounded-lg p-2 text-left text-xs border-l-2 transition-all hover:bg-white/[0.1] ${
               isOwn ? "bg-white/[0.08] border-white/30" : "bg-white/[0.04] border-[#4F6EF7]/50"
             }`}>
               <p className="font-semibold opacity-80">{replyPreview.senderName}</p>
@@ -928,16 +932,16 @@ export default function MessagesPage() {
           )}
 
           {msg.messageType === "image" || msg.messageType === "video" ? (
-            <div>
+            <div className="max-w-[90vw] sm:max-w-full">
               {msg.mediaUrl && (
                 msg.messageType === "video"
-                  ? <video src={msg.mediaUrl} controls className="max-w-full rounded-lg max-h-60" />
-                  : <img src={msg.mediaUrl} alt="" className="max-w-full rounded-lg max-h-60 object-cover" />
+                  ? <video src={msg.mediaUrl} controls preload="metadata" playsInline className="max-h-56 w-full rounded-lg object-contain sm:max-h-60" />
+                  : <img src={msg.mediaUrl} alt="" loading="lazy" decoding="async" className="max-h-56 w-full rounded-lg object-cover sm:max-h-60" />
               )}
               {msg.caption && <p className="mt-1 text-xs opacity-80">{msg.caption}</p>}
             </div>
           ) : msg.messageType === "audio" ? (
-            <audio src={msg.mediaUrl!} controls className="max-w-full h-10" />
+            <audio src={msg.mediaUrl!} controls preload="metadata" className="h-10 max-w-full" />
           ) : msg.messageType === "sticker" ? (
             <img src={msg.mediaUrl!} alt="Sticker" className="w-24 h-24 object-contain" />
           ) : msg.messageType === "file" && msg.mediaUrl ? (
@@ -946,7 +950,7 @@ export default function MessagesPage() {
                 href={msg.mediaUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`flex items-center gap-3 rounded-xl p-3 transition-all ${
+                className={`touch-target flex items-center gap-3 rounded-xl p-3 transition-all ${
                   isOwn
                     ? "bg-white/[0.08] hover:bg-white/[0.12]"
                     : "bg-white/[0.04] hover:bg-white/[0.08]"
@@ -987,14 +991,14 @@ export default function MessagesPage() {
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => handleSaveEdit(msg.id)}
-                  className="flex items-center gap-1 rounded-md bg-[#4F6EF7] px-2.5 py-1 text-[10px] font-medium text-white"
+                  className="touch-target flex items-center gap-1 rounded-md bg-[#4F6EF7] px-2.5 py-1 text-[10px] font-medium text-white"
                   aria-label="Save edit"
                 >
                   <Check size={12} /> Save
                 </button>
                 <button
                   onClick={handleCancelEdit}
-                  className="flex items-center gap-1 rounded-md bg-white/[0.08] px-2.5 py-1 text-[10px] font-medium text-white/70 hover:text-white"
+                  className="touch-target flex items-center gap-1 rounded-md bg-white/[0.08] px-2.5 py-1 text-[10px] font-medium text-white/70 hover:text-white"
                   aria-label="Cancel edit"
                 >
                   Cancel
@@ -1020,7 +1024,7 @@ export default function MessagesPage() {
             <div className="absolute right-1 top-1 flex opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
               <button
                 onClick={(e) => { e.stopPropagation(); setDropdownMsgId(showDropdown ? null : msg.id) }}
-                className="flex h-6 w-6 items-center justify-center rounded-lg text-white/55 hover:text-white hover:bg-white/[0.12] transition-all"
+                className="touch-target flex h-7 w-7 items-center justify-center rounded-lg text-white/55 hover:text-white hover:bg-white/[0.12] transition-all"
                 aria-label="Message actions"
                 aria-expanded={showDropdown}
               >
@@ -1038,47 +1042,47 @@ export default function MessagesPage() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -4, scale: 0.98 }}
               transition={{ duration: 0.14 }}
-              className={`absolute z-50 ${isOwn ? "right-1" : "right-1"} top-8 w-40 rounded-xl border border-white/[0.08] bg-[#12121A] shadow-xl py-1`}
+              className={`absolute z-50 ${isOwn ? "right-1" : "right-1"} top-8 min-w-40 rounded-xl border border-white/[0.08] bg-[#12121A] shadow-xl py-1`}
               role="menu"
             >
               {msg.senderId === uid && (
                 <>
                   <button
                     onClick={() => handleEdit(msg)}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-[#D0D0E0] hover:bg-white/[0.06] transition-all"
+                    className="touch-target flex w-full items-center gap-2 px-3 py-2.5 text-xs text-[#D0D0E0] hover:bg-white/[0.06] transition-all"
                     role="menuitem"
                   >
-                    <Edit3 size={13} /> Edit
+                    <Edit3 size={14} /> Edit
                   </button>
                   <button
                     onClick={() => handleDelete(msg)}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-white/[0.06] transition-all"
+                    className="touch-target flex w-full items-center gap-2 px-3 py-2.5 text-xs text-red-400 hover:bg-white/[0.06] transition-all"
                     role="menuitem"
                   >
-                    <Trash2 size={13} /> Delete
+                    <Trash2 size={14} /> Delete
                   </button>
                 </>
               )}
               <button
                 onClick={() => handleReply(msg)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-xs text-[#D0D0E0] hover:bg-white/[0.06] transition-all"
+                className="touch-target flex w-full items-center gap-2 px-3 py-2.5 text-xs text-[#D0D0E0] hover:bg-white/[0.06] transition-all"
                 role="menuitem"
               >
-                <Reply size={13} /> Reply
+                <Reply size={14} /> Reply
               </button>
               <button
                 onClick={() => handleCopy(msg)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-xs text-[#D0D0E0] hover:bg-white/[0.06] transition-all"
+                className="touch-target flex w-full items-center gap-2 px-3 py-2.5 text-xs text-[#D0D0E0] hover:bg-white/[0.06] transition-all"
                 role="menuitem"
               >
-                <Copy size={13} /> Copy
+                <Copy size={14} /> Copy
               </button>
               <button
                 onClick={() => handleForward(msg)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-xs text-[#D0D0E0] hover:bg-white/[0.06] transition-all"
+                className="touch-target flex w-full items-center gap-2 px-3 py-2.5 text-xs text-[#D0D0E0] hover:bg-white/[0.06] transition-all"
                 role="menuitem"
               >
-                <Forward size={13} /> Forward
+                <Forward size={14} /> Forward
               </button>
             </motion.div>
           )}
@@ -1090,36 +1094,38 @@ export default function MessagesPage() {
 
   // ========== SIDEBAR ==========
   const sidebar = (
-    <div className="flex h-full flex-col">
-      {/* Tabs */}
-      <div className="flex border-b border-white/[0.06] shrink-0">
-        {([
-          { key: "conversations" as Tab, label: "Conversations", icon: MessageCircle },
-          { key: "groups" as Tab, label: "Groups", icon: Users },
-          { key: "status" as Tab, label: "Status", icon: Hash },
-        ]).map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => {
-              if (key === "status") {
-                navigate("/dashboard/status")
-                return
-              }
-              setTab(key)
-              setActiveConv(null)
-              setActiveGroup(null)
-              setMobileView("list")
-            }}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-all ${
-              tab === key
-                ? "text-[#4F6EF7] border-b-2 border-[#4F6EF7] bg-[#4F6EF7]/5"
-                : "text-[#6B6B80] hover:text-[#F0F0F5] hover:bg-white/[0.02]"
-            }`}
-          >
-            <Icon size={14} />
-            <span className="hidden sm:inline">{label}</span>
-          </button>
-        ))}
+    <div className="flex h-full min-h-0 flex-col">
+      {/* Tabs - horizontally scrollable on mobile */}
+      <div className="mobile-scroll-x flex border-b border-white/[0.06] shrink-0">
+        <div className="flex min-w-full sm:min-w-0">
+          {([
+            { key: "conversations" as Tab, label: "Conversations", icon: MessageCircle },
+            { key: "groups" as Tab, label: "Groups", icon: Users },
+            { key: "status" as Tab, label: "Status", icon: Hash },
+          ]).map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => {
+                if (key === "status") {
+                  navigate("/dashboard/status")
+                  return
+                }
+                setTab(key)
+                setActiveConv(null)
+                setActiveGroup(null)
+                setMobileView("list")
+              }}
+              className={`touch-target flex-1 flex items-center justify-center gap-1.5 px-4 py-3 text-xs font-medium transition-all whitespace-nowrap ${
+                tab === key
+                  ? "text-[#4F6EF7] border-b-2 border-[#4F6EF7] bg-[#4F6EF7]/5"
+                  : "text-[#6B6B80] hover:text-[#F0F0F5] hover:bg-white/[0.02]"
+              }`}
+            >
+              <Icon size={16} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === "conversations" && (
@@ -1132,7 +1138,7 @@ export default function MessagesPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search conversations..."
-                className="w-full rounded-xl border border-white/[0.06] bg-white/[0.03] py-2 pl-9 pr-3 text-sm text-white placeholder:text-[#4A4A5A] outline-none focus:border-[#4F6EF7]/30 transition-all"
+                className="touch-target w-full rounded-xl border border-white/[0.06] bg-white/[0.03] py-2 pl-9 pr-3 text-sm text-white placeholder:text-[#4A4A5A] outline-none focus:border-[#4F6EF7]/30 transition-all"
               />
             </div>
             <div className="flex gap-1">
@@ -1140,7 +1146,7 @@ export default function MessagesPage() {
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all ${
+                  className={`touch-target px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     filter === f
                       ? "bg-[#4F6EF7]/15 text-[#4F6EF7]"
                       : "text-[#6B6B80] hover:bg-white/[0.04]"
@@ -1153,7 +1159,7 @@ export default function MessagesPage() {
           </div>
 
           {/* Conversation list */}
-          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/[0.08]">
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/[0.08]">
             {convLoading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 size={24} className="animate-spin text-[#4F6EF7]" />
@@ -1164,7 +1170,7 @@ export default function MessagesPage() {
                 <p className="text-sm text-[#6B6B80] mb-3">{convError}</p>
                 <button
                   onClick={loadConversations}
-                  className="flex items-center gap-2 rounded-xl bg-[#4F6EF7] px-4 py-2 text-xs font-medium text-white hover:bg-[#4F6EF7]/90 transition-all"
+                  className="touch-target flex items-center gap-2 rounded-xl bg-[#4F6EF7] px-4 py-2.5 text-xs font-medium text-white hover:bg-[#4F6EF7]/90 transition-all"
                 >
                   <RefreshCw size={13} />
                   Retry
@@ -1182,7 +1188,7 @@ export default function MessagesPage() {
                   <button
                     key={conv.id}
                     onClick={() => handleSelectConversation(conv)}
-                    className={`flex w-full items-center gap-3 px-4 py-3.5 transition-all text-left ${
+                    className={`touch-target flex w-full items-center gap-3 px-4 py-3.5 transition-all text-left ${
                       activeConv?.id === conv.id
                         ? "bg-[#4F6EF7]/10 border-l-2 border-[#4F6EF7] shadow-[inset_0_0_20px_rgba(79,110,247,0.04)]"
                         : "hover:bg-white/[0.03] border-l-2 border-transparent"
@@ -1224,15 +1230,15 @@ export default function MessagesPage() {
           <div className="border-b border-white/[0.06] px-3 py-2 shrink-0">
             <button
               onClick={() => setShowCreateGroup(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] px-4 py-2.5 text-xs font-semibold text-white hover:shadow-[0_0_16px_rgba(37,99,235,0.3)] transition-all"
+              className="touch-target flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] px-4 py-2.5 text-xs font-semibold text-white hover:shadow-[0_0_16px_rgba(37,99,235,0.3)] transition-all"
             >
-              <UserPlus size={14} />
+              <UserPlus size={16} />
               Create Group
             </button>
           </div>
 
           {/* Group list */}
-          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/[0.08]">
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/[0.08]">
             {groupsLoading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 size={24} className="animate-spin text-[#4F6EF7]" />
@@ -1259,7 +1265,7 @@ export default function MessagesPage() {
                       <button
                         type="button"
                         onClick={() => handleSelectGroup(group)}
-                        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2.5 text-left"
+                        className="touch-target flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2.5 text-left"
                       >
                         <div className="relative shrink-0">
                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#4F6EF7]/30 to-[#8B5CF6]/20 text-sm font-bold text-[#4F6EF7] ring-1 ring-white/[0.06]">
@@ -1298,7 +1304,7 @@ export default function MessagesPage() {
                             event.stopPropagation()
                             setGroupListMenuId((current) => current === group.id ? null : group.id)
                           }}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg text-white/40 opacity-100 transition-all hover:bg-white/[0.06] hover:text-white md:opacity-0 md:group-hover/item:opacity-100"
+                          className="touch-target flex h-9 w-9 items-center justify-center rounded-lg text-white/40 transition-all hover:bg-white/[0.06] hover:text-white"
                           aria-label={`Options for ${group.name}`}
                           aria-expanded={groupListMenuId === group.id}
                         >
@@ -1311,7 +1317,7 @@ export default function MessagesPage() {
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               exit={{ opacity: 0, y: -4, scale: 0.98 }}
                               transition={{ duration: 0.14 }}
-                              className="absolute right-0 top-10 z-40 w-48 rounded-xl border border-white/[0.08] bg-[#12121A] py-1 shadow-xl"
+                              className="absolute right-0 top-10 z-40 min-w-48 rounded-xl border border-white/[0.08] bg-[#12121A] py-1 shadow-xl"
                               role="menu"
                             >
                               <button
@@ -1321,10 +1327,10 @@ export default function MessagesPage() {
                                   setActiveGroup(group)
                                   openGroupSettings(group)
                                 }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-[#D0D0E0] transition-all hover:bg-white/[0.06]"
+                                className="touch-target flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-[#D0D0E0] transition-all hover:bg-white/[0.06]"
                                 role="menuitem"
                               >
-                                <Settings size={13} /> Manage Group
+                                <Settings size={14} /> Manage Group
                               </button>
                               <button
                                 type="button"
@@ -1333,10 +1339,10 @@ export default function MessagesPage() {
                                   setActiveGroup(group)
                                   handleRemoveMemberFromGroup(group, uid!)
                                 }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-[#D0D0E0] transition-all hover:bg-white/[0.06]"
+                                className="touch-target flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-[#D0D0E0] transition-all hover:bg-white/[0.06]"
                                 role="menuitem"
                               >
-                                <LogOut size={13} /> Leave Group
+                                <LogOut size={14} /> Leave Group
                               </button>
                               {userIsAdmin && (
                                 <button
@@ -1346,10 +1352,10 @@ export default function MessagesPage() {
                                     setActiveGroup(group)
                                     handleDeleteGroup(group)
                                   }}
-                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-400 transition-all hover:bg-white/[0.06]"
+                                  className="touch-target flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-red-400 transition-all hover:bg-white/[0.06]"
                                   role="menuitem"
                                 >
-                                  <Trash2 size={13} /> Delete Group
+                                  <Trash2 size={14} /> Delete Group
                                 </button>
                               )}
                             </motion.div>
@@ -1390,13 +1396,13 @@ export default function MessagesPage() {
                 {postMediaUrl && (
                   <div className="mt-2 flex items-center gap-2 rounded-lg bg-white/[0.04] p-2">
                     <span className="text-xs text-[#6B6B80] truncate flex-1">{postMediaType === "video" ? "Video attached" : "Photo attached"}</span>
-                    <button onClick={() => { setPostMediaUrl(null); setPostMediaType(null) }} className="text-[#4A4A5A] hover:text-white">
+                    <button onClick={() => { setPostMediaUrl(null); setPostMediaType(null) }} className="touch-target text-[#4A4A5A] hover:text-white">
                       <X size={14} />
                     </button>
                   </div>
                 )}
                 <div className="mt-2 flex items-center justify-between">
-                  <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-[#4A4A5A] hover:text-[#4F6EF7] hover:bg-white/[0.06] transition-all">
+                  <label className="touch-target flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-[#4A4A5A] hover:text-[#4F6EF7] hover:bg-white/[0.06] transition-all">
                     <Camera size={15} />
                     <input type="file" accept="image/*,video/*" className="hidden" aria-label="Attach photo or video to status" onChange={async (e) => {
                       const file = e.target.files?.[0]
@@ -1412,7 +1418,7 @@ export default function MessagesPage() {
                   <button
                     onClick={handleCreatePost}
                     disabled={(!postInput.trim() && !postMediaUrl) || posting}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#4F6EF7] px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40 hover:bg-[#6B85FF] transition-all"
+                    className="touch-target inline-flex items-center gap-1.5 rounded-xl bg-[#4F6EF7] px-4 py-2 text-xs font-semibold text-white disabled:opacity-40 hover:bg-[#6B85FF] transition-all"
                   >
                     {posting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                     Share Status
@@ -1422,7 +1428,7 @@ export default function MessagesPage() {
             </div>
           </div>
 
-          {/* Status feed */}
+          {/* Status feed - single column */}
           {postsLoading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 size={24} className="animate-spin text-[#4F6EF7]" />
@@ -1430,7 +1436,7 @@ export default function MessagesPage() {
           ) : postError ? (
             <div className="flex flex-col items-center justify-center py-20 text-center px-4">
               <p className="text-sm text-red-400">{postError}</p>
-              <button onClick={() => loadPosts("all")} className="mt-3 text-xs text-[#4F6EF7] hover:underline">Retry</button>
+              <button onClick={() => loadPosts("all")} className="touch-target mt-3 text-xs text-[#4F6EF7] hover:underline">Retry</button>
             </div>
           ) : posts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center px-4">
@@ -1443,12 +1449,12 @@ export default function MessagesPage() {
               {posts.map((post) => (
                 <div key={post.id} className="p-3 hover:bg-white/[0.01] transition-colors">
                   <div className="flex gap-3">
-                    <button onClick={() => openProfile(post.userId)} className="shrink-0">
+                    <button onClick={() => openProfile(post.userId)} className="shrink-0 touch-target">
                       <UserAvatar user={post.user} size="md" />
                     </button>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => openProfile(post.userId)} className="text-sm font-semibold text-white hover:text-[#4F6EF7] transition-colors">
+                        <button onClick={() => openProfile(post.userId)} className="touch-target text-sm font-semibold text-white hover:text-[#4F6EF7] transition-colors">
                           {getUserDisplayName(post.user)}
                         </button>
                         {post.user?.username && (
@@ -1464,34 +1470,34 @@ export default function MessagesPage() {
                       {post.mediaUrl && (
                         <div className="mt-3 overflow-hidden rounded-lg border border-white/[0.08] bg-black/20 shadow-[0_16px_42px_rgba(0,0,0,0.28)]">
                           {post.mediaType === "video" ? (
-                            <video src={post.mediaUrl} controls className="w-full max-h-80 object-cover" />
+                            <video src={post.mediaUrl} controls preload="metadata" playsInline className="max-h-72 w-full object-contain sm:max-h-80" />
                           ) : (
-                            <img src={post.mediaUrl} alt="Status media" className="w-full max-h-80 object-cover" />
+                            <img src={post.mediaUrl} alt="Status media" loading="lazy" decoding="async" className="max-h-72 w-full object-cover sm:max-h-80" />
                           )}
                         </div>
                       )}
                       <div className="mt-2 flex items-center gap-4">
                         <button
                           onClick={() => handleLike(post.id)}
-                          className={`flex items-center gap-1.5 text-xs transition-all ${
+                          className={`touch-target flex items-center gap-1.5 text-xs transition-all ${
                             post.liked ? "text-[#4F6EF7]" : "text-[#4A4A5A] hover:text-[#F0F0F5]"
                           }`}
                         >
-                          <Heart size={14} className={post.liked ? "fill-[#4F6EF7]" : ""} />
+                          <Heart size={16} className={post.liked ? "fill-[#4F6EF7]" : ""} />
                           {post.likesCount > 0 && post.likesCount}
                         </button>
                         <button
                           onClick={() => toggleComments(post.id)}
-                          className="flex items-center gap-1.5 text-xs text-[#4A4A5A] hover:text-[#F0F0F5] transition-all"
+                          className="touch-target flex items-center gap-1.5 text-xs text-[#4A4A5A] hover:text-[#F0F0F5] transition-all"
                         >
-                          <MessageSquare size={14} />
+                          <MessageSquare size={16} />
                           {post.commentsCount > 0 && post.commentsCount}
                         </button>
                         <button
                           onClick={() => openProfile(post.userId)}
-                          className="flex items-center gap-1.5 text-xs text-[#4A4A5A] hover:text-[#F0F0F5] transition-all"
+                          className="touch-target flex items-center gap-1.5 text-xs text-[#4A4A5A] hover:text-[#F0F0F5] transition-all"
                         >
-                          <ExternalLink size={14} />
+                          <ExternalLink size={16} />
                         </button>
                         {uid && post.userId !== uid && (
                           <button
@@ -1501,7 +1507,7 @@ export default function MessagesPage() {
                                 setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p } : p))
                               }
                             }}
-                            className="ml-auto text-[10px] text-[#4F6EF7] hover:underline"
+                            className="touch-target ml-auto text-[10px] text-[#4F6EF7] hover:underline"
                           >
                             Follow
                           </button>
@@ -1532,14 +1538,14 @@ export default function MessagesPage() {
                                 onChange={(e) => setCommentInput((prev) => ({ ...prev, [post.id]: e.target.value }))}
                                 onKeyDown={(e) => { if (e.key === "Enter") handleComment(post.id) }}
                                 placeholder="Reply to this status..."
-                                className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-xs text-white placeholder:text-[#4A4A5A] outline-none focus:border-[#4F6EF7]/30 transition-all"
+                                className="touch-target flex-1 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-xs text-white placeholder:text-[#4A4A5A] outline-none focus:border-[#4F6EF7]/30 transition-all"
                               />
                               <button
                                 onClick={() => handleComment(post.id)}
                                 disabled={!commentInput[post.id]?.trim() || commenting[post.id]}
-                                className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#4F6EF7]/10 text-[#4F6EF7] disabled:opacity-30"
+                                className="touch-target flex h-10 w-10 items-center justify-center rounded-lg bg-[#4F6EF7]/10 text-[#4F6EF7] disabled:opacity-30"
                               >
-                                {commenting[post.id] ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                                {commenting[post.id] ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                               </button>
                             </div>
                           </motion.div>
@@ -1571,7 +1577,7 @@ export default function MessagesPage() {
 
   // ========== STATUS PANEL ==========
   const statusPanel = tab === "status" ? (
-    <div className="flex h-full flex-col overflow-hidden bg-[#08080D]">
+    <div className="mobile-panel flex h-full flex-col overflow-hidden bg-[#08080D]">
       <div className="shrink-0 border-b border-white/[0.06] bg-[radial-gradient(circle_at_top_left,rgba(79,110,247,0.18),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.012))] px-6 py-5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#4F6EF7]">Community showcase</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
@@ -1584,7 +1590,7 @@ export default function MessagesPage() {
           <button
             type="button"
             onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.035] px-3 py-2 text-xs font-semibold text-[#D8D8E8] transition-all hover:bg-white/[0.06] hover:text-white"
+            className="touch-target inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.035] px-3 py-2 text-xs font-semibold text-[#D8D8E8] transition-all hover:bg-white/[0.06] hover:text-white"
           >
             <Plus size={14} />
             Share from sidebar
@@ -1601,7 +1607,7 @@ export default function MessagesPage() {
           <div className="flex h-full flex-col items-center justify-center text-center">
             <AlertCircle size={28} className="mb-3 text-red-400" />
             <p className="text-sm text-[#B8B8C8]">{postError}</p>
-            <button onClick={() => loadPosts("all")} className="mt-3 text-xs font-semibold text-[#4F6EF7] hover:underline">Retry</button>
+            <button onClick={() => loadPosts("all")} className="touch-target mt-3 text-xs font-semibold text-[#4F6EF7] hover:underline">Retry</button>
           </div>
         ) : posts.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
@@ -1609,7 +1615,7 @@ export default function MessagesPage() {
               <Hash size={30} className="text-[#4F6EF7]" />
             </div>
             <p className="text-lg font-semibold text-white">No stories yet</p>
-            <p className="mt-1 max-w-sm text-sm text-[#6B6B80]">Create the first community status from the sidebar.</p>
+            <p className="mt-1 max-w-sm text-sm text-[#6B6B80]">Create the first community status from the mobile status screen.</p>
           </div>
         ) : (
           <div className="mx-auto grid w-full max-w-5xl gap-4 xl:grid-cols-2">
@@ -1618,19 +1624,19 @@ export default function MessagesPage() {
                 {post.mediaUrl && (
                   <div className="border-b border-white/[0.06] bg-black/30">
                     {post.mediaType === "video" ? (
-                      <video src={post.mediaUrl} controls className="aspect-video w-full object-cover" />
+                      <video src={post.mediaUrl} controls preload="metadata" playsInline className="aspect-video w-full object-cover" />
                     ) : (
-                      <img src={post.mediaUrl} alt="Status media" className="aspect-video w-full object-cover" />
+                      <img src={post.mediaUrl} alt="Status media" loading="lazy" decoding="async" className="aspect-video w-full object-cover" />
                     )}
                   </div>
                 )}
                 <div className="p-4">
                   <div className="flex items-center gap-3">
-                    <button type="button" onClick={() => openProfile(post.userId)} className="shrink-0">
+                    <button type="button" onClick={() => openProfile(post.userId)} className="shrink-0 touch-target">
                       <UserAvatar user={post.user} size="md" />
                     </button>
                     <div className="min-w-0 flex-1">
-                      <button type="button" onClick={() => openProfile(post.userId)} className="truncate text-sm font-semibold text-white hover:text-[#4F6EF7]">
+                      <button type="button" onClick={() => openProfile(post.userId)} className="touch-target truncate text-sm font-semibold text-white hover:text-[#4F6EF7]">
                         {getUserDisplayName(post.user)}
                       </button>
                       <p className="text-[11px] text-[#5F5F73]">
@@ -1647,23 +1653,23 @@ export default function MessagesPage() {
                     <button
                       type="button"
                       onClick={() => handleLike(post.id)}
-                      className={`inline-flex items-center gap-1.5 text-xs font-semibold transition-all ${post.liked ? "text-[#4F6EF7]" : "text-[#6B6B80] hover:text-white"}`}
+                      className={`touch-target inline-flex items-center gap-1.5 text-xs font-semibold transition-all ${post.liked ? "text-[#4F6EF7]" : "text-[#6B6B80] hover:text-white"}`}
                     >
-                      <Heart size={15} className={post.liked ? "fill-[#4F6EF7]" : ""} />
+                      <Heart size={16} className={post.liked ? "fill-[#4F6EF7]" : ""} />
                       {post.likesCount || "Like"}
                     </button>
                     <button
                       type="button"
                       onClick={() => toggleComments(post.id)}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#6B6B80] transition-all hover:text-white"
+                      className="touch-target inline-flex items-center gap-1.5 text-xs font-semibold text-[#6B6B80] transition-all hover:text-white"
                     >
-                      <MessageSquare size={15} />
+                      <MessageSquare size={16} />
                       {post.commentsCount || "Comment"}
                     </button>
                     <button
                       type="button"
                       onClick={() => openProfile(post.userId)}
-                      className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-[#6B6B80] transition-all hover:text-white"
+                      className="touch-target ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-[#6B6B80] transition-all hover:text-white"
                     >
                       <ExternalLink size={14} />
                       Profile
@@ -1693,15 +1699,15 @@ export default function MessagesPage() {
                             onChange={(e) => setCommentInput((prev) => ({ ...prev, [post.id]: e.target.value }))}
                             onKeyDown={(e) => { if (e.key === "Enter") handleComment(post.id) }}
                             placeholder="Write a quick reply..."
-                            className="min-w-0 flex-1 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs text-white outline-none placeholder:text-[#4A4A5A] focus:border-[#4F6EF7]/30"
+                            className="touch-target min-w-0 flex-1 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs text-white outline-none placeholder:text-[#4A4A5A] focus:border-[#4F6EF7]/30"
                           />
                           <button
                             type="button"
                             onClick={() => handleComment(post.id)}
                             disabled={!commentInput[post.id]?.trim() || commenting[post.id]}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#4F6EF7]/10 text-[#4F6EF7] disabled:opacity-30"
+                            className="touch-target flex h-10 w-10 items-center justify-center rounded-lg bg-[#4F6EF7]/10 text-[#4F6EF7] disabled:opacity-30"
                           >
-                            {commenting[post.id] ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                            {commenting[post.id] ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                           </button>
                         </div>
                       </motion.div>
@@ -1719,11 +1725,11 @@ export default function MessagesPage() {
 
   // ========== CHAT PANEL (conversation) ==========
   const chatPanel = activeConv ? (
-    <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b border-white/[0.06] bg-[#0A0A0F]/80 backdrop-blur-md px-4 py-3 shrink-0">
-        <button onClick={handleBack} className="flex h-9 w-9 items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/[0.06] transition-all md:hidden">
-          <ChevronLeft size={18} />
+    <div className="mobile-panel flex h-full min-h-0 flex-col">
+      {/* Header - compact */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] bg-[#0A0A0F]/80 px-2 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
+        <button onClick={handleBack} className="touch-target flex h-10 w-10 items-center justify-center rounded-xl text-white/50 transition-all hover:bg-white/[0.06] hover:text-white" aria-label="Back to conversations">
+          <ChevronLeft size={20} />
         </button>
         <div
           onClick={() => !isActiveConvBot && navigate(`/profile/${activeConv.otherUser.username || activeConv.otherUser.id}`)}
@@ -1751,7 +1757,7 @@ export default function MessagesPage() {
             type="button"
             onClick={handleClearChat}
             disabled={clearingChat || messages.length === 0}
-            className="inline-flex h-9 items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-3 text-xs font-semibold text-red-200 transition-all hover:bg-red-400/15 disabled:cursor-not-allowed disabled:opacity-45"
+            className="touch-target inline-flex h-10 items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-3 text-xs font-semibold text-red-200 transition-all hover:bg-red-400/15 disabled:cursor-not-allowed disabled:opacity-45"
             title="Clear chat"
           >
             {clearingChat ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
@@ -1761,15 +1767,16 @@ export default function MessagesPage() {
         {!isActiveConvBot && (
           <button
             onClick={() => openProfile(activeConv.otherUser.id)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-white/40 hover:text-white hover:bg-white/[0.06] transition-all"
+            className="touch-target flex h-10 w-10 items-center justify-center rounded-xl text-white/40 transition-all hover:bg-white/[0.06] hover:text-white"
+            aria-label="Open profile"
           >
             <ExternalLink size={16} />
           </button>
         )}
       </div>
 
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin scrollbar-thumb-white/[0.08] scrollbar-track-transparent">
+      {/* Messages area - full width */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/[0.08] sm:px-4 sm:py-4">
         {msgLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 size={24} className="animate-spin text-[#4F6EF7]" />
@@ -1777,7 +1784,7 @@ export default function MessagesPage() {
         ) : msgError ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <p className="text-sm text-red-400">{msgError}</p>
-            <button onClick={loadMessages} className="mt-3 text-xs text-[#4F6EF7] hover:underline">Retry</button>
+            <button onClick={loadMessages} className="touch-target mt-3 text-xs text-[#4F6EF7] hover:underline">Retry</button>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
@@ -1809,7 +1816,7 @@ export default function MessagesPage() {
           </div>
           <button
             onClick={() => { setReplyTo(null) }}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-[#4A4A5A] hover:text-white hover:bg-white/[0.06] transition-all"
+            className="touch-target flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] hover:text-white hover:bg-white/[0.06] transition-all"
             aria-label="Cancel reply"
           >
             <X size={14} />
@@ -1833,11 +1840,11 @@ export default function MessagesPage() {
 
   // ========== GROUP CHAT PANEL ==========
   const groupChatPanel = activeGroup ? (
-    <div className="flex h-full flex-col">
+    <div className="mobile-panel flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-white/[0.06] bg-[#0A0A0F]/80 backdrop-blur-md px-4 py-3 shrink-0">
-        <button onClick={handleBack} className="flex h-9 w-9 items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/[0.06] transition-all md:hidden">
-          <ChevronLeft size={18} />
+      <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] bg-[#0A0A0F]/80 px-2 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
+        <button onClick={handleBack} className="touch-target flex h-10 w-10 items-center justify-center rounded-xl text-white/50 transition-all hover:bg-white/[0.06] hover:text-white" aria-label="Back to groups">
+          <ChevronLeft size={20} />
         </button>
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="relative shrink-0">
@@ -1858,7 +1865,7 @@ export default function MessagesPage() {
           <button
             type="button"
             onClick={() => setGroupMenuOpen((open) => !open)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-white/45 transition-all hover:bg-white/[0.06] hover:text-white"
+            className="touch-target flex h-10 w-10 items-center justify-center rounded-xl text-white/45 transition-all hover:bg-white/[0.06] hover:text-white"
             aria-label="Group options"
             aria-expanded={groupMenuOpen}
           >
@@ -1871,33 +1878,33 @@ export default function MessagesPage() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -4, scale: 0.98 }}
                 transition={{ duration: 0.14 }}
-                className="absolute right-0 top-11 z-40 w-48 rounded-xl border border-white/[0.08] bg-[#12121A] py-1 shadow-xl"
+                className="absolute right-0 top-11 z-40 min-w-48 rounded-xl border border-white/[0.08] bg-[#12121A] py-1 shadow-xl"
                 role="menu"
               >
                 <button
                   type="button"
                   onClick={() => openGroupSettings()}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-[#D0D0E0] transition-all hover:bg-white/[0.06]"
+                  className="touch-target flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-[#D0D0E0] transition-all hover:bg-white/[0.06]"
                   role="menuitem"
                 >
-                  <Settings size={13} /> Manage Group
+                  <Settings size={14} /> Manage Group
                 </button>
                 <button
                   type="button"
                   onClick={() => handleRemoveMemberFromActiveGroup(uid!)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-[#D0D0E0] transition-all hover:bg-white/[0.06]"
+                  className="touch-target flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-[#D0D0E0] transition-all hover:bg-white/[0.06]"
                   role="menuitem"
                 >
-                  <LogOut size={13} /> Leave Group
+                  <LogOut size={14} /> Leave Group
                 </button>
                 {isGroupAdmin(activeGroup) && (
                   <button
                     type="button"
                     onClick={handleDeleteActiveGroup}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-400 transition-all hover:bg-white/[0.06]"
+                    className="touch-target flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-red-400 transition-all hover:bg-white/[0.06]"
                     role="menuitem"
                   >
-                    <Trash2 size={13} /> Delete Group
+                    <Trash2 size={14} /> Delete Group
                   </button>
                 )}
               </motion.div>
@@ -1907,7 +1914,7 @@ export default function MessagesPage() {
       </div>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin scrollbar-thumb-white/[0.08] scrollbar-track-transparent">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/[0.08] sm:px-4 sm:py-4">
         {groupMsgLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 size={24} className="animate-spin text-[#4F6EF7]" />
@@ -1948,7 +1955,7 @@ export default function MessagesPage() {
           </button>
           <button
             onClick={() => { setReplyTo(null) }}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-[#4A4A5A] hover:text-white hover:bg-white/[0.06] transition-all"
+            className="touch-target flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] hover:text-white hover:bg-white/[0.06] transition-all"
             aria-label="Cancel reply"
           >
             <X size={14} />
@@ -1980,15 +1987,15 @@ export default function MessagesPage() {
 
   // ========== MAIN RENDER ==========
   return (
-    <div className="min-h-screen bg-[#050508]">
+    <div className="mobile-page bg-[#050508]">
       <FloatingOrbs />
       <Navbar />
       <div
         className="flex overflow-hidden border-t border-white/[0.06]"
-        style={{ height: "100vh", paddingTop: "64px" }}
+        style={{ height: "100dvh", paddingTop: "64px" }}
       >
-        {/* Mobile: show list or chat */}
-        <div className="flex w-full md:hidden">
+        {/* Mobile: show list or chat with page transition */}
+        <div className="flex min-w-0 w-full md:hidden">
           <AnimatePresence mode="popLayout">
             {mobileView === "list" ? (
               <motion.div
@@ -1996,7 +2003,7 @@ export default function MessagesPage() {
                 initial={{ x: -20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: -20, opacity: 0 }}
-                className="w-full border-r border-white/[0.06] bg-[#0A0A0F]"
+                className="mobile-panel border-r border-white/[0.06] bg-[#0A0A0F]"
               >
                 {sidebar}
               </motion.div>
@@ -2006,7 +2013,7 @@ export default function MessagesPage() {
                 initial={{ x: 20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: 20, opacity: 0 }}
-                className="w-full bg-[#0A0A0F]"
+                className="mobile-panel bg-[#0A0A0F]"
               >
                 {chatPanel || groupChatPanel || statusPanel || emptyState}
               </motion.div>
@@ -2015,38 +2022,38 @@ export default function MessagesPage() {
         </div>
 
         {/* Desktop: two columns */}
-        <div className="hidden md:flex w-full">
+        <div className="hidden min-w-0 w-full md:flex">
           <div className="w-[380px] border-r border-white/[0.06] bg-[#0A0A0F] flex flex-col shrink-0">
             {sidebar}
           </div>
-          <div className="flex-1 bg-[#0A0A0F] flex flex-col overflow-hidden">
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#0A0A0F]">
             {chatPanel || groupChatPanel || statusPanel || emptyState}
           </div>
         </div>
       </div>
 
-      {/* Forward Modal */}
+      {/* Forward Modal - bottom sheet on mobile */}
       <AnimatePresence>
         {forwardMsg && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4"
             onClick={() => { setForwardMsg(null); setForwardSelectedId(null) }}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-md rounded-3xl border border-white/[0.08] bg-[#0A0A0F] p-6 shadow-2xl"
+              className="safe-bottom max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-white/[0.08] bg-[#0A0A0F] p-5 shadow-2xl sm:rounded-3xl sm:p-6"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold text-white">Forward Message</h3>
                 <button
                   onClick={() => { setForwardMsg(null); setForwardSelectedId(null) }}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-white/50 hover:text-white"
+                  className="touch-target flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] text-white/50 hover:text-white"
                 >
                   <X size={14} />
                 </button>
@@ -2060,25 +2067,25 @@ export default function MessagesPage() {
                     <button
                       key={target.id}
                       onClick={() => setForwardSelectedId(target.id)}
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-all text-left ${
+                      className={`touch-target flex w-full items-center gap-3 rounded-xl px-3 py-3 transition-all text-left ${
                         forwardSelectedId === target.id
                           ? "bg-[#4F6EF7]/15 border border-[#4F6EF7]/30"
                           : "hover:bg-white/[0.04] border border-transparent"
                       }`}
                     >
-                      <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold ${
                         target.type === "group"
                           ? "bg-gradient-to-br from-[#4F6EF7]/30 to-[#8B5CF6]/20 text-[#4F6EF7]"
                           : "bg-white/[0.06] text-white"
                       }`}>
-                        {target.type === "group" ? <Users size={14} /> : target.name[0]?.toUpperCase()}
+                        {target.type === "group" ? <Users size={16} /> : target.name[0]?.toUpperCase()}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-white truncate">{target.name}</p>
                         <p className="text-[10px] text-[#4A4A5A]">{target.type === "group" ? "Group" : "Conversation"}</p>
                       </div>
                       {forwardSelectedId === target.id && (
-                        <Check size={16} className="text-[#4F6EF7] shrink-0" />
+                        <Check size={18} className="text-[#4F6EF7] shrink-0" />
                       )}
                     </button>
                   ))
@@ -2088,7 +2095,7 @@ export default function MessagesPage() {
               <button
                 onClick={handleForwardSubmit}
                 disabled={!forwardSelectedId || forwarding}
-                className="w-full rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] py-2.5 text-sm font-semibold text-white disabled:opacity-40 hover:shadow-[0_0_16px_rgba(37,99,235,0.3)] transition-all"
+                className="touch-target w-full rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] py-3 text-sm font-semibold text-white disabled:opacity-40 hover:shadow-[0_0_16px_rgba(37,99,235,0.3)] transition-all"
               >
                 {forwarding ? <Loader2 size={16} className="animate-spin mx-auto" /> : "Forward"}
               </button>
@@ -2097,21 +2104,21 @@ export default function MessagesPage() {
         )}
       </AnimatePresence>
 
-      {/* Group Creation Modal */}
+      {/* Group Creation Modal - bottom sheet on mobile */}
       <AnimatePresence>
         {showCreateGroup && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 backdrop-blur-md sm:items-center sm:p-4"
             onClick={() => setShowCreateGroup(false)}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-2xl overflow-hidden rounded-lg border border-white/[0.08] bg-[#09090D] shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+              className="safe-bottom max-h-[94dvh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/[0.08] bg-[#09090D] shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:rounded-lg"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="border-b border-white/[0.06] bg-white/[0.025] px-5 py-4">
@@ -2124,7 +2131,7 @@ export default function MessagesPage() {
                   <button
                     type="button"
                     onClick={() => setShowCreateGroup(false)}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-white/50 transition-all hover:bg-white/[0.1] hover:text-white"
+                    className="touch-target flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-white/50 transition-all hover:bg-white/[0.1] hover:text-white"
                     title="Close"
                   >
                     <X size={15} />
@@ -2132,7 +2139,7 @@ export default function MessagesPage() {
                 </div>
               </div>
 
-              <div className="grid gap-5 p-5 md:grid-cols-[0.85fr_1.15fr]">
+              <div className="flex flex-col gap-5 overflow-y-auto p-4 sm:p-5 md:grid md:grid-cols-[0.85fr_1.15fr]">
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#4F6EF7]/30 to-[#8B5CF6]/20 text-lg font-bold text-[#7E95FF] ring-1 ring-white/[0.08]">
@@ -2142,7 +2149,7 @@ export default function MessagesPage() {
                         <Users size={22} />
                       )}
                     </div>
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-white/[0.08] px-3 py-2 text-xs font-semibold text-[#D8D8E8] transition-all hover:bg-white/[0.05]">
+                    <label className="touch-target inline-flex cursor-pointer items-center gap-2 rounded-lg border border-white/[0.08] px-3 py-2 text-xs font-semibold text-[#D8D8E8] transition-all hover:bg-white/[0.05]">
                       <Camera size={14} />
                       Group Avatar
                       <input
@@ -2160,7 +2167,7 @@ export default function MessagesPage() {
                       value={groupName}
                       onChange={(e) => setGroupName(e.target.value)}
                       placeholder="Product team, VIP clients..."
-                      className="w-full rounded-lg border border-white/[0.08] bg-white/[0.035] px-3.5 py-3 text-sm text-white outline-none transition-all placeholder:text-[#4A4A5A] focus:border-[#4F6EF7]/45 focus:bg-white/[0.05]"
+                      className="touch-target w-full rounded-lg border border-white/[0.08] bg-white/[0.035] px-3.5 py-3 text-sm text-white outline-none transition-all placeholder:text-[#4A4A5A] focus:border-[#4F6EF7]/45 focus:bg-white/[0.05]"
                       autoFocus
                     />
                   </div>
@@ -2195,7 +2202,7 @@ export default function MessagesPage() {
                         onChange={(e) => handleGroupSearch(e.target.value)}
                         onFocus={() => { setGroupMembersOpen(true); loadGroupCandidates(groupSearch) }}
                         placeholder="Search by name, username or email"
-                        className="w-full rounded-lg border border-white/[0.08] bg-white/[0.035] py-3 pl-9 pr-3 text-sm text-white outline-none transition-all placeholder:text-[#4A4A5A] focus:border-[#4F6EF7]/45 focus:bg-white/[0.05]"
+                        className="touch-target w-full rounded-lg border border-white/[0.08] bg-white/[0.035] py-3 pl-9 pr-3 text-sm text-white outline-none transition-all placeholder:text-[#4A4A5A] focus:border-[#4F6EF7]/45 focus:bg-white/[0.05]"
                       />
                       {groupMembersOpen && (
                         <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-72 overflow-y-auto rounded-lg border border-white/[0.08] bg-[#111118] shadow-[0_18px_55px_rgba(0,0,0,0.45)]">
@@ -2214,9 +2221,9 @@ export default function MessagesPage() {
                                   type="button"
                                   onClick={() => handleAddMember(user)}
                                   disabled={selected}
-                                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-all hover:bg-white/[0.055] disabled:cursor-default disabled:opacity-45"
+                                  className="touch-target flex w-full items-center gap-3 px-3 py-3 text-left transition-all hover:bg-white/[0.055] disabled:cursor-default disabled:opacity-45"
                                 >
-                                  <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#4F6EF7]/14 text-xs font-bold text-[#7E95FF] ring-1 ring-white/[0.06]">
+                                  <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#4F6EF7]/14 text-xs font-bold text-[#7E95FF] ring-1 ring-white/[0.06]">
                                     {user.avatar_url ? (
                                       <img src={user.avatar_url} alt="" className="h-full w-full object-cover" />
                                     ) : (
@@ -2227,7 +2234,7 @@ export default function MessagesPage() {
                                     <p className="truncate text-sm font-medium text-white">{getCandidateName(user)}</p>
                                     <p className="truncate text-[11px] text-[#6B6B80]">{user.username ? `@${user.username}` : user.email || "Profile user"}</p>
                                   </div>
-                                  {selected && <Check size={15} className="text-[#4F6EF7]" />}
+                                  {selected && <Check size={16} className="text-[#4F6EF7]" />}
                                 </button>
                               )
                             })
@@ -2259,10 +2266,10 @@ export default function MessagesPage() {
                               <button
                                 type="button"
                                 onClick={() => handleRemoveMember(memberId)}
-                                className="flex h-7 w-7 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.08] hover:text-white"
+                                className="touch-target flex h-8 w-8 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.08] hover:text-white"
                                 title="Remove member"
                               >
-                                <X size={13} />
+                                <X size={14} />
                               </button>
                             </div>
                           )
@@ -2273,11 +2280,11 @@ export default function MessagesPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 border-t border-white/[0.06] bg-white/[0.02] px-5 py-4">
+              <div className="flex flex-col gap-2 border-t border-white/[0.06] bg-white/[0.02] px-4 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-5">
                 <button
                   type="button"
                   onClick={() => setShowCreateGroup(false)}
-                  className="rounded-lg border border-white/[0.08] px-4 py-2.5 text-sm font-semibold text-[#B8B8C8] transition-all hover:bg-white/[0.05] hover:text-white"
+                  className="touch-target w-full rounded-lg border border-white/[0.08] px-4 py-3 text-sm font-semibold text-[#B8B8C8] transition-all hover:bg-white/[0.05] hover:text-white sm:w-auto"
                 >
                   Cancel
                 </button>
@@ -2285,7 +2292,7 @@ export default function MessagesPage() {
                   type="button"
                   onClick={handleCreateGroup}
                   disabled={!groupName.trim() || creatingGroup}
-                  className="min-w-36 rounded-lg bg-gradient-to-br from-[#2563EB] to-[#6D28D9] px-4 py-2.5 text-sm font-semibold text-white transition-all hover:shadow-[0_0_18px_rgba(37,99,235,0.35)] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="touch-target w-full rounded-lg bg-gradient-to-br from-[#2563EB] to-[#6D28D9] px-4 py-3 text-sm font-semibold text-white transition-all hover:shadow-[0_0_18px_rgba(37,99,235,0.35)] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
                 >
                   {creatingGroup ? <Loader2 size={16} className="mx-auto animate-spin" /> : "Create group"}
                 </button>
@@ -2295,21 +2302,21 @@ export default function MessagesPage() {
         )}
       </AnimatePresence>
 
-      {/* Group Settings Modal */}
+      {/* Group Settings Modal - bottom sheet on mobile */}
       <AnimatePresence>
         {showGroupSettings && activeGroup && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 backdrop-blur-md sm:items-center sm:p-4"
             onClick={() => setShowGroupSettings(false)}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-2xl overflow-hidden rounded-lg border border-white/[0.08] bg-[#09090D] shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+              className="safe-bottom max-h-[94dvh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-white/[0.08] bg-[#09090D] shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:rounded-lg"
               onClick={(e) => e.stopPropagation()}
               role="dialog"
               aria-modal="true"
@@ -2323,14 +2330,14 @@ export default function MessagesPage() {
                 <button
                   type="button"
                   onClick={() => setShowGroupSettings(false)}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-white/50 transition-all hover:bg-white/[0.1] hover:text-white"
+                  className="touch-target flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-white/50 transition-all hover:bg-white/[0.1] hover:text-white"
                   aria-label="Close group settings"
                 >
                   <X size={15} />
                 </button>
               </div>
 
-              <div className="grid max-h-[70vh] gap-5 overflow-y-auto p-5 md:grid-cols-[0.85fr_1.15fr]">
+              <div className="flex flex-col gap-5 overflow-y-auto p-4 sm:p-5 md:grid md:grid-cols-[0.85fr_1.15fr]">
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#4F6EF7]/30 to-[#8B5CF6]/20 text-lg font-bold text-[#7E95FF] ring-1 ring-white/[0.08]">
@@ -2342,7 +2349,7 @@ export default function MessagesPage() {
                         activeGroup.name[0]?.toUpperCase() || "G"
                       )}
                     </div>
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-white/[0.08] px-3 py-2 text-xs font-semibold text-[#D8D8E8] transition-all hover:bg-white/[0.05]">
+                    <label className="touch-target inline-flex cursor-pointer items-center gap-2 rounded-lg border border-white/[0.08] px-3 py-2 text-xs font-semibold text-[#D8D8E8] transition-all hover:bg-white/[0.05]">
                       <Camera size={14} />
                       Change Avatar
                       {isGroupAdmin(activeGroup) && (
@@ -2362,7 +2369,7 @@ export default function MessagesPage() {
                       value={manageGroupName}
                       onChange={(e) => setManageGroupName(e.target.value)}
                       disabled={!isGroupAdmin(activeGroup)}
-                      className="w-full rounded-lg border border-white/[0.08] bg-white/[0.035] px-3.5 py-3 text-sm text-white outline-none transition-all focus:border-[#4F6EF7]/45"
+                      className="touch-target w-full rounded-lg border border-white/[0.08] bg-white/[0.035] px-3.5 py-3 text-sm text-white outline-none transition-all focus:border-[#4F6EF7]/45"
                     />
                   </div>
 
@@ -2389,7 +2396,7 @@ export default function MessagesPage() {
                           onChange={(e) => searchManageMembers(e.target.value)}
                           onFocus={() => searchManageMembers(manageMemberSearch)}
                           placeholder="Search contacts"
-                          className="w-full rounded-lg border border-white/[0.08] bg-white/[0.035] py-3 pl-9 pr-3 text-sm text-white outline-none transition-all placeholder:text-[#4A4A5A] focus:border-[#4F6EF7]/45"
+                          className="touch-target w-full rounded-lg border border-white/[0.08] bg-white/[0.035] py-3 pl-9 pr-3 text-sm text-white outline-none transition-all placeholder:text-[#4A4A5A] focus:border-[#4F6EF7]/45"
                         />
                       </div>
                       {(manageMemberResults.length > 0 || groupMembersLoading) && (
@@ -2404,11 +2411,11 @@ export default function MessagesPage() {
                                 type="button"
                                 onClick={() => handleSelectManageMember(user)}
                                 disabled={selected}
-                                className="flex w-full items-center gap-3 px-3 py-2 text-left text-xs text-white transition-all hover:bg-white/[0.055] disabled:opacity-45"
+                                className="touch-target flex w-full items-center gap-3 px-3 py-2.5 text-left text-xs text-white transition-all hover:bg-white/[0.055] disabled:opacity-45"
                               >
-                                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#4F6EF7]/14 text-[10px] font-bold text-[#7E95FF]">{getCandidateName(user)[0]?.toUpperCase() || "U"}</span>
+                                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#4F6EF7]/14 text-[10px] font-bold text-[#7E95FF]">{getCandidateName(user)[0]?.toUpperCase() || "U"}</span>
                                 <span className="min-w-0 flex-1 truncate">{getCandidateName(user)}</span>
-                                {selected && <Check size={14} className="text-[#4F6EF7]" />}
+                                {selected && <Check size={15} className="text-[#4F6EF7]" />}
                               </button>
                             )
                           })}
@@ -2425,8 +2432,8 @@ export default function MessagesPage() {
                           <span className="min-w-0 flex-1 truncate text-xs text-[#E6E6F2]">
                             {manageSelectedProfiles[memberId] ? getCandidateName(manageSelectedProfiles[memberId]) : memberId.slice(0, 8)}
                           </span>
-                          <button type="button" onClick={() => handleRemoveManageSelected(memberId)} className="text-[#6B6B80] hover:text-white" aria-label="Remove selected member">
-                            <X size={13} />
+                          <button type="button" onClick={() => handleRemoveManageSelected(memberId)} className="touch-target text-[#6B6B80] hover:text-white" aria-label="Remove selected member">
+                            <X size={14} />
                           </button>
                         </div>
                       ))}
@@ -2453,7 +2460,7 @@ export default function MessagesPage() {
                               <button
                                 type="button"
                                 onClick={() => handleUpdateActiveMemberRole(member.userId, member.role === "admin" ? "member" : "admin")}
-                                className="rounded-lg border border-white/[0.08] px-2 py-1.5 text-[10px] font-semibold text-[#B8B8C8] transition-all hover:bg-white/[0.05] hover:text-white"
+                                className="touch-target rounded-lg border border-white/[0.08] px-2 py-1.5 text-[10px] font-semibold text-[#B8B8C8] transition-all hover:bg-white/[0.05] hover:text-white"
                               >
                                 {member.role === "admin" ? "Make member" : "Make admin"}
                               </button>
@@ -2462,10 +2469,10 @@ export default function MessagesPage() {
                               <button
                                 type="button"
                                 onClick={() => handleRemoveMemberFromActiveGroup(member.userId)}
-                                className="flex h-7 w-7 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-red-500/10 hover:text-red-300"
+                                className="touch-target flex h-8 w-8 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-red-500/10 hover:text-red-300"
                                 aria-label={`Remove ${member.name}`}
                               >
-                                <UserMinus size={13} />
+                                <UserMinus size={14} />
                               </button>
                             )}
                           </div>
@@ -2476,22 +2483,22 @@ export default function MessagesPage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] bg-white/[0.02] px-5 py-4">
-                <div className="flex gap-2">
+              <div className="flex flex-col gap-2 border-t border-white/[0.06] bg-white/[0.02] px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <button
                     type="button"
                     onClick={() => handleRemoveMemberFromActiveGroup(uid!)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] px-3 py-2 text-xs font-semibold text-[#B8B8C8] transition-all hover:bg-white/[0.05] hover:text-white"
+                    className="touch-target w-full rounded-lg border border-white/[0.08] px-3 py-3 text-xs font-semibold text-[#B8B8C8] transition-all hover:bg-white/[0.05] hover:text-white sm:w-auto"
                   >
-                    <LogOut size={14} /> Leave Group
+                    <LogOut size={14} className="inline mr-1" /> Leave Group
                   </button>
                   {isGroupAdmin(activeGroup) && (
                     <button
                       type="button"
                       onClick={handleDeleteActiveGroup}
-                      className="inline-flex items-center gap-2 rounded-lg border border-red-500/20 px-3 py-2 text-xs font-semibold text-red-300 transition-all hover:bg-red-500/10"
+                      className="touch-target w-full rounded-lg border border-red-500/20 px-3 py-3 text-xs font-semibold text-red-300 transition-all hover:bg-red-500/10 sm:w-auto"
                     >
-                      <Trash2 size={14} /> Delete Group
+                      <Trash2 size={14} className="inline mr-1" /> Delete Group
                     </button>
                   )}
                 </div>
@@ -2499,7 +2506,7 @@ export default function MessagesPage() {
                   type="button"
                   onClick={handleSaveGroupSettings}
                   disabled={!manageGroupName.trim() || savingGroup || !isGroupAdmin(activeGroup)}
-                  className="inline-flex min-w-32 items-center justify-center gap-2 rounded-lg bg-gradient-to-br from-[#2563EB] to-[#6D28D9] px-4 py-2.5 text-sm font-semibold text-white transition-all hover:shadow-[0_0_18px_rgba(37,99,235,0.35)] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="touch-target w-full rounded-lg bg-gradient-to-br from-[#2563EB] to-[#6D28D9] px-4 py-3 text-sm font-semibold text-white transition-all hover:shadow-[0_0_18px_rgba(37,99,235,0.35)] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
                 >
                   {savingGroup ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} />}
                   Save
@@ -2510,21 +2517,21 @@ export default function MessagesPage() {
         )}
       </AnimatePresence>
 
-      {/* Profile Drawer */}
+      {/* Profile Drawer - bottom sheet on mobile */}
       <AnimatePresence>
         {drawerUserId && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4"
             onClick={() => setDrawerUserId(null)}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-md rounded-3xl border border-white/[0.08] bg-[#0A0A0F] p-6 shadow-2xl"
+              className="safe-bottom relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-white/[0.08] bg-[#0A0A0F] p-5 shadow-2xl sm:rounded-3xl sm:p-6"
               onClick={(e) => e.stopPropagation()}
             >
               {drawerLoading ? (
@@ -2561,7 +2568,7 @@ export default function MessagesPage() {
                       <p className="text-[10px] text-[#4A4A5A]">Following</p>
                     </div>
                   </div>
-                  <div className="mt-5 flex gap-3">
+                  <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                     {uid && drawerProfile.id !== uid && (
                       <>
                         <FollowButton
@@ -2572,7 +2579,7 @@ export default function MessagesPage() {
                           onStateChange={(nowFollowing) => {
                             setDrawerProfile((prev) => prev ? { ...prev, following_: nowFollowing, followers: nowFollowing ? prev.followers + 1 : Math.max(0, prev.followers - 1) } : prev)
                           }}
-                          className="flex-1"
+                          className="w-full sm:flex-1"
                         />
                         <button
                           onClick={async () => {
@@ -2588,7 +2595,7 @@ export default function MessagesPage() {
                               }
                             }
                           }}
-                          className="flex-1 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] py-2.5 text-sm font-semibold text-white"
+                          className="touch-target w-full rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] py-3 text-sm font-semibold text-white sm:flex-1"
                         >
                           Message
                         </button>
@@ -2601,7 +2608,7 @@ export default function MessagesPage() {
               )}
               <button
                 onClick={() => setDrawerUserId(null)}
-                className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] text-white/50 hover:text-white"
+                className="touch-target absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] text-white/50 hover:text-white"
               >
                 <X size={16} />
               </button>

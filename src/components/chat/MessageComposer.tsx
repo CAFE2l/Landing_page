@@ -227,7 +227,7 @@ export default function MessageComposer({
   }
 
   return (
-    <div className="safe-bottom shrink-0 border-t border-white/[0.06] bg-[#0A0A0F]/90 px-3 py-3 backdrop-blur-md sm:px-4">
+    <div className="safe-bottom sticky bottom-0 z-10 shrink-0 border-t border-white/[0.06] bg-[#0A0A0F]/95 px-2 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
       <AnimatePresence>
         {showAudioRecorder && (
           <div className="mb-2">
@@ -236,91 +236,163 @@ export default function MessageComposer({
         )}
       </AnimatePresence>
 
-      <div className="flex items-end gap-2">
-        <div className="relative flex-1 min-w-0">
-          {showEmoji && <EmojiPicker onSelect={handleEmojiSelect} onClose={() => setShowEmoji(false)} />}
-          {showStickers && <StickerPanel onSelect={handleStickerSelect} onClose={() => setShowStickers(false)} />}
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={`Message ${otherUserName}...`}
-            rows={1}
-            className="w-full min-h-[44px] max-h-[120px] resize-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-base text-white outline-none transition-all placeholder:text-[#4A4A5A] focus:border-[#4F6EF7]/40 sm:py-2.5 sm:pr-36 sm:text-sm"
-          />
-          <div className="mt-2 flex items-center justify-between gap-1 sm:absolute sm:bottom-1.5 sm:right-2 sm:mt-0 sm:justify-start sm:gap-0.5">
+      {/* Mobile: stacked layout (textarea above, icons + send below) */}
+      <div className="flex flex-col gap-2 sm:hidden">
+        {showEmoji && <EmojiPicker onSelect={handleEmojiSelect} onClose={() => setShowEmoji(false)} />}
+        {showStickers && <StickerPanel onSelect={handleStickerSelect} onClose={() => setShowStickers(false)} />}
+        <textarea
+          ref={inputRef}
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={`Message ${otherUserName}...`}
+          rows={1}
+          className="min-h-[46px] max-h-[120px] w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-base text-white outline-none transition-all placeholder:text-[#4A4A5A] focus:border-[#4F6EF7]/40"
+        />
+        <div className="flex items-center justify-between gap-1">
+          <div className="flex items-center gap-0.5">
             <button
               type="button"
               onClick={() => { closePanels(); mediaFileRef.current?.click() }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7] sm:h-8 sm:w-8 sm:text-[#4A4A5A]"
+              className="touch-target flex h-11 w-11 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
               title="Attach image or video"
               aria-label="Attach image or video"
             >
-              <Image size={16} />
+              <Image size={20} />
             </button>
-            <input
-              ref={mediaFileRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime,audio/webm,audio/mp4,audio/ogg,audio/wav"
-              className="hidden"
-              onChange={handleFileSelect}
-            />
             <button
               type="button"
               onClick={() => { closePanels(); docFileRef.current?.click() }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7] sm:h-8 sm:w-8 sm:text-[#4A4A5A]"
+              className="touch-target flex h-11 w-11 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
               title="Attach file"
               aria-label="Attach file"
             >
-              <FileIcon size={16} />
+              <FileIcon size={20} />
             </button>
-            <input
-              ref={docFileRef}
-              type="file"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.gz,.json,.csv,.txt"
-              className="hidden"
-              onChange={handleDocSelect}
-            />
             <button
               type="button"
               onClick={() => { setShowStickers(!showStickers); setShowEmoji(false); setShowAudioRecorder(false) }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7] sm:h-8 sm:w-8 sm:text-[#4A4A5A]"
+              className="touch-target flex h-11 w-11 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
               title="Sticker"
               aria-label="Open stickers"
             >
-              <Sticker size={16} />
+              <Sticker size={20} />
             </button>
             <button
               type="button"
               onClick={() => { setShowEmoji(!showEmoji); setShowStickers(false); setShowAudioRecorder(false) }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7] sm:h-8 sm:w-8 sm:text-[#4A4A5A]"
+              className="touch-target flex h-11 w-11 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
               title="Emoji"
               aria-label="Open emoji picker"
             >
-              <Smile size={16} />
+              <Smile size={20} />
             </button>
             <button
               type="button"
               onClick={() => { setShowAudioRecorder(!showAudioRecorder); setShowEmoji(false); setShowStickers(false) }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7] sm:h-8 sm:w-8 sm:text-[#4A4A5A]"
+              className="touch-target flex h-11 w-11 items-center justify-center rounded-lg text-[#6B6B80] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
               title="Record audio"
               aria-label="Record audio"
             >
-              <Mic size={16} />
+              <Mic size={20} />
             </button>
           </div>
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={sending || !input.trim() || !!pendingMedia}
+            className="touch-target flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white transition-all hover:shadow-[0_0_16px_rgba(37,99,235,0.3)] disabled:cursor-not-allowed disabled:opacity-40"
+            title="Send"
+            aria-label="Send message"
+          >
+            {sending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+          </button>
         </div>
+      </div>
 
+      {/* Desktop: single row layout (textarea + icons + send) */}
+      <div className="hidden sm:flex sm:items-end sm:gap-2">
+        <textarea
+          ref={inputRef}
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={`Message ${otherUserName}...`}
+          rows={1}
+          className="min-h-[46px] max-h-[120px] flex-1 resize-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-white outline-none transition-all placeholder:text-[#4A4A5A] focus:border-[#4F6EF7]/40"
+        />
+        <div className="flex items-center gap-0.5 shrink-0">
+          {showEmoji && <EmojiPicker onSelect={handleEmojiSelect} onClose={() => setShowEmoji(false)} />}
+          {showStickers && <StickerPanel onSelect={handleStickerSelect} onClose={() => setShowStickers(false)} />}
+          <button
+            type="button"
+            onClick={() => { closePanels(); mediaFileRef.current?.click() }}
+            className="touch-target flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
+            title="Attach image or video"
+            aria-label="Attach image or video"
+          >
+            <Image size={18} />
+          </button>
+          <input
+            ref={mediaFileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime,audio/webm,audio/mp4,audio/ogg,audio/wav"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+          <button
+            type="button"
+            onClick={() => { closePanels(); docFileRef.current?.click() }}
+            className="touch-target flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
+            title="Attach file"
+            aria-label="Attach file"
+          >
+            <FileIcon size={18} />
+          </button>
+          <input
+            ref={docFileRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.gz,.json,.csv,.txt"
+            className="hidden"
+            onChange={handleDocSelect}
+          />
+          <button
+            type="button"
+            onClick={() => { setShowStickers(!showStickers); setShowEmoji(false); setShowAudioRecorder(false) }}
+            className="touch-target flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
+            title="Sticker"
+            aria-label="Open stickers"
+          >
+            <Sticker size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowEmoji(!showEmoji); setShowStickers(false); setShowAudioRecorder(false) }}
+            className="touch-target flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
+            title="Emoji"
+            aria-label="Open emoji picker"
+          >
+            <Smile size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowAudioRecorder(!showAudioRecorder); setShowEmoji(false); setShowStickers(false) }}
+            className="touch-target flex h-8 w-8 items-center justify-center rounded-lg text-[#4A4A5A] transition-all hover:bg-white/[0.06] hover:text-[#4F6EF7]"
+            title="Record audio"
+            aria-label="Record audio"
+          >
+            <Mic size={18} />
+          </button>
+        </div>
         <button
           type="button"
           onClick={handleSend}
           disabled={sending || !input.trim() || !!pendingMedia}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white transition-all hover:shadow-[0_0_16px_rgba(37,99,235,0.3)] disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-10"
+          className="touch-target flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563EB] to-[#6D28D9] text-white transition-all hover:shadow-[0_0_16px_rgba(37,99,235,0.3)] disabled:cursor-not-allowed disabled:opacity-40"
           title="Send"
           aria-label="Send message"
         >
-          {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+          {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
         </button>
       </div>
 

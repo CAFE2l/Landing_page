@@ -209,7 +209,7 @@ function StatusAvatar({
       whileHover={{ y: -3, scale: 1.035 }}
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
-      className="group w-[86px] shrink-0 text-center"
+      className="group w-[78px] shrink-0 text-center sm:w-[86px]"
     >
       <span
         className={cn(
@@ -219,7 +219,7 @@ function StatusAvatar({
         )}
       >
         <span className="block rounded-full bg-[#07080d] p-[3px]">
-          <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="lg" className="h-[58px] w-[58px]" ring={false} />
+          <UserAvatar user={{ name: group.name, avatarUrl: group.avatarUrl }} size="lg" className="h-[54px] w-[54px] sm:h-[58px] sm:w-[58px]" ring={false} />
         </span>
       </span>
       <span className="mt-2 block truncate text-xs font-semibold text-white/80 transition group-hover:text-white">{group.name}</span>
@@ -244,17 +244,17 @@ function StatusRail({
   onOpenGroup: (group: StatusGroup) => void
 }) {
   return (
-    <section className="rounded-[30px] border border-white/[0.08] bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] p-4 shadow-[0_28px_90px_rgba(0,0,0,0.28)] backdrop-blur-2xl">
-      <div className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <section className="rounded-[24px] border border-white/[0.08] bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.28)] backdrop-blur-2xl sm:rounded-[30px] sm:p-4">
+      <div className="mobile-scroll-x flex gap-3 pb-1 sm:gap-4">
         <motion.button
           type="button"
           whileHover={{ y: -3, scale: 1.035 }}
           whileTap={{ scale: 0.97 }}
           onClick={onCreate}
           disabled={!signedIn}
-          className="group w-[86px] shrink-0 text-center disabled:cursor-not-allowed disabled:opacity-45"
+          className="group w-[78px] shrink-0 text-center disabled:cursor-not-allowed disabled:opacity-45 sm:w-[86px]"
         >
-          <span className="mx-auto flex h-[66px] w-[66px] items-center justify-center rounded-full border border-dashed border-[#7EA1FF]/50 bg-[#4F6EF7]/12 text-[#B9C8FF] shadow-[0_0_30px_rgba(79,110,247,0.16)] transition group-hover:border-[#9bb3ff]/80 group-hover:bg-[#4F6EF7]/18">
+          <span className="mx-auto flex h-[62px] w-[62px] items-center justify-center rounded-full border border-dashed border-[#7EA1FF]/50 bg-[#4F6EF7]/12 text-[#B9C8FF] shadow-[0_0_30px_rgba(79,110,247,0.16)] transition group-hover:border-[#9bb3ff]/80 group-hover:bg-[#4F6EF7]/18 sm:h-[66px] sm:w-[66px]">
             <Plus size={22} />
           </span>
           <span className="mt-2 block text-xs font-semibold text-white/82">Create</span>
@@ -263,8 +263,8 @@ function StatusRail({
 
         {loading
           ? [0, 1, 2, 3, 4, 5].map((item) => (
-              <div key={item} className="w-[86px] shrink-0 text-center">
-                <div className="mx-auto h-[66px] w-[66px] animate-pulse rounded-full bg-white/[0.06]" />
+              <div key={item} className="w-[78px] shrink-0 text-center sm:w-[86px]">
+                <div className="mx-auto h-[62px] w-[62px] animate-pulse rounded-full bg-white/[0.06] sm:h-[66px] sm:w-[66px]" />
                 <div className="mx-auto mt-2 h-3 w-14 animate-pulse rounded bg-white/[0.06]" />
                 <div className="mx-auto mt-1 h-2 w-10 animate-pulse rounded bg-white/[0.04]" />
               </div>
@@ -361,7 +361,7 @@ function StatusComposer({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/76 p-4 backdrop-blur-2xl"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/76 p-0 backdrop-blur-2xl sm:items-center sm:p-4"
           onClick={onClose}
         >
           <motion.div
@@ -370,26 +370,27 @@ function StatusComposer({
             exit={{ opacity: 0, y: 18, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 260, damping: 24 }}
             onClick={(event) => event.stopPropagation()}
-            className="relative max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-[32px] border border-white/[0.11] bg-[#090a10]/96 shadow-[0_44px_130px_rgba(0,0,0,0.62)]"
+            className="safe-bottom relative max-h-[94dvh] w-full max-w-2xl overflow-hidden rounded-t-[28px] border border-white/[0.11] bg-[#090a10]/96 shadow-[0_44px_130px_rgba(0,0,0,0.62)] sm:max-h-[92vh] sm:rounded-[32px]"
           >
             <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_26%_0%,rgba(79,110,247,0.22),transparent_42%),radial-gradient(circle_at_82%_8%,rgba(139,92,246,0.14),transparent_36%)]" />
-            <div className="relative max-h-[92vh] overflow-y-auto p-5 md:p-6">
+            <div className="relative max-h-[92dvh] overflow-y-auto p-4 sm:p-5 md:p-6">
               <div className="mb-5 flex items-start justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                   <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#7EA1FF]">Create Status</p>
-                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Share what you are building</h2>
+                  <h2 className="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">Share what you are building</h2>
                   <p className="mt-1 text-sm text-white/46">Progress, projects, wins, lifestyle and behind-the-scenes updates.</p>
                 </div>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.045] text-white/55 transition hover:bg-white/[0.08] hover:text-white"
+                  className="touch-target flex shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.045] text-white/55 transition hover:bg-white/[0.08] hover:text-white"
+                  aria-label="Close status composer"
                 >
                   <X size={17} />
                 </button>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="mobile-scroll-x flex gap-2 sm:grid sm:grid-cols-3">
                 {CATEGORIES.map((category) => {
                   const selected = form.category === category.id
                   const Icon = category.icon
@@ -399,8 +400,8 @@ function StatusComposer({
                       type="button"
                       whileHover={{ y: -1 }}
                       onClick={() => update("category", category.id)}
-                      className={cn(
-                        "flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-left text-xs font-semibold transition",
+                    className={cn(
+                        "flex min-h-11 shrink-0 items-center gap-2 rounded-2xl border px-3 py-2.5 text-left text-xs font-semibold transition",
                         selected ? category.color : "border-white/[0.08] bg-white/[0.035] text-white/48 hover:bg-white/[0.055] hover:text-white",
                       )}
                     >
@@ -424,11 +425,12 @@ function StatusComposer({
                 />
                 {form.image ? (
                   <div className="relative mt-4 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.035]">
-                    <img src={form.image.url} alt="Status preview" className="max-h-[340px] w-full object-cover" />
+                    <img src={form.image.url} alt="Status preview" loading="lazy" decoding="async" className="max-h-[340px] w-full object-cover" />
                     <button
                       type="button"
                       onClick={() => update("image", null)}
-                      className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/72 text-white transition hover:bg-red-500"
+                      className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/72 text-white transition hover:bg-red-500"
+                      aria-label="Remove selected image"
                     >
                       <X size={15} />
                     </button>
@@ -441,8 +443,8 @@ function StatusComposer({
                 )}
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <div className="flex items-center justify-between gap-3 sm:justify-start">
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
@@ -459,7 +461,7 @@ function StatusComposer({
                   type="button"
                   onClick={submit}
                   disabled={submitting || uploading || Boolean(error)}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45 sm:h-11 sm:w-auto"
                 >
                   {submitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                   Create Status
@@ -558,7 +560,7 @@ function StatusViewer({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/78 p-3 backdrop-blur-2xl md:p-6"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/78 p-0 backdrop-blur-2xl sm:items-center sm:p-3 md:p-6"
           onClick={onClose}
         >
           <motion.div
@@ -567,7 +569,7 @@ function StatusViewer({
             exit={{ opacity: 0, y: 18, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 250, damping: 24 }}
             onClick={(event) => event.stopPropagation()}
-            className="relative h-[92vh] w-full max-w-6xl overflow-hidden rounded-[34px] border border-white/[0.11] bg-[#05060a]/96 shadow-[0_48px_150px_rgba(0,0,0,0.65)]"
+            className="relative h-[96dvh] w-full max-w-6xl overflow-hidden rounded-t-[28px] border border-white/[0.11] bg-[#05060a]/96 shadow-[0_48px_150px_rgba(0,0,0,0.65)] sm:h-[92vh] sm:rounded-[34px]"
           >
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(79,110,247,0.24),transparent_34%),radial-gradient(circle_at_82%_12%,rgba(139,92,246,0.18),transparent_34%)]" />
             <div className="relative grid h-full lg:grid-cols-[minmax(0,1fr)_310px]">
@@ -579,15 +581,17 @@ function StatusViewer({
                         key={post.id}
                         type="button"
                         onClick={() => setActiveIndex(index)}
-                        className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/16"
+                        className="flex flex-1 items-center py-2"
                         aria-label={`Open status ${index + 1}`}
                       >
-                        <motion.span
-                          className="block h-full rounded-full bg-white"
-                          initial={false}
-                          animate={{ width: index < activeIndex ? "100%" : index === activeIndex ? "100%" : "0%" }}
-                          transition={{ duration: index === activeIndex ? 0.35 : 0.18 }}
-                        />
+                        <span className="h-1.5 w-full overflow-hidden rounded-full bg-white/16">
+                          <motion.span
+                            className="block h-full rounded-full bg-white"
+                            initial={false}
+                            animate={{ width: index < activeIndex ? "100%" : index === activeIndex ? "100%" : "0%" }}
+                            transition={{ duration: index === activeIndex ? 0.35 : 0.18 }}
+                          />
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -622,7 +626,7 @@ function StatusViewer({
                   </div>
                 </div>
 
-                <div className="relative flex min-h-0 flex-1 items-center justify-center p-4 pt-24 md:p-8 md:pt-24">
+                <div className="relative flex min-h-0 flex-1 items-center justify-center p-3 pt-24 sm:p-4 md:p-8 md:pt-24">
                   <button
                     type="button"
                     onClick={goPrev}
@@ -648,10 +652,10 @@ function StatusViewer({
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.98, y: -10 }}
                         transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                        className="flex h-full max-h-[720px] w-full max-w-[520px] flex-col overflow-hidden rounded-[32px] border border-white/[0.12] bg-[linear-gradient(145deg,rgba(255,255,255,0.085),rgba(255,255,255,0.025))] shadow-[0_34px_110px_rgba(0,0,0,0.50)] backdrop-blur-2xl"
+                        className="flex h-full max-h-[720px] w-full max-w-[520px] flex-col overflow-hidden rounded-[24px] border border-white/[0.12] bg-[linear-gradient(145deg,rgba(255,255,255,0.085),rgba(255,255,255,0.025))] shadow-[0_34px_110px_rgba(0,0,0,0.50)] backdrop-blur-2xl sm:rounded-[32px]"
                       >
                         {activePost.mediaUrl && activePost.mediaType === "image" ? (
-                          <img src={activePost.mediaUrl} alt="" className="min-h-0 flex-1 object-cover" />
+                          <img src={activePost.mediaUrl} alt="" loading="lazy" decoding="async" className="min-h-0 flex-1 object-cover" />
                         ) : activePost.mediaUrl && activePost.mediaType === "video" ? (
                           <video src={activePost.mediaUrl} controls preload="metadata" playsInline className="min-h-0 flex-1 bg-black object-contain" />
                         ) : activePost.mediaUrl && activePost.mediaType === "audio" ? (
@@ -660,7 +664,7 @@ function StatusViewer({
                           </div>
                         ) : (
                           <div className="flex flex-1 items-center justify-center p-8">
-                            <p className="whitespace-pre-wrap text-center text-2xl font-semibold leading-relaxed text-white md:text-3xl">{activePost.content}</p>
+                            <p className="whitespace-pre-wrap text-center text-xl font-semibold leading-relaxed text-white sm:text-2xl md:text-3xl">{activePost.content}</p>
                           </div>
                         )}
                         {(activePost.mediaUrl && activePost.content) ? (
@@ -681,11 +685,11 @@ function StatusViewer({
                 </div>
 
                 <div className="flex items-center justify-center gap-3 border-t border-white/[0.07] bg-black/18 px-4 py-3 md:hidden">
-                  <button type="button" onClick={goPrev} disabled={activeIndex === 0} className="rounded-full border border-white/[0.1] bg-white/[0.04] p-3 text-white disabled:opacity-25">
+                  <button type="button" onClick={goPrev} disabled={activeIndex === 0} className="touch-target rounded-full border border-white/[0.1] bg-white/[0.04] p-3 text-white disabled:opacity-25">
                     <ChevronLeft size={18} />
                   </button>
                   <span className="text-xs text-white/42">{activeIndex + 1} / {posts.length}</span>
-                  <button type="button" onClick={goNext} disabled={activeIndex >= posts.length - 1} className="rounded-full border border-white/[0.1] bg-white/[0.04] p-3 text-white disabled:opacity-25">
+                  <button type="button" onClick={goNext} disabled={activeIndex >= posts.length - 1} className="touch-target rounded-full border border-white/[0.1] bg-white/[0.04] p-3 text-white disabled:opacity-25">
                     <ChevronRight size={18} />
                   </button>
                 </div>
@@ -729,7 +733,7 @@ function StatusViewer({
                       {group.followedByMe ? "Following" : "Follow"}
                     </button>
                   ) : null}
-                  <button type="button" onClick={() => navigate("/messages")} className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.045] text-sm font-semibold text-white/76 transition hover:bg-white/[0.07] hover:text-white">
+                  <button type="button" onClick={() => navigate("/dashboard/messages")} className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.045] text-sm font-semibold text-white/76 transition hover:bg-white/[0.07] hover:text-white">
                     <MessageCircle size={15} />
                     Send Message
                   </button>
@@ -846,7 +850,7 @@ function MobileFilters({
   onCategory: (category: CategoryFilter) => void
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 xl:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="mobile-scroll-x flex gap-2 pb-1 xl:hidden">
       {FILTERS.map((filter) => {
         const active = filter.type === "mode" ? mode === filter.value && category === "all" : category === filter.value
         return (
@@ -862,7 +866,7 @@ function MobileFilters({
               }
             }}
             className={cn(
-              "h-10 shrink-0 rounded-full border px-4 text-xs font-semibold transition",
+              "touch-target shrink-0 rounded-full border px-4 text-xs font-semibold transition",
               active ? "border-white/20 bg-white text-black" : "border-white/[0.08] bg-white/[0.04] text-white/52 hover:text-white",
             )}
           >
@@ -908,7 +912,7 @@ function StatusCard({
     >
       {hasImage ? (
         <button type="button" onClick={onOpenViewer} className="block w-full overflow-hidden bg-white/[0.025]">
-          <img src={post.mediaUrl || ""} alt="" loading="lazy" decoding="async" className="max-h-[420px] w-full object-cover transition duration-500 group-hover:scale-[1.025]" />
+          <img src={post.mediaUrl || ""} alt="" loading="lazy" decoding="async" className="max-h-[360px] w-full object-cover transition duration-500 group-hover:scale-[1.025] sm:max-h-[420px]" />
         </button>
       ) : null}
       <div className={cn("p-5", compactText && "p-6")}>
@@ -921,12 +925,12 @@ function StatusCard({
             </span>
           </button>
           <div className="relative flex items-center gap-2">
-            <CategoryBadge category={post.category} />
+            <span className="inline-flex shrink-0"><CategoryBadge category={post.category} /></span>
             {isAdmin ? (
               <button
                 type="button"
                 onClick={() => setAdminOpen((value) => !value)}
-                className="flex h-8 w-8 items-center justify-center rounded-xl text-white/40 transition hover:bg-white/[0.06] hover:text-white"
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-white/40 transition hover:bg-white/[0.06] hover:text-white sm:h-8 sm:w-8"
               >
                 <MoreHorizontal size={15} />
               </button>
@@ -937,17 +941,17 @@ function StatusCard({
                   initial={{ opacity: 0, y: 8, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                  className="absolute right-0 top-10 z-10 w-46 overflow-hidden rounded-2xl border border-white/[0.09] bg-[#101018] shadow-2xl"
+                className="absolute right-0 top-10 z-10 w-44 overflow-hidden rounded-2xl border border-white/[0.09] bg-[#101018] shadow-2xl"
                 >
-                  <button type="button" onClick={onHide} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-white/70 hover:bg-white/[0.06]">
+                  <button type="button" onClick={onHide} className="flex w-full items-center gap-2 px-3 py-3 text-left text-xs text-white/70 hover:bg-white/[0.06]">
                     <EyeOff size={13} />
                     Hide status
                   </button>
-                  <button type="button" onClick={onDelete} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-red-200 hover:bg-red-500/10">
+                  <button type="button" onClick={onDelete} className="flex w-full items-center gap-2 px-3 py-3 text-left text-xs text-red-200 hover:bg-red-500/10">
                     <Trash2 size={13} />
                     Remove status
                   </button>
-                  <div className="flex items-center gap-2 border-t border-white/[0.06] px-3 py-2.5 text-xs text-white/38">
+                  <div className="flex items-center gap-2 border-t border-white/[0.06] px-3 py-3 text-xs text-white/38">
                     <Flag size={13} />
                     {reportCount} reports
                   </div>
@@ -1199,10 +1203,10 @@ export default function StatusPage() {
       subtitle="Share progress, projects, wins, lifestyle and behind-the-scenes updates from the CAFÉ community."
     >
       <div className="relative">
-        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px] rounded-[56px] bg-[radial-gradient(circle_at_18%_6%,rgba(79,110,247,0.22),transparent_34%),radial-gradient(circle_at_82%_14%,rgba(139,92,246,0.14),transparent_30%),radial-gradient(circle_at_54%_32%,rgba(14,165,233,0.10),transparent_28%)] blur-3xl" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] rounded-[36px] bg-[radial-gradient(circle_at_18%_6%,rgba(79,110,247,0.18),transparent_34%),radial-gradient(circle_at_82%_14%,rgba(139,92,246,0.10),transparent_30%),radial-gradient(circle_at_54%_32%,rgba(14,165,233,0.08),transparent_28%)] blur-3xl sm:h-[560px] sm:rounded-[56px]" />
 
         <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
+          <div className="max-w-3xl min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#7EA1FF]">Discovery feed</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">Explore what the community is building</h2>
             <p className="mt-2 text-sm leading-6 text-white/48">Status updates stay published until the user or an admin removes them.</p>
@@ -1211,7 +1215,7 @@ export default function StatusPage() {
             type="button"
             onClick={() => setShowComposer(true)}
             disabled={!uid}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black shadow-[0_18px_50px_rgba(255,255,255,0.10)] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45"
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black shadow-[0_18px_50px_rgba(255,255,255,0.10)] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
           >
             <Plus size={16} />
             Create Status

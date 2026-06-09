@@ -704,16 +704,16 @@ export default function ProfilePage() {
   const showBadge = profile?.role || "client";
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#0a0a0f] px-4 pb-8 pt-28 text-white sm:px-6">
+    <main className="mobile-page relative overflow-hidden bg-[#0a0a0f] px-4 pb-8 pt-28 text-white sm:px-6">
       <AuthBackground />
       <Navbar />
 
-      <div className="relative z-10 mx-auto grid min-h-[calc(100vh-8rem)] w-full max-w-6xl gap-6 py-8 md:grid-cols-[minmax(360px,0.38fr)_1fr]">
+      <div className="relative z-10 mx-auto grid min-h-[calc(100dvh-8rem)] w-full max-w-6xl gap-6 py-6 md:grid-cols-[minmax(320px,0.38fr)_1fr] md:py-8">
         <motion.aside
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-          className={`${cardClass} p-6`}
+          className={`${cardClass} min-w-0 p-4 sm:p-6`}
         >
           <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:url('data:image/svg+xml,%3Csvg_viewBox=%220_0_200_200%22_xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter_id=%22n%22%3E%3CfeTurbulence_type=%22fractalNoise%22_baseFrequency=%220.85%22_numOctaves=%223%22_stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect_width=%22200%22_height=%22200%22_filter=%22url(%23n)%22_opacity=%220.45%22/%3E%3C/svg%3E')]" />
 
@@ -750,7 +750,7 @@ export default function ProfilePage() {
               />
             </div>
 
-            <h1 className="mt-5 font-['Clash_Display',Inter,sans-serif] text-2xl font-semibold text-white">
+            <h1 className="mt-5 break-words font-['Clash_Display',Inter,sans-serif] text-2xl font-semibold text-white">
               {displayName}
             </h1>
             {profile?.username && (
@@ -758,7 +758,7 @@ export default function ProfilePage() {
                 @{profile.username}
               </p>
             )}
-            <p className="mt-1 text-sm text-white/45">{profile?.email}</p>
+            <p className="mt-1 break-all text-sm text-white/45">{profile?.email}</p>
             <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs font-semibold text-[#b7c2ff] shadow-[0_6px_22px_rgba(59,130,246,0.12)]">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
               {showBadge === "admin" ? "Admin" : "Client Account"}
@@ -789,7 +789,7 @@ export default function ProfilePage() {
               <motion.button
                 whileHover={{ y: -2 }}
                 onClick={() => openSocialDrawer("following")}
-                className="flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-3.5 transition-all hover:border-blue-500/20 hover:shadow-[0_0_20px_rgba(37,99,235,0.08)] cursor-pointer"
+                className="touch-target flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-3.5 transition-all hover:border-blue-500/20 hover:shadow-[0_0_20px_rgba(37,99,235,0.08)] cursor-pointer"
               >
                 <span className="bg-gradient-to-r from-[#60a5fa] to-[#a78bfa] bg-clip-text text-xl font-bold text-transparent">
                   <CountUp value={profile?.following_count || 0} />
@@ -801,7 +801,7 @@ export default function ProfilePage() {
               <motion.button
                 whileHover={{ y: -2 }}
                 onClick={() => openSocialDrawer("followers")}
-                className="flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-3.5 transition-all hover:border-blue-500/20 hover:shadow-[0_0_20px_rgba(37,99,235,0.08)] cursor-pointer"
+                className="touch-target flex flex-col items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-2 py-3.5 transition-all hover:border-blue-500/20 hover:shadow-[0_0_20px_rgba(37,99,235,0.08)] cursor-pointer"
               >
                 <span className="bg-gradient-to-r from-[#60a5fa] to-[#a78bfa] bg-clip-text text-xl font-bold text-transparent">
                   <CountUp value={profile?.followers_count || 0} />
@@ -827,8 +827,8 @@ export default function ProfilePage() {
                   onClick={() => setActiveTab(tab.id)}
                   className={
                     active
-                      ? "flex w-full items-center gap-3 rounded-xl border border-[#2563eb]/30 bg-[#2563eb]/15 px-4 py-3 font-medium text-white shadow-[0_0_16px_rgba(37,99,235,0.15)]"
-                      : "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-white/45 transition-all duration-200 hover:bg-white/[0.04] hover:text-white"
+                      ? "touch-target flex w-full items-center gap-3 rounded-xl border border-[#2563eb]/30 bg-[#2563eb]/15 px-4 py-3 font-medium text-white shadow-[0_0_16px_rgba(37,99,235,0.15)]"
+                      : "touch-target flex w-full items-center gap-3 rounded-xl px-4 py-3 text-white/45 transition-all duration-200 hover:bg-white/[0.04] hover:text-white"
                   }
                 >
                   <Icon
@@ -856,7 +856,7 @@ export default function ProfilePage() {
                 >
                   <Link
                     to={item.href}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-white/45 transition-all duration-200 hover:bg-white/[0.04] hover:text-white"
+                    className="touch-target flex w-full items-center gap-3 rounded-xl px-4 py-3 text-white/45 transition-all duration-200 hover:bg-white/[0.04] hover:text-white"
                   >
                     <Icon className="text-[#475569]" size={18} />
                     {item.label}
@@ -889,7 +889,7 @@ export default function ProfilePage() {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-          className={`${cardClass} p-6 md:p-8`}
+          className={`${cardClass} min-w-0 p-4 sm:p-6 md:p-8`}
         >
           <AnimatePresence mode="wait">
             {activeTab === "profile" ? (
@@ -915,24 +915,24 @@ export default function ProfilePage() {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.97 }}
                       onClick={() => setIsEditing(true)}
-                      className="rounded-xl bg-gradient-to-r from-[#2563eb] to-[#8b5cf6] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(79,110,247,0.28)] transition-all hover:shadow-[0_0_36px_rgba(139,92,246,0.38)]"
+                      className="touch-target w-full sm:w-auto rounded-xl bg-gradient-to-r from-[#2563eb] to-[#8b5cf6] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(79,110,247,0.28)] transition-all hover:shadow-[0_0_36px_rgba(139,92,246,0.38)]"
                     >
                       Edit Profile
                     </motion.button>
                   ) : (
-                    <div className="flex gap-3">
-                      <button
-                        onClick={cancelEdit}
-                        className="rounded-xl border border-[#1a2d4a] px-4 py-2.5 text-sm text-[#94a3b8] transition-all duration-200 hover:border-[#2a4a7a] hover:text-white"
-                      >
-                        Cancel
-                      </button>
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.97 }}
-                        onClick={saveProfile}
-                        disabled={!hasChanges || saving}
-                        className={`flex items-center gap-2 rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300 hover:bg-[#1d4ed8] hover:shadow-[0_0_32px_rgba(37,99,235,0.55)] ${(!hasChanges || saving) ? "cursor-not-allowed opacity-50" : ""}`}
+                      <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                        <button
+                          onClick={cancelEdit}
+                          className="touch-target w-full rounded-xl border border-[#1a2d4a] px-4 py-2.5 text-sm text-[#94a3b8] transition-all duration-200 hover:border-[#2a4a7a] hover:text-white sm:w-auto"
+                        >
+                          Cancel
+                        </button>
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.97 }}
+                          onClick={saveProfile}
+                          disabled={!hasChanges || saving}
+                          className={`touch-target flex w-full items-center justify-center gap-2 rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300 hover:bg-[#1d4ed8] hover:shadow-[0_0_32px_rgba(37,99,235,0.55)] sm:w-auto ${(!hasChanges || saving) ? "cursor-not-allowed opacity-50" : ""}`}
                       >
                         {saving ? (
                           <Loader2 size={16} className="animate-spin" />
@@ -1077,13 +1077,13 @@ export default function ProfilePage() {
                         </div>
                       </div>
 
-                      <div className="mt-6 flex items-center gap-3 border-t border-[#1a2d4a] pt-6">
+                      <div className="mt-6 flex w-full flex-col gap-3 border-t border-[#1a2d4a] pt-6 sm:w-auto sm:flex-row sm:items-center">
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.97 }}
                           onClick={saveProfile}
                           disabled={!hasChanges || saving}
-                          className={`relative flex items-center gap-2 overflow-hidden rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-6 py-2.5 font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300 hover:bg-[#1d4ed8] hover:shadow-[0_0_32px_rgba(37,99,235,0.55)] ${(!hasChanges || saving) ? "cursor-not-allowed opacity-50" : ""}`}
+                          className={`touch-target flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-6 py-3 font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300 hover:bg-[#1d4ed8] hover:shadow-[0_0_32px_rgba(37,99,235,0.55)] sm:w-auto ${(!hasChanges || saving) ? "cursor-not-allowed opacity-50" : ""}`}
                         >
                           {saving ? (
                             <Loader2 size={16} className="animate-spin" />
@@ -1094,7 +1094,7 @@ export default function ProfilePage() {
                         </motion.button>
                         <button
                           onClick={cancelEdit}
-                          className="rounded-xl border border-[#1a2d4a] px-6 py-2.5 text-[#94a3b8] transition-all duration-200 hover:border-[#2a4a7a] hover:text-white"
+                          className="touch-target w-full rounded-xl border border-[#1a2d4a] px-6 py-3 text-[#94a3b8] transition-all duration-200 hover:border-[#2a4a7a] hover:text-white sm:w-auto"
                         >
                           Cancel
                         </button>
@@ -1135,7 +1135,7 @@ export default function ProfilePage() {
                           .catch(() => setOrdersError("Failed to load orders"))
                           .finally(() => setOrdersLoading(false));
                       }}
-                      className="inline-flex items-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white"
+                      className="touch-target inline-flex items-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white"
                     >
                       <RefreshCw size={13} /> Retry
                     </button>
@@ -1162,7 +1162,7 @@ export default function ProfilePage() {
                           <button
                             type="button"
                             onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
-                            className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-white/[0.02]"
+                            className="touch-target flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-white/[0.02]"
                           >
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/10">
                               <ShoppingBag size={18} className="text-[#60a5fa]" />
@@ -1316,7 +1316,7 @@ export default function ProfilePage() {
                                             );
                                           }
                                         }}
-                                        className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#0070BA] hover:bg-[#003087] disabled:opacity-60 disabled:cursor-not-allowed px-4 py-3 text-sm font-semibold text-white transition-all shadow-[0_4px_20px_rgba(0,112,186,0.35)]"
+                                        className="touch-target flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#0070BA] hover:bg-[#003087] disabled:opacity-60 disabled:cursor-not-allowed px-4 py-3 text-sm font-semibold text-white transition-all shadow-[0_4px_20px_rgba(0,112,186,0.35)]"
                                       >
                                         {payingOrderId === order.id ? (
                                           <Loader2 size={16} className="animate-spin" />
@@ -1418,7 +1418,7 @@ export default function ProfilePage() {
                           <button
                             type="button"
                             onClick={() => setShowPasswords((s) => !s)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-2 text-[#94a3b8] hover:text-white"
+                            className="touch-target absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-2 text-[#94a3b8] hover:text-white"
                             aria-label={
                               showPasswords
                                 ? "Hide passwords"
@@ -1502,11 +1502,11 @@ export default function ProfilePage() {
                         </p>
                       )}
 
-                      <div className="mt-2 flex items-center gap-3">
+                      <div className="mt-2 flex w-full flex-col gap-3 sm:flex-row sm:items-center">
                         <button
                           type="submit"
                           disabled={passwordLoading}
-                          className="inline-flex items-center gap-2 rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white shadow-[0_0_16px_rgba(37,99,235,0.25)] hover:bg-[#1d4ed8]"
+                          className="touch-target inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#3b82f6]/30 bg-[#2563eb] px-4 py-3 text-sm font-semibold text-white shadow-[0_0_16px_rgba(37,99,235,0.25)] hover:bg-[#1d4ed8] sm:w-auto"
                         >
                           {passwordLoading ? (
                             <Loader2 size={16} className="animate-spin" />
@@ -1522,7 +1522,7 @@ export default function ProfilePage() {
                             setNewPassword("");
                             setConfirmPassword("");
                           }}
-                          className="rounded-xl border border-[#1a2d4a] px-4 py-2 text-sm text-[#94a3b8]"
+                          className="touch-target w-full rounded-xl border border-[#1a2d4a] px-4 py-3 text-sm text-[#94a3b8] sm:w-auto"
                         >
                           Clear
                         </button>
@@ -1617,7 +1617,7 @@ export default function ProfilePage() {
                 </h2>
                 <button
                   onClick={() => setSocialDrawer(null)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors"
+                  className="touch-target flex h-8 w-8 items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors"
                 >
                   <X size={16} />
                 </button>
@@ -1676,7 +1676,7 @@ export default function ProfilePage() {
                           <button
                             type="button"
                             onClick={() => openSocialProfile(user)}
-                            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-500/30 to-cyan-500/30 text-sm font-bold text-blue-400"
+                            className="touch-target flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-500/30 to-cyan-500/30 text-sm font-bold text-blue-400"
                             title={`Open ${user.name}'s profile`}
                           >
                             {user.avatarUrl ? (
@@ -1724,7 +1724,7 @@ export default function ProfilePage() {
                                 whileTap={{ scale: 0.97 }}
                                 onClick={() => openSocialChat(user)}
                                 disabled={chattingUserId === user.id}
-                                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-blue-400/20 bg-blue-500/10 px-2.5 text-xs font-semibold text-blue-300 transition-colors hover:border-blue-400/35 hover:bg-blue-500/20 disabled:cursor-wait disabled:opacity-60"
+                                className="touch-target inline-flex h-11 items-center justify-center gap-1.5 rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 text-xs font-semibold text-blue-300 transition-colors hover:border-blue-400/35 hover:bg-blue-500/20 disabled:cursor-wait disabled:opacity-60 sm:h-8 sm:px-2.5"
                                 title={`Chat with ${user.name}`}
                               >
                                 {chattingUserId === user.id ? (

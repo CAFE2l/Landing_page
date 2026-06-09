@@ -47,7 +47,7 @@ export default function Testimonials({ feedbacks }: TestimonialsProps) {
             <p className="mx-auto mb-7 max-w-md text-sm leading-relaxed text-zinc-500">
               This area will be filled from the backend after clients publish approved feedback.
             </p>
-            <Link to="/feedback" className="inline-flex items-center justify-center rounded-xl border border-[#3b82f6]/40 bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-colors hover:bg-[#1d4ed8]">
+            <Link to="/feedback" className="touch-target inline-flex items-center justify-center rounded-xl border border-[#3b82f6]/40 bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-colors hover:bg-[#1d4ed8]">
               Go to Feedbacks
             </Link>
           </motion.div>

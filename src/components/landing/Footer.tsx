@@ -26,12 +26,12 @@ export default function Footer() {
             </span>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-1">
             {links.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
-                className="text-sm text-zinc-600 hover:text-zinc-300 transition-colors duration-200"
+                className="touch-target inline-flex items-center text-sm text-zinc-600 hover:text-zinc-300 transition-colors duration-200"
               >
                 {link.name}
               </a>

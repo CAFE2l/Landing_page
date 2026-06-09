@@ -81,7 +81,7 @@ function OrderCard({ order }: { order: ServiceOrder }) {
 
       <Link
         to={`/checkout/${order.id}`}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-2.5 text-sm font-medium text-blue-300 hover:bg-blue-500/15 transition-colors"
+        className="touch-target inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm font-medium text-blue-300 hover:bg-blue-500/15 transition-colors"
       >
         View Details
         <ArrowRight size={14} />
@@ -153,7 +153,7 @@ export default function OrdersDashboardPage() {
             </p>
             <Link
               to="/#work"
-              className="inline-flex items-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1d4ed8] transition-colors"
+                className="touch-target inline-flex items-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1d4ed8] transition-colors"
             >
               Browse Services
               <ArrowRight size={14} />

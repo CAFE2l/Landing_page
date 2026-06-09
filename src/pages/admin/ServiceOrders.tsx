@@ -147,15 +147,16 @@ function DeliverModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm p-0 sm:items-center sm:p-4"
       onClick={onClose}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 16 }}
+        initial={{ opacity: 0, y: 26 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 18 }}
+        transition={{ type: "spring", stiffness: 260, damping: 24 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl border border-white/[0.08] bg-[#0a0a10] p-6 shadow-2xl"
+        className="safe-bottom w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border border-white/[0.08] bg-[#0a0a10] p-6 shadow-2xl"
       >
         <div className="flex items-center justify-between mb-5">
           <div>
@@ -235,10 +236,12 @@ function OrderCard({
   const [expanded, setExpanded] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [deliverTarget, setDeliverTarget] = useState<ServiceOrder | null>(null)
+  const [actionsOpen, setActionsOpen] = useState(false)
   const displayName = getOrderDisplayName(order)
   const availableActions = STATUS_ACTIONS.filter((a) => a.from.includes(order.projectStatus))
 
   const handleStatusUpdate = async (action: typeof STATUS_ACTIONS[number]) => {
+    setActionsOpen(false)
     if (action.needsUrl) {
       setDeliverTarget(order)
       return
@@ -440,36 +443,48 @@ function OrderCard({
           </a>
 
           {availableActions.length > 0 && (
-            <div className="relative group/actions ml-auto">
+            <div className="relative ml-auto">
               <button
+                type="button"
                 disabled={updating}
+                onClick={() => setActionsOpen((open) => !open)}
                 className="flex min-h-9 items-center gap-1.5 rounded-lg border border-[#4F6EF7]/20 bg-[#4F6EF7]/10 px-3 py-1.5 text-xs font-semibold text-[#7E95FF] transition-colors hover:bg-[#4F6EF7]/18 disabled:opacity-50"
                 aria-label="Update order status"
+                aria-expanded={actionsOpen}
               >
                 {updating ? <Loader2 size={12} className="animate-spin" /> : <Edit3 size={12} />}
                 Update
                 <ChevronDown size={11} />
               </button>
-              <div className="invisible absolute right-0 top-full z-20 mt-1.5 w-58 origin-top-right rounded-xl border border-white/[0.08] bg-[#0a0a10] py-1 opacity-0 shadow-2xl transition-all duration-150 group-focus-within/actions:visible group-focus-within/actions:opacity-100 group-hover/actions:visible group-hover/actions:opacity-100">
-                {availableActions.map((action) => (
-                  <button
-                    key={action.to}
-                    onClick={() => handleStatusUpdate(action)}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors text-left",
-                      action.to === "cancelled"
-                        ? "text-red-400/70 hover:text-red-300 hover:bg-red-500/8"
-                        : action.to === "delivered"
-                        ? "text-emerald-400/80 hover:text-emerald-300 hover:bg-emerald-500/8"
-                        : "text-white/50 hover:text-white hover:bg-white/[0.05]",
-                    )}
+              <AnimatePresence>
+                {actionsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                    className="absolute right-0 top-full z-20 mt-1.5 w-58 origin-top-right rounded-xl border border-white/[0.08] bg-[#0a0a10] py-1 shadow-2xl"
                   >
-                    <action.icon size={13} className="shrink-0" />
-                    {action.label}
-                    {action.needsUrl && <Link2 size={11} className="ml-auto opacity-50" />}
-                  </button>
-                ))}
-              </div>
+                    {availableActions.map((action) => (
+                      <button
+                        key={action.to}
+                        onClick={() => handleStatusUpdate(action)}
+                        className={cn(
+                          "flex min-h-10 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors",
+                          action.to === "cancelled"
+                            ? "text-red-400/70 hover:bg-red-500/8 hover:text-red-300"
+                            : action.to === "delivered"
+                            ? "text-emerald-400/80 hover:bg-emerald-500/8 hover:text-emerald-300"
+                            : "text-white/50 hover:bg-white/[0.05] hover:text-white",
+                        )}
+                      >
+                        <action.icon size={13} className="shrink-0" />
+                        {action.label}
+                        {action.needsUrl && <Link2 size={11} className="ml-auto opacity-50" />}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           )}
         </div>

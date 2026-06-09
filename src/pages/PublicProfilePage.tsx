@@ -330,7 +330,7 @@ export default function PublicProfilePage() {
                 <UserAvatar user={{ name: profile.name, username: profile.username, avatarUrl: profile.avatarUrl }} size="xl" />
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-2xl font-semibold text-white">{profile.name}</h2>
+                    <h2 className="break-words text-2xl font-semibold text-white">{profile.name}</h2>
                     <span className="rounded-full border border-[#4F6EF7]/25 bg-[#4F6EF7]/10 px-2.5 py-1 text-xs text-[#9BA7FF]">
                       {profile.role}
                     </span>
@@ -339,9 +339,9 @@ export default function PublicProfilePage() {
                   {profile.bio && <p className="mt-2 max-w-xl text-sm text-[#A0A0B5]">{profile.bio}</p>}
                 </div>
               </div>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap">
                 {isOwnProfile ? (
-                  <Link to="/dashboard/profile" className="inline-flex items-center gap-2 rounded-xl bg-[#4F6EF7] px-4 py-2.5 text-sm font-semibold text-white">
+                  <Link to="/dashboard/profile" className="touch-target inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#4F6EF7] px-4 py-3 text-sm font-semibold text-white sm:w-auto">
                     <Edit3 size={16} /> Edit Profile
                   </Link>
                 ) : (
@@ -355,7 +355,7 @@ export default function PublicProfilePage() {
                         onStateChange={handleFollowStateChange}
                       />
                     )}
-                    <button onClick={handleMessage} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#8B5CF6] px-4 py-2.5 text-sm font-semibold text-white">
+                    <button onClick={handleMessage} className="touch-target inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#8B5CF6] px-4 py-3 text-sm font-semibold text-white sm:w-auto">
                       <MessageCircle size={16} /> Send Message
                     </button>
                   </>
@@ -388,16 +388,16 @@ export default function PublicProfilePage() {
                 <Shield size={16} className="text-red-400" />
                 <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wider">Admin Actions</h3>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
                 <button
                   onClick={handleMessage}
-                  className="flex items-center gap-2 rounded-xl border border-white/[0.1] px-3.5 py-2 text-xs font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+                  className="touch-target flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.1] px-3.5 py-3 text-xs font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors sm:w-auto sm:py-2"
                 >
                   <MessageCircle size={14} /> Send Message
                 </button>
                 <button
                   onClick={() => setShowDeleteModal(true)}
-                  className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+                  className="touch-target flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-3 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors sm:w-auto sm:py-2"
                 >
                   <Trash2 size={14} /> Delete User
                 </button>

@@ -447,11 +447,11 @@ export default function Dashboard() {
               A focused command center for selling services, managing clients and tracking payments from backend records only.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <button
               type="button"
               onClick={load}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.05] px-4 py-2 text-sm font-semibold text-white transition hover:border-[#4f6ef7]/45 hover:bg-[#4f6ef7]/15"
+              className="touch-target inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.05] px-4 py-2 text-sm font-semibold text-white transition hover:border-[#4f6ef7]/45 hover:bg-[#4f6ef7]/15"
             >
               <RefreshCcw size={16} />
               Refresh
@@ -459,7 +459,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => navigate("/admin/service-orders")}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#2f68ff] px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_40px_rgba(47,104,255,0.32)] transition hover:bg-[#4579ff]"
+              className="touch-target inline-flex items-center justify-center gap-2 rounded-xl bg-[#2f68ff] px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_40px_rgba(47,104,255,0.32)] transition hover:bg-[#4579ff]"
             >
               Open Orders
               <ArrowUpRight size={16} />

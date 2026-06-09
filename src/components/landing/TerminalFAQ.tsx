@@ -159,7 +159,7 @@ export default function TerminalFAQ() {
 
             <div
               ref={terminalRef}
-              className="p-4 sm:p-6 font-mono text-sm leading-relaxed max-h-[400px] sm:max-h-[560px] overflow-y-auto"
+              className="p-4 sm:p-6 font-mono text-xs sm:text-sm leading-relaxed max-h-[300px] sm:max-h-[400px] lg:max-h-[560px] overflow-y-auto"
               style={{
                 scrollbarWidth: "thin",
                 scrollbarColor: "rgba(37,99,235,0.15) transparent",
@@ -189,7 +189,7 @@ export default function TerminalFAQ() {
                       transition={{ duration: 0.3, delay: i * 0.04 }}
                       whileHover={{ scale: 1.02 }}
                       onClick={() => handleSelect(q)}
-                      className={`text-left px-4 py-2.5 rounded-lg border text-sm font-mono transition-all duration-200 ${
+                      className={`touch-target text-left px-4 py-2.5 rounded-lg border text-sm font-mono transition-all duration-200 min-h-[44px] ${
                         isSelected
                           ? "border-blue-500/50 bg-blue-500/10 text-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.12)]"
                           : "border-white/10 bg-white/[0.03] text-zinc-500/70 hover:border-blue-500/30 hover:text-zinc-300 hover:bg-blue-500/5 hover:shadow-[0_0_15px_rgba(37,99,235,0.06)]"
@@ -221,7 +221,7 @@ export default function TerminalFAQ() {
                         {entry.question}
                       </span>
                     </div>
-                    <div className="text-zinc-400/80 pl-0">
+                    <div className="text-zinc-400/80 pl-0 break-words">
                       <span className="text-blue-500/80 font-semibold">
                         &gt;
                       </span>{" "}

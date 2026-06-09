@@ -58,7 +58,7 @@ export default function Differentials() {
           subtitle="Beyond technical skills — these are the qualities that make working with me a great experience."
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 max-w-5xl mx-auto">
           {items.map((item, i) => (
             <motion.div
               key={item.title}
@@ -67,7 +67,7 @@ export default function Differentials() {
               whileInView="visible"
               viewport={{ once: true, amount: 0.1 }}
               variants={!reduceMotion ? fadeUp : undefined}
-              className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-all duration-300 hover:bg-white/[0.04] hover:border-white/[0.10]"
+              className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6 transition-all duration-300 hover:bg-white/[0.04] hover:border-white/[0.10]"
             >
               <div className="w-10 h-10 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-4">
                 {"imgSrc" in item ? (

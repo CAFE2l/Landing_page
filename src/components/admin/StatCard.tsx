@@ -84,14 +84,14 @@ export default function StatCard({
             >
               <button
                 type="button"
-                className="flex h-6 w-6 items-center justify-center rounded-full text-[#6b6b80] transition-colors hover:bg-white/[0.06] hover:text-[#f0f0f5]"
+                className="touch-target flex h-8 w-8 items-center justify-center rounded-full text-[#6b6b80] transition-colors hover:bg-white/[0.06] hover:text-[#f0f0f5]"
                 aria-label="Information"
               >
                 <Info size={14} />
               </button>
               {showInfo && (
                 <div
-                  className="absolute right-0 top-full z-50 mt-1.5 w-64 rounded-xl border border-white/[0.1] bg-[#1a1a26] p-3 shadow-2xl"
+                  className="absolute right-0 top-full z-50 mt-1.5 w-64 rounded-xl border border-white/[0.1] bg-[#1a1a26] p-3 shadow-2xl sm:w-72"
                   onMouseEnter={handleInfoEnter}
                   onMouseLeave={handleInfoLeave}
                 >

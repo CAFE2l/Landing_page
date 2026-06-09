@@ -39,16 +39,16 @@ export default function ConfirmModal({ title, message, onConfirm, onCancel, vari
             <X size={16} />
           </button>
         </div>
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             onClick={onCancel}
-            className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm text-[#6b6b80] hover:text-[#f0f0f5] transition-colors"
+            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-[#6b6b80] hover:text-[#f0f0f5] transition-colors sm:w-auto sm:py-2"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            className={`w-full rounded-lg px-4 py-3 text-sm font-semibold transition-colors sm:w-auto sm:py-2 ${
               variant === "danger"
                 ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
                 : "bg-[#4f6ef7]/10 text-[#4f6ef7] hover:bg-[#4f6ef7]/20"

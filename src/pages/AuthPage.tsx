@@ -244,7 +244,7 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
                   type="button"
                   onClick={handleGoogleAuth}
                   disabled={googleLoading}
-                  className="inline-flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.04] px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:border-[#3b82f6]/35 hover:bg-white/[0.07]"
+                  className="touch-target inline-flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.04] px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:border-[#3b82f6]/35 hover:bg-white/[0.07]"
                 >
                   <img
                     src="/imgs/icons/Google.png"
@@ -390,7 +390,7 @@ export default function AuthPage({ mode, onAuth }: AuthPageProps) {
 
                 <button
                   disabled={emailLoading}
-                  className="group mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#3b82f6]/50 bg-[#2563eb] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_0_28px_rgba(37,99,235,0.38)] transition-all hover:bg-[#1d4ed8] hover:shadow-[0_0_42px_rgba(37,99,235,0.48)] disabled:cursor-not-allowed disabled:opacity-70"
+                  className="touch-target min-h-12 group mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#3b82f6]/50 bg-[#2563eb] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_0_28px_rgba(37,99,235,0.38)] transition-all hover:bg-[#1d4ed8] hover:shadow-[0_0_42px_rgba(37,99,235,0.48)] disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {emailLoading
                     ? "Connecting..."
