@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion"
 import { Link } from "react-router-dom"
 import { MessageSquareText } from "lucide-react"
+import { useIsMobile } from "../../hooks/useMobile"
 import SectionHeading from "./SectionHeading"
 import type { FeedbackEntry } from "../../data/feedbackStore"
 
@@ -12,6 +13,7 @@ interface TestimonialsProps {
 
 export default function Testimonials({ feedbacks }: TestimonialsProps) {
   const reduceMotion = useReducedMotion()
+  const isMobile = useIsMobile()
   const approved = feedbacks.filter((item) => item.approved).slice(0, 3)
 
   return (
@@ -35,9 +37,9 @@ export default function Testimonials({ feedbacks }: TestimonialsProps) {
           </div>
         ) : (
           <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
+            initial={reduceMotion || isMobile ? { opacity: 1 } : { opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
+            viewport={{ once: true, amount: 0.1 }}
             className="mx-auto max-w-2xl rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 md:p-8 text-center"
           >
             <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-[#3b82f6]/25 bg-[#2563eb]/10 text-[#60a5fa]">

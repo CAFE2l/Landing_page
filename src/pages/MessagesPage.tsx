@@ -6,7 +6,7 @@ import {
   ExternalLink, Plus, AlertCircle, RefreshCw,
   FileText, Download, Film, ImageIcon, Music,
   MoreVertical, Edit3, Trash2, Reply, Copy, Forward,
-  Users, UserPlus, Check, Settings, LogOut, UserMinus, Save, ChevronDown,
+  Users, UserPlus, Check, CheckCheck, Settings, LogOut, UserMinus, Save, ChevronDown,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import FloatingOrbs from "../components/landing/FloatingOrbs"
@@ -938,7 +938,14 @@ export default function MessagesPage() {
                   ? <video src={msg.mediaUrl} controls preload="metadata" playsInline className="max-h-56 w-full rounded-lg object-contain sm:max-h-60" />
                   : <img src={msg.mediaUrl} alt="" loading="lazy" decoding="async" className="max-h-56 w-full rounded-lg object-cover sm:max-h-60" />
               )}
-              {msg.caption && <p className="mt-1 text-xs opacity-80">{msg.caption}</p>}
+              {msg.caption && (
+                <>
+                  <div className="mx-1 mt-2 h-px bg-white/[0.12]" />
+                  <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                    {msg.caption}
+                  </p>
+                </>
+              )}
             </div>
           ) : msg.messageType === "audio" ? (
             <audio src={msg.mediaUrl!} controls preload="metadata" className="h-10 max-w-full" />
@@ -974,9 +981,12 @@ export default function MessagesPage() {
                 <Download size={16} className="shrink-0 opacity-60" />
               </a>
               {msg.caption && (
-                <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap break-words">
-                  {msg.caption}
-                </p>
+                <>
+                  <div className="mx-1 mt-2 h-px bg-white/[0.12]" />
+                  <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                    {msg.caption}
+                  </p>
+                </>
               )}
             </div>
           ) : isEditing ? (
@@ -1014,7 +1024,15 @@ export default function MessagesPage() {
             <span>{new Date(msg.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
             {msg.editedAt && <span className="italic opacity-60">(edited)</span>}
             {isOwn && (
-              <span className="ml-0.5">{msg.readAt ? "✓✓" : "✓"}</span>
+              <span className="ml-0.5 inline-flex items-center">
+                {!msg.deliveredAt ? (
+                  <Loader2 size={10} className="animate-spin text-white/40" />
+                ) : !msg.readAt ? (
+                  <CheckCheck size={12} className="text-blue-300/60" />
+                ) : (
+                  <CheckCheck size={12} className="text-blue-400" />
+                )}
+              </span>
             )}
             {msg.forwardedFrom && <Forward size={10} className="opacity-40" />}
           </div>

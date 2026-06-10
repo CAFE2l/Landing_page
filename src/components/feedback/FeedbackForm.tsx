@@ -75,6 +75,8 @@ export default function FeedbackForm({
   onSubmit,
   isSubmitting,
 }: FeedbackFormProps) {
+  const launchDate = "2026-06-06";
+  const today = new Date().toISOString().split("T")[0];
   const { profile } = useUserProfile();
   const [step, setStep] = useState(0);
   const [serviceCategory, setServiceCategory] =
@@ -95,8 +97,6 @@ export default function FeedbackForm({
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadIdRef = useRef(0);
-  const launchDate = "2026-06-06";
-  const today = new Date().toISOString().split("T")[0];
 
   const reset = () => {
     setStep(0);

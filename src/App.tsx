@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import AuthPage from "./pages/AuthPage";
@@ -24,24 +23,12 @@ import OrdersDashboardPage from "./pages/OrdersDashboardPage";
 import AdminServiceOrders from "./pages/admin/ServiceOrders";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AdminRoute } from "./components/auth/AdminRoute";
-import { loadFeedbacks, type FeedbackEntry } from "./data/feedbackStore";
-import { listPublicFeedbacks } from "./data/firestoreStore";
 import { Toaster } from "react-hot-toast";
 import ChatWidget from "./components/chat/ChatWidget";
 import ChatErrorBoundary from "./components/chat/ChatErrorBoundary";
 import NotificationsPage from "./pages/NotificationsPage";
 
 function App() {
-  const [feedbacks, setFeedbacks] = useState<FeedbackEntry[]>(() =>
-    loadFeedbacks(),
-  );
-
-  useEffect(() => {
-    listPublicFeedbacks()
-      .then(setFeedbacks)
-      .catch(() => setFeedbacks([]));
-  }, []);
-
   return (
     <AuthProvider>
       <Toaster
@@ -56,7 +43,7 @@ function App() {
       />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<LandingPage feedbacks={feedbacks} />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/feedback" element={<FeedbackPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/login" element={<AuthPage mode="login" />} />

@@ -201,6 +201,52 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 color-mix(in srgb, white 8%, transparent);
 }
 
+@custom-media --mobile (max-width: 767px);
+@custom-media --desktop (min-width: 768px);
+
+@media (max-width: 767px) {
+  .mobile-glass {
+    backdrop-filter: blur(6px) saturate(120%) !important;
+    -webkit-backdrop-filter: blur(6px) saturate(120%) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .mobile-glass-card {
+    backdrop-filter: blur(6px) saturate(120%) !important;
+    -webkit-backdrop-filter: blur(6px) saturate(120%) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .mobile-glass-strong {
+    backdrop-filter: blur(8px) saturate(120%) !important;
+    -webkit-backdrop-filter: blur(8px) saturate(120%) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .animate-marquee {
+    animation-duration: 60s !important;
+  }
+
+  .animate-mesh,
+  .bg-gradient-mesh {
+    animation-duration: 40s !important;
+    background-size: 200% 200% !important;
+  }
+
+  .auth-perspective-grid {
+    animation: none !important;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  section, .container {
+    content-visibility: auto;
+    contain-intrinsic-size: 500px;
+  }
+}
+
 @keyframes marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }

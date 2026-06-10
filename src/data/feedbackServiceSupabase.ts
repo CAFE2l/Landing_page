@@ -196,6 +196,33 @@ export async function fetchFeedbackPosts(
   return applyProfileAuthors(posts);
 }
 
+export async function fetchUserFeedbackPosts(
+  userId: string,
+  limitCount = 50,
+): Promise<FeedbackPost[]> {
+  if (!supabase || !supabaseConfigured || !userId) return [];
+  const { data, error } = await supabase
+    .from(POSTS_TABLE)
+    .select(`*, ${MEDIA_TABLE}(*)`)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limitCount);
+  if (error) return [];
+  const posts = (data || []).map((row: Record<string, unknown>) => {
+    const media =
+      (row[MEDIA_TABLE] as Record<string, unknown>[] | undefined) || [];
+    return mapPost({
+      ...row,
+      media: media.map((m: Record<string, unknown>) => ({
+        url: m.url as string,
+        type: m.type as "image" | "video",
+        altText: (m.alt_text as string) || undefined,
+      })),
+    });
+  });
+  return applyProfileAuthors(posts);
+}
+
 export async function fetchFeedbackPostById(
   id: string,
 ): Promise<FeedbackPost | null> {

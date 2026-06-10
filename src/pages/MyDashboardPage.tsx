@@ -17,8 +17,9 @@ import {
 } from "lucide-react"
 import AuthBackground from "../components/auth/AuthBackground"
 import Navbar from "../components/landing/Navbar"
-import { loadCurrentUser, type FeedbackEntry } from "../data/feedbackStore"
-import { listUserFeedbacks } from "../data/firestoreStore"
+import { useAuth } from "../contexts/AuthContext"
+import { fetchUserFeedbackPosts } from "../data/feedbackServiceSupabase"
+import type { FeedbackPost } from "../data/feedbackStore"
 
 const serviceIcons: Record<string, typeof MonitorSmartphone> = {
   landing: MonitorSmartphone,
@@ -32,8 +33,8 @@ const statusConfig = {
   rejected: { icon: ThumbsUp, color: "#ef4444", label: "Rejected" },
 } as const
 
-function ProjectCard({ feedback }: { feedback: FeedbackEntry }) {
-  const Icon = serviceIcons[feedback.project?.toLowerCase() === "saas" ? "saas" : "landing"] || MonitorSmartphone
+function ProjectCard({ feedback }: { feedback: FeedbackPost }) {
+  const Icon = serviceIcons[feedback.serviceCategory?.toLowerCase() === "saas" ? "saas" : "landing"] || MonitorSmartphone
   const status = statusConfig[feedback.status || "pending"] || statusConfig.pending
 
   return (
@@ -48,7 +49,7 @@ function ProjectCard({ feedback }: { feedback: FeedbackEntry }) {
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold text-white truncate">
-            {feedback.project || "Untitled Project"}
+            {feedback.projectTitle || "Untitled Project"}
           </h3>
           <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
             <span className={feedback.status === "approved" ? "text-[#22c55e]" : feedback.status === "rejected" ? "text-[#ef4444]" : "text-[#f59e0b]"}>
@@ -57,22 +58,22 @@ function ProjectCard({ feedback }: { feedback: FeedbackEntry }) {
             <span>·</span>
             <span>{new Date(feedback.createdAt).toLocaleDateString()}</span>
           </div>
-          {feedback.quote && (
-            <p className="mt-2 text-sm text-zinc-400 line-clamp-2">{feedback.quote}</p>
+          {feedback.content && (
+            <p className="mt-2 text-sm text-zinc-400 line-clamp-2">{feedback.content}</p>
           )}
-          {feedback.mediaUrl && (
+          {feedback.media?.length ? (
             <span className="mt-2 inline-flex items-center gap-1 text-xs text-[#3b82f6]">
               <MessageSquareText size={12} />
               Has media attached
             </span>
-          )}
+          ) : null}
         </div>
       </div>
     </motion.div>
   )
 }
 
-function FeedbackCard({ feedback }: { feedback: FeedbackEntry }) {
+function FeedbackCard({ feedback }: { feedback: FeedbackPost }) {
   const status = statusConfig[feedback.status || "pending"] || statusConfig.pending
   const StatusIcon = status.icon
 
@@ -86,7 +87,7 @@ function FeedbackCard({ feedback }: { feedback: FeedbackEntry }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
             <h3 className="text-sm font-semibold text-white truncate">
-              {feedback.project || "General Feedback"}
+              {feedback.projectTitle || feedback.serviceCategory || "General Feedback"}
             </h3>
             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
               feedback.status === "approved" ? "bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20" :
@@ -97,7 +98,7 @@ function FeedbackCard({ feedback }: { feedback: FeedbackEntry }) {
               {status.label}
             </span>
           </div>
-          <p className="mt-2 text-sm text-zinc-400 line-clamp-3">{feedback.quote}</p>
+          <p className="mt-2 text-sm text-zinc-400 line-clamp-3">{feedback.title || feedback.content}</p>
           <div className="mt-3 flex items-center gap-4 text-xs text-zinc-600">
             <span>{new Date(feedback.createdAt).toLocaleDateString()}</span>
             {feedback.rating > 0 && (
@@ -114,26 +115,33 @@ function FeedbackCard({ feedback }: { feedback: FeedbackEntry }) {
 }
 
 export default function MyDashboardPage() {
-  const user = loadCurrentUser()
-  const [feedbacks, setFeedbacks] = useState<FeedbackEntry[]>([])
+  const { user: authUser } = useAuth()
+  const [feedbacks, setFeedbacks] = useState<FeedbackPost[]>([])
   const [loading, setLoading] = useState(true)
 
+  const userId = authUser?.id
+
   useEffect(() => {
-    if (!user?.uid) {
-      queueMicrotask(() => setLoading(false))
+    if (!userId) {
+      setLoading(false)
       return
     }
-    listUserFeedbacks(user.uid)
-      .then(setFeedbacks)
-      .catch(() => setFeedbacks([]))
-      .finally(() => setLoading(false))
-  }, [user?.uid])
+    fetchUserFeedbackPosts(userId)
+      .then((posts) => {
+        setFeedbacks(posts)
+        setLoading(false)
+      })
+      .catch(() => {
+        setFeedbacks([])
+        setLoading(false)
+      })
+  }, [userId])
 
-  if (!user) return <Navigate to="/login" replace />
+  if (!authUser) return <Navigate to="/login" replace />
 
-  const projects = feedbacks.filter((f) => f.project)
+  const projects = feedbacks.filter((f) => f.projectTitle)
   const uniqueProjects = projects.filter(
-    (p, i, arr) => arr.findIndex((x) => x.project === p.project) === i
+    (p, i, arr) => arr.findIndex((x) => x.projectTitle === p.projectTitle) === i
   )
 
   return (

@@ -1,12 +1,14 @@
 "use client"
 
 import { motion, useReducedMotion } from "framer-motion"
+import { useIsMobile } from "../../hooks/useMobile"
 import WhatsAppIcon from "./WhatsAppIcon"
 import Magnetic from "./Magnetic"
 import { wa, WA_MESSAGES } from "../../lib/utils"
 
 export default function Contact() {
   const reduceMotion = useReducedMotion()
+  const isMobile = useIsMobile()
 
   return (
     <section id="contact" className="py-20 md:py-32 relative overflow-hidden">
@@ -23,9 +25,8 @@ export default function Contact() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 max-w-5xl mx-auto mb-14 sm:mb-20 md:mb-32">
-          {/* Discord Card */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={isMobile ? { opacity: 1 } : { opacity: 0, x: -20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             className="group relative p-5 sm:p-6 md:p-8 rounded-3xl bg-white/[0.02] border border-white/[0.08] hover:bg-white/[0.04] hover:border-white/[0.12] transition-all duration-300"
@@ -51,9 +52,8 @@ export default function Contact() {
             <span className="text-[10px] text-zinc-600 uppercase tracking-widest font-medium">Open to everyone interested</span>
           </motion.div>
 
-          {/* Telegram Card */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
+            initial={isMobile ? { opacity: 1 } : { opacity: 0, x: 20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             className="group relative p-5 sm:p-6 md:p-8 rounded-3xl bg-white/[0.02] border border-white/[0.08] hover:bg-white/[0.04] hover:border-white/[0.12] transition-all duration-300"
@@ -84,7 +84,7 @@ export default function Contact() {
         </div>
 
         <motion.div
-          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
+          initial={reduceMotion || isMobile ? { opacity: 1 } : { opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}

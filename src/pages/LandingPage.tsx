@@ -1,3 +1,4 @@
+import { useState } from "react"
 import CursorSpotlight from "../components/landing/CursorSpotlight"
 import ReadingProgress from "../components/landing/ReadingProgress"
 import FloatingOrbs from "../components/landing/FloatingOrbs"
@@ -8,17 +9,14 @@ import Services from "../components/landing/Services"
 import Process from "../components/landing/Process"
 import FeaturedWork from "../components/landing/FeaturedWork"
 import Differentials from "../components/landing/Differentials"
-import Testimonials from "../components/landing/Testimonials"
+import ServiceDetails from "../components/landing/ServiceDetails"
 import TerminalFAQ from "../components/landing/TerminalFAQ"
 import Contact from "../components/landing/Contact"
 import Footer from "../components/landing/Footer"
-import type { FeedbackEntry } from "../data/feedbackStore"
 
-interface LandingPageProps {
-  feedbacks: FeedbackEntry[]
-}
+export default function LandingPage() {
+  const [activeService, setActiveService] = useState<number | null>(null)
 
-export default function LandingPage({ feedbacks }: LandingPageProps) {
   return (
     <>
       <CursorSpotlight />
@@ -28,11 +26,11 @@ export default function LandingPage({ feedbacks }: LandingPageProps) {
       <main>
         <Hero />
         <TechMarquee />
-        <Services />
+        <Services onLearnMore={(i) => setActiveService(i)} />
         <Process />
         <FeaturedWork />
         <Differentials />
-        <Testimonials feedbacks={feedbacks} />
+        <ServiceDetails activeService={activeService} onSelectService={setActiveService} />
         <TerminalFAQ />
         <Contact />
       </main>

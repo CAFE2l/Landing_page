@@ -36,24 +36,30 @@ import TechPremiumBackground from "../components/ui/TechPremiumBackground"
 import Navbar from "../components/landing/Navbar"
 import { cn } from "../lib/utils"
 
-const TYPE_ICONS: Record<UserNotificationType, typeof Bell> = {
+const TYPE_ICONS: Record<string, typeof Bell> = {
   order_created: Package,
   payment_claimed: Banknote,
   payment_confirmed: CheckCircle2,
   payment_failed: XCircle,
   project_started: Play,
+  project_ready: Rocket,
+  remaining_payment_requested: Banknote,
+  remaining_payment_confirmed: CheckCircle2,
   project_delivered: Rocket,
   feedback_requested: MessageCircle,
   admin_message: MessageCircle,
   file_uploaded: Upload,
 }
 
-const TYPE_COLORS: Record<UserNotificationType, string> = {
+const TYPE_COLORS: Record<string, string> = {
   order_created: "border-blue-400/25 bg-blue-400/10 text-blue-300",
   payment_claimed: "border-yellow-400/25 bg-yellow-400/10 text-yellow-300",
   payment_confirmed: "border-green-400/25 bg-green-400/10 text-green-300",
   payment_failed: "border-red-400/25 bg-red-400/10 text-red-300",
   project_started: "border-cyan-400/25 bg-cyan-400/10 text-cyan-300",
+  project_ready: "border-teal-400/25 bg-teal-400/10 text-teal-300",
+  remaining_payment_requested: "border-yellow-400/25 bg-yellow-400/10 text-yellow-300",
+  remaining_payment_confirmed: "border-green-400/25 bg-green-400/10 text-green-300",
   project_delivered: "border-teal-400/25 bg-teal-400/10 text-teal-300",
   feedback_requested: "border-purple-400/25 bg-purple-400/10 text-purple-300",
   admin_message: "border-pink-400/25 bg-pink-400/10 text-pink-300",
@@ -66,6 +72,9 @@ const ALL_TYPES: UserNotificationType[] = [
   "payment_confirmed",
   "payment_failed",
   "project_started",
+  "project_ready",
+  "remaining_payment_requested",
+  "remaining_payment_confirmed",
   "project_delivered",
   "feedback_requested",
   "admin_message",
@@ -98,7 +107,6 @@ export default function NotificationsPage() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<UserNotificationType | "all">("all")
-  const [workingId, setWorkingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user?.id) {
@@ -129,13 +137,20 @@ export default function NotificationsPage() {
   }, [user?.id])
 
   const handleMarkRead = async (id: string) => {
-    setWorkingId(id)
     await markNotificationRead(id)
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
     )
     setUnreadCount((prev) => Math.max(0, prev - 1))
-    setWorkingId(null)
+  }
+
+  const handleCardClick = async (n: UserNotification) => {
+    if (!n.is_read) {
+      await handleMarkRead(n.id)
+    }
+    if (n.action_url) {
+      window.location.href = n.action_url
+    }
   }
 
   const handleMarkAllRead = async () => {
@@ -263,79 +278,80 @@ export default function NotificationsPage() {
         ) : (
           <div className="space-y-2">
             <AnimatePresence initial={false}>
-              {filtered.map((notification) => {
-                const Icon = TYPE_ICONS[notification.type]
-                const colorClass = TYPE_COLORS[notification.type]
-                return (
-                  <motion.div
-                    key={notification.id}
-                    layout
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className={cn(
-                      "group relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 transition-all hover:border-white/[0.12] hover:bg-white/[0.04]",
-                      !notification.is_read && "border-l-2 border-l-blue-500/50",
-                    )}
-                  >
-                    <div className="flex items-start gap-3.5">
-                      <div
-                        className={cn(
-                          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border",
-                          colorClass,
-                        )}
-                      >
-                        <Icon size={18} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h3 className="text-sm font-semibold text-white">
-                              {notification.title}
-                            </h3>
-                            <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-white/40">
-                              {getTypeLabel(notification.type)}
-                              <span className="mx-1">·</span>
-                              {formatDate(notification.created_at)}
-                            </span>
+                {filtered.map((notification) => {
+                  const Icon = TYPE_ICONS[notification.type] || Bell
+                  const colorClass = TYPE_COLORS[notification.type] || TYPE_COLORS.admin_message
+                  return (
+                    <motion.div
+                      key={notification.id}
+                      layout
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      onClick={() => handleCardClick(notification)}
+                      className={cn(
+                        "group relative rounded-2xl border p-4 transition-all cursor-pointer",
+                        notification.is_read
+                          ? "border-white/[0.04] bg-white/[0.01] opacity-60 hover:opacity-90 hover:bg-white/[0.03] hover:border-white/[0.08]"
+                          : "border-blue-500/20 bg-blue-500/[0.03] hover:bg-blue-500/[0.06] hover:border-blue-500/30",
+                      )}
+                    >
+                      {!notification.is_read && (
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
+                      )}
+                      <div className={cn("flex items-start gap-3.5", !notification.is_read && "pl-4")}>
+                        <div
+                          className={cn(
+                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border",
+                            colorClass,
+                          )}
+                        >
+                          <Icon size={18} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className={cn(
+                                  "text-sm leading-snug",
+                                  notification.is_read ? "text-zinc-400" : "text-white font-semibold",
+                                )}>
+                                  {notification.title}
+                                </h3>
+                              </div>
+                              <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-white/30">
+                                {getTypeLabel(notification.type)}
+                                <span className="mx-1">·</span>
+                                {formatDate(notification.created_at)}
+                              </span>
+                            </div>
                           </div>
-                          {!notification.is_read && (
-                            <button
-                              onClick={() => handleMarkRead(notification.id)}
-                              disabled={workingId === notification.id}
-                              className="touch-target shrink-0 rounded-lg border border-white/[0.06] bg-white/[0.04] p-1.5 text-white/30 hover:text-white hover:bg-white/[0.08] transition-all disabled:opacity-50"
-                              title="Mark as read"
+                          {notification.message && (
+                            <p className={cn(
+                              "mt-1.5 text-sm leading-relaxed",
+                              notification.is_read ? "text-zinc-600" : "text-zinc-400",
+                            )}>
+                              {notification.message}
+                            </p>
+                          )}
+                          {notification.action_url && (
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                window.open(notification.action_url!, "_blank", "noopener")
+                              }}
+                              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-300 hover:bg-blue-500/15 transition-all cursor-pointer"
                             >
-                              {workingId === notification.id ? (
-                                <Loader2 size={13} className="animate-spin" />
-                              ) : (
-                                <CheckCheck size={13} />
-                              )}
-                            </button>
+                              <ExternalLink size={12} />
+                              View details
+                              <ArrowRight size={12} />
+                            </span>
                           )}
                         </div>
-                        {notification.message && (
-                          <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
-                            {notification.message}
-                          </p>
-                        )}
-                        {notification.action_url && (
-                          <a
-                            href={notification.action_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-300 hover:bg-blue-500/15 transition-all"
-                          >
-                            <ExternalLink size={12} />
-                            View details
-                            <ArrowRight size={12} />
-                          </a>
-                        )}
                       </div>
-                    </div>
-                  </motion.div>
-                )
-              })}
+                    </motion.div>
+                  )
+                })}
             </AnimatePresence>
           </div>
         )}

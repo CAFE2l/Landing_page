@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowRight, Bell, Menu, MessageCircle, X } from "lucide-react"
+import NotificationDropdown from "../notifications/NotificationDropdown"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import WhatsAppIcon from "./WhatsAppIcon"
 import UserMenu from "../auth/UserMenu"
@@ -11,6 +12,7 @@ import { wa, WA_MESSAGES } from "../../lib/utils"
 import { getGlobalUnreadCount } from "../../lib/chatService"
 import { fetchUnreadCount } from "../../lib/userNotificationService"
 import { supabase } from "../../lib/supabase/client"
+import { useIsMobile } from "../../hooks/useMobile"
 
 const links = [
   { name: "Services", href: "#services" },
@@ -31,6 +33,7 @@ export default function Navbar() {
   const navigate = useNavigate()
   const location = useLocation()
   const isLanding = location.pathname === "/"
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     if (!user?.id) {
@@ -60,22 +63,32 @@ export default function Navbar() {
 
   useEffect(() => {
     const onScroll = () => {
-      const y = window.scrollY
-      setScrolled(y > 30)
-
-      const sections = links.filter((l) => l.href.startsWith("#")).map((l) => l.href.slice(1))
-      for (const id of sections.reverse()) {
-        const el = document.getElementById(id)
-        if (el && el.offsetTop <= y + 200) {
-          setActive(id)
-          return
-        }
-      }
-      setActive("")
+      setScrolled(window.scrollY > 30)
     }
     window.addEventListener("scroll", onScroll, { passive: true })
-    return () => window.removeEventListener("scroll", onScroll)
-  }, [])
+
+    const sectionIds = links.filter((l) => l.href.startsWith("#")).map((l) => l.href.slice(1))
+    const observers: IntersectionObserver[] = []
+    if (isLanding) {
+      for (const id of sectionIds) {
+        const el = document.getElementById(id)
+        if (!el) continue
+        const observer = new IntersectionObserver(
+          ([entry]) => {
+            if (entry.isIntersecting) setActive(id)
+          },
+          { rootMargin: "-200px 0px -50% 0px" }
+        )
+        observer.observe(el)
+        observers.push(observer)
+      }
+    }
+
+    return () => {
+      window.removeEventListener("scroll", onScroll)
+      observers.forEach((o) => o.disconnect())
+    }
+  }, [isLanding])
 
   const handleClick = (href: string) => {
     setOpen(false)
@@ -96,15 +109,15 @@ export default function Navbar() {
       <motion.nav
         initial={{ y: -80 }}
         animate={{ y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" as const }}
-        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-500 ${
+        transition={{ duration: isMobile ? 0.3 : 0.5, ease: "easeOut" as const }}
+        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
           scrolled
             ? "bg-[#020408]/80 backdrop-blur-xl border-b border-white/[0.08] py-3"
             : "bg-transparent py-4 md:py-5"
         }`}
       >
         <div className="container mx-auto flex items-center justify-between px-4 sm:px-6">
-          <motion.div whileHover={{ scale: 1.02 }}>
+          <motion.div whileHover={isMobile ? undefined : { scale: 1.02 }}>
             <Link to="/" className="flex min-w-0 items-center gap-2.5" onClick={() => setOpen(false)}>
               <img
                 src="/favicon.png"
@@ -130,7 +143,7 @@ export default function Navbar() {
                     {link.name}
                   </span>
                   <span
-                    className={`absolute bottom-0 left-4 right-4 h-[2px] rounded-full transition-all duration-300 ${
+                    className={`absolute bottom-0 left-4 right-4 h-[2px] rounded-full transition-all duration-200 ${
                       isActive
                         ? "bg-[#3b82f6] shadow-[0_0_8px_rgba(59,130,246,0.5)]"
                         : "bg-transparent group-hover:bg-zinc-600 scale-x-0 group-hover:scale-x-100"
@@ -144,18 +157,7 @@ export default function Navbar() {
           <div className="hidden lg:flex items-center gap-3">
             {user && (
               <>
-                <Link
-                  to="/dashboard/notifications"
-                  className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition-all hover:border-[#3b82f6]/35 hover:text-white"
-                  aria-label={`Notifications${unreadNotifications > 0 ? ` (${unreadNotifications} unread)` : ""}`}
-                >
-                  <Bell size={17} />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                      {unreadNotifications > 9 ? "9+" : unreadNotifications}
-                    </span>
-                  )}
-                </Link>
+                <NotificationDropdown />
                 <Link
                   to="/dashboard/messages"
                   className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition-all hover:border-[#3b82f6]/35 hover:text-white"
@@ -175,7 +177,7 @@ export default function Navbar() {
               href={wa(WA_MESSAGES.general)}
               target="_blank"
               rel="noopener noreferrer"
-              whileHover={{ scale: 1.04 }}
+              whileHover={isMobile ? undefined : { scale: 1.04 }}
               whileTap={{ scale: 0.97 }}
               className="inline-flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#3b82f6]/40 shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300"
             >
@@ -244,7 +246,7 @@ export default function Navbar() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.15 }}
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm lg:hidden"
             onClick={() => setOpen(false)}
           >
@@ -252,7 +254,7 @@ export default function Navbar() {
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              transition={isMobile ? { duration: 0.2, ease: "easeOut" } : { type: "spring", stiffness: 300, damping: 30 }}
               className="safe-bottom absolute bottom-0 left-0 right-0 max-h-[85dvh] overflow-y-auto rounded-t-[28px] border-t border-white/[0.1] bg-[#05070c]/95 shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-2xl"
               role="dialog"
               aria-modal="true"

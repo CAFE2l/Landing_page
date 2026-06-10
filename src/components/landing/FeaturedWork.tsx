@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion"
 import { Link } from "react-router-dom"
 import { ArrowRight, Check, Code2, LayoutDashboard, MonitorSmartphone } from "lucide-react"
+import { useIsMobile } from "../../hooks/useMobile"
 import SectionHeading from "./SectionHeading"
 import WhatsAppIcon from "./WhatsAppIcon"
 import Magnetic from "./Magnetic"
@@ -98,6 +99,7 @@ function PlanPreview({ type }: { type: PlanPreviewType }) {
           alt="Landing page example preview"
           className="h-full w-full object-cover object-top"
           loading="lazy"
+          decoding="async"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#020408]/45 via-transparent to-transparent" />
       </div>
@@ -112,6 +114,7 @@ function PlanPreview({ type }: { type: PlanPreviewType }) {
           alt="Professional website example preview"
           className="h-full w-full object-cover object-top"
           loading="lazy"
+          decoding="async"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#020408]/45 via-transparent to-transparent" />
       </div>
@@ -126,6 +129,7 @@ function PlanPreview({ type }: { type: PlanPreviewType }) {
           alt="Web app and SaaS example preview"
           className="h-full w-full object-cover object-top"
           loading="lazy"
+          decoding="async"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#020408]/45 via-transparent to-transparent" />
       </div>
@@ -146,6 +150,7 @@ const fadeUp = {
 
 export default function FeaturedWork() {
   const reduceMotion = useReducedMotion()
+  const isMobile = useIsMobile()
 
   return (
     <section id="work" className="py-20 md:py-32 relative">
@@ -165,9 +170,9 @@ export default function FeaturedWork() {
               custom={i}
               initial={reduceMotion ? { opacity: 1 } : "hidden"}
               whileInView="visible"
-              viewport={{ once: true, amount: 0.2 }}
+              viewport={{ once: true, amount: 0.1 }}
               variants={!reduceMotion ? fadeUp : undefined}
-              whileHover={!reduceMotion ? { y: -6, transition: { duration: 0.2 } } : undefined}
+              whileHover={!reduceMotion && !isMobile ? { y: -6, transition: { duration: 0.2 } } : undefined}
               className={`group relative rounded-2xl border bg-white/[0.025] overflow-hidden transition-all duration-300 ${
                 plan.featured
                   ? "border-[#3b82f6]/60 shadow-[0_0_36px_rgba(37,99,235,0.18)]"

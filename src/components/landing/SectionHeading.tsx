@@ -1,6 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
+import { useIsMobile } from "../../hooks/useMobile"
 
 interface SectionHeadingProps {
   label?: string
@@ -9,12 +10,14 @@ interface SectionHeadingProps {
 }
 
 export default function SectionHeading({ label, title, subtitle }: SectionHeadingProps) {
+  const isMobile = useIsMobile()
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
+      initial={isMobile ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.3 }}
-      transition={{ duration: 0.5, ease: "easeOut" as const }}
+      viewport={{ once: true, amount: 0.1 }}
+      transition={{ duration: 0.4, ease: "easeOut" as const }}
       className="text-center mb-10 md:mb-16"
     >
       {label && (

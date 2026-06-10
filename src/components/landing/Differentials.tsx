@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion"
 import { Palette, Zap, Code, LifeBuoy, Search } from "lucide-react"
+import { useIsMobile } from "../../hooks/useMobile"
 import SectionHeading from "./SectionHeading"
 
 const items = [
@@ -48,6 +49,7 @@ const fadeUp = {
 
 export default function Differentials() {
   const reduceMotion = useReducedMotion()
+  const isMobile = useIsMobile()
 
   return (
     <section className="py-20 md:py-32 relative">
@@ -65,9 +67,9 @@ export default function Differentials() {
               custom={i}
               initial={reduceMotion ? { opacity: 1 } : "hidden"}
               whileInView="visible"
-              viewport={{ once: true, amount: 0.1 }}
+              viewport={{ once: true, amount: isMobile ? 0.05 : 0.1 }}
               variants={!reduceMotion ? fadeUp : undefined}
-              className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6 transition-all duration-300 hover:bg-white/[0.04] hover:border-white/[0.10]"
+              className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6 transition-all duration-200 hover:bg-white/[0.04] hover:border-white/[0.10]"
             >
               <div className="w-10 h-10 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-4">
                 {"imgSrc" in item ? (

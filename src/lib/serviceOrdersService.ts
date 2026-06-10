@@ -428,7 +428,8 @@ export async function confirmPayment(
 
 type BotNotificationAction =
   | "view_order"
-  | "mark_paid"
+  | "mark_upfront_paid"
+  | "mark_remaining_paid"
   | "reply_client"
   | "view_proof"
   | "move_in_progress"
@@ -675,7 +676,7 @@ export async function sendBotPaymentNotification(order: ServiceOrder, event: str
         ? ["view_order", "reply_client", "open_dashboard"]
         : confirmed
           ? ["view_order", "move_in_progress", "open_dashboard"]
-          : ["view_order", "mark_paid", "open_dashboard"],
+          : ["view_order", "mark_upfront_paid", "open_dashboard"],
     }),
     `${title} - ${displayName} - $${order.upfrontAmount}`,
   )
@@ -878,17 +879,48 @@ export async function sendFinalDelivery(
   return updateServiceOrder(orderId, { deliveryUrl, projectStatus: "delivered" })
 }
 
-// ========== Confirm Remaining Payment ==========
+// ========== Workflow RPC wrappers ==========
+
+export async function confirmUpfrontPaymentRpc(orderId: string): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+  const { error } = await supabase.rpc("confirm_upfront_payment", { p_order_id: orderId })
+  if (error) { toast.error(error.message); return false }
+  return true
+}
 
 export async function confirmRemainingPayment(orderId: string): Promise<boolean> {
   if (!supabase || !supabaseConfigured) return false
-  const order = await fetchServiceOrder(orderId)
-  if (!order) { toast.error("Order not found"); return false }
-  if (!order.remainingPaid && !order.remainingPayment) {
-    toast.error("Remaining payment has not been claimed yet.")
-    return false
-  }
-  return updateServiceOrder(orderId, { projectStatus: "fully_paid", remainingPaid: true })
+  const { error } = await supabase.rpc("confirm_remaining_payment", { p_order_id: orderId })
+  if (error) { toast.error(error.message); return false }
+  return true
+}
+
+export async function startProject(orderId: string): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+  const { error } = await supabase.rpc("start_project", { p_order_id: orderId })
+  if (error) { toast.error(error.message); return false }
+  return true
+}
+
+export async function markReadyForDelivery(orderId: string): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+  const { error } = await supabase.rpc("mark_ready_for_delivery", { p_order_id: orderId })
+  if (error) { toast.error(error.message); return false }
+  return true
+}
+
+export async function releaseFinalDelivery(orderId: string, deliveryUrl: string): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+  const { error } = await supabase.rpc("release_final_delivery", { p_order_id: orderId, p_delivery_url: deliveryUrl })
+  if (error) { toast.error(error.message); return false }
+  return true
+}
+
+export async function markCompleted(orderId: string): Promise<boolean> {
+  if (!supabase || !supabaseConfigured) return false
+  const { error } = await supabase.rpc("mark_completed", { p_order_id: orderId })
+  if (error) { toast.error(error.message); return false }
+  return true
 }
 
 export async function deleteServiceOrder(id: string): Promise<boolean> {

@@ -230,11 +230,21 @@ export async function markMessagesAsRead(
   currentUserId?: string,
 ): Promise<void> {
   if (!supabase || !supabaseConfigured) return
-  void currentUserId
+  if (!currentUserId) return
 
-  await supabase.rpc("mark_conversation_as_read", {
-    p_conversation_id: conversationId,
-  })
+  const now = new Date().toISOString()
+
+  await supabase
+    .from("messages")
+    .update({ read_at: now })
+    .eq("conversation_id", conversationId)
+    .neq("sender_id", currentUserId)
+    .is("read_at", null)
+
+  await supabase
+    .from("conversations")
+    .update({ updated_at: now })
+    .eq("id", conversationId)
 }
 
 export async function getGlobalUnreadCount(): Promise<number> {

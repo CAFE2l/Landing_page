@@ -16,12 +16,38 @@ export type ActivityAction =
   | "feedbacks_cleared"
   | "account_deleted"
 
+export interface PhoneData {
+  countryCode: string
+  callingCode: string
+  nationalNumber: string
+  internationalNumber: string
+  formattedNumber: string
+}
+
+export interface LocationData {
+  city: string
+  state: string
+  country: string
+  countryCode: string
+  formattedAddress: string
+  latitude: number | null
+  longitude: number | null
+  placeId: string
+  source: "nominatim" | "viacep" | "manual"
+  postalCode: string
+}
+
 export interface SiteSettings {
   siteName: string
   siteDescription: string
   logoUrl: string | null
   publicEmail: string
   whatsapp: string
+  phoneData: PhoneData | null
+  telegram: string
+  discord: string
+  location: string
+  locationData: LocationData | null
   siteUrl: string
   currency: Currency
   language: Language
@@ -32,8 +58,19 @@ export interface SiteSettings {
   notifyNewFeedback: boolean
   notifyNewClient: boolean
   notifyNewOrder: boolean
+  notifyPaymentReceived: boolean
+  notifyProjectDelivered: boolean
   notificationEmail: string
   digestFrequency: DigestFrequency
+  upfrontPercentage: number
+  finalPaymentPercentage: number
+  acceptedPaymentMethods: string[]
+  paypalEmail: string
+  stripePublishableKey: string
+  stripeSecretKey: string
+  pixKey: string
+  browserPushEnabled: boolean
+  whatsappNotificationsEnabled: boolean
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -42,6 +79,28 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   logoUrl: null,
   publicEmail: "contato@cafeservices.com",
   whatsapp: "5541996713782",
+  phoneData: {
+    countryCode: "BR",
+    callingCode: "55",
+    nationalNumber: "41996713782",
+    internationalNumber: "+5541996713782",
+    formattedNumber: "+55 (41) 99671-3782",
+  },
+  telegram: "",
+  discord: "",
+  location: "Curitiba, Paraná, Brazil",
+  locationData: {
+    city: "Curitiba",
+    state: "Paraná",
+    country: "Brazil",
+    countryCode: "BR",
+    formattedAddress: "Curitiba, Paraná, Brazil",
+    latitude: -25.4284,
+    longitude: -49.2733,
+    placeId: "",
+    source: "manual",
+    postalCode: "",
+  },
   siteUrl: "https://cafeservices.com",
   currency: "BRL",
   language: "pt-BR",
@@ -52,8 +111,19 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   notifyNewFeedback: true,
   notifyNewClient: true,
   notifyNewOrder: true,
+  notifyPaymentReceived: true,
+  notifyProjectDelivered: true,
   notificationEmail: "admin@cafeservices.com",
   digestFrequency: "weekly",
+  upfrontPercentage: 50,
+  finalPaymentPercentage: 50,
+  acceptedPaymentMethods: ["paypal", "pix", "wise"],
+  paypalEmail: "",
+  stripePublishableKey: "",
+  stripeSecretKey: "",
+  pixKey: "",
+  browserPushEnabled: false,
+  whatsappNotificationsEnabled: false,
 }
 
 export interface TeamMember {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
+import { useIsMobile, useReducedAnimations } from "../../hooks/useMobile"
 
 interface Orb {
   id: number
@@ -15,7 +16,7 @@ interface Orb {
   delay: number
 }
 
-const orbs: Orb[] = [
+const desktopOrbs: Orb[] = [
   { id: 1, color: "bg-blue-500", size: "hidden sm:block w-96 h-96", initialX: 10, initialY: 15, driftX: 40, driftY: -30, duration: 18, delay: 0 },
   { id: 2, color: "bg-cyan-500", size: "hidden sm:block w-80 h-80", initialX: 70, initialY: 10, driftX: -30, driftY: 40, duration: 22, delay: 1 },
   { id: 3, color: "bg-blue-500", size: "w-48 h-48 sm:w-72 sm:h-72", initialX: 5, initialY: 60, driftX: 30, driftY: 20, duration: 20, delay: 0.5 },
@@ -24,21 +25,24 @@ const orbs: Orb[] = [
   { id: 6, color: "bg-blue-400", size: "hidden sm:block w-80 h-80", initialX: 30, initialY: 70, driftX: -20, driftY: -40, duration: 19, delay: 1.5 },
 ]
 
+const mobileOrbs: Orb[] = [
+  { id: 1, color: "bg-blue-500", size: "w-48 h-48", initialX: 10, initialY: 15, driftX: 20, driftY: -15, duration: 25, delay: 0 },
+  { id: 3, color: "bg-blue-500", size: "w-36 h-36", initialX: 60, initialY: 50, driftX: 15, driftY: 10, duration: 28, delay: 0.5 },
+]
+
 export default function FloatingOrbs() {
-  const [reduceMotion, setReduceMotion] = useState(() =>
-    typeof window !== "undefined"
-      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      : false
-  )
+  const isMobile = useIsMobile()
+  const reduceMotion = useReducedAnimations()
+  const [render, setRender] = useState(false)
 
   useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)")
-    const handler = (e: MediaQueryListEvent) => setReduceMotion(e.matches)
-    mq.addEventListener("change", handler)
-    return () => mq.removeEventListener("change", handler)
+    setRender(true)
   }, [])
 
-  if (reduceMotion) return null
+  if (!render || reduceMotion) return null
+
+  const orbs = isMobile ? mobileOrbs : desktopOrbs
+  const blurPx = isMobile ? 60 : 120
 
   return (
     <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
@@ -63,7 +67,8 @@ export default function FloatingOrbs() {
             delay: orb.delay,
             ease: "linear",
           }}
-          className={`absolute -z-10 rounded-full blur-[120px] pointer-events-none ${orb.color} ${orb.size}`}
+          className={`absolute -z-10 rounded-full pointer-events-none ${orb.color} ${orb.size}`}
+          style={{ filter: `blur(${blurPx}px)` }}
         />
       ))}
     </div>

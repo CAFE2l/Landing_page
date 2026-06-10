@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, useReducedMotion } from "framer-motion"
 import { countUsers, countProjects, countCountries } from "../../data/firestoreStore"
+import { useIsMobile, usePerformanceMode } from "../../hooks/useMobile"
 import Magnetic from "./Magnetic"
 
 const titleLine1 = "I Build Digital Products"
@@ -78,6 +79,7 @@ const statLabels = [
 
 export default function Hero() {
   const reduceMotion = useReducedMotion()
+  const isMobile = useIsMobile()
   const [stats, setStats] = useState({ users: 0, projects: 0, countries: 0 })
   const [loaded, setLoaded] = useState(false)
 
@@ -97,20 +99,23 @@ export default function Hero() {
     return () => { cancelled = true }
   }, [])
 
+  const blurSize = isMobile ? 40 : 80
+  const glowSize = isMobile ? "h-[100px] w-[100px]" : "h-[180px] w-[180px] sm:h-[450px] sm:w-[450px] lg:h-[600px] lg:w-[600px]"
+
   return (
     <section className="relative flex min-h-[100svh] items-center justify-center overflow-hidden pt-24 pb-14 md:pt-32 md:pb-24">
       <div className="absolute inset-0 bg-dot-grid" />
 
       <motion.div
-        className="pointer-events-none absolute top-1/2 left-1/2 h-[180px] w-[180px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#2563eb] sm:h-[450px] sm:w-[450px] lg:h-[600px] lg:w-[600px]"
-        style={{ filter: "blur(80px)" }}
+        className={`pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#2563eb] ${glowSize}`}
+        style={{ filter: `blur(${blurSize}px)` }}
         animate={
-          !reduceMotion
+          !reduceMotion && !isMobile
             ? { scale: [1, 1.1, 1], opacity: [0.15, 0.25, 0.15] }
-            : undefined
+            : { opacity: 0.15 }
         }
         transition={{
-          repeat: Infinity,
+          repeat: isMobile ? 0 : Infinity,
           duration: 6,
           ease: "easeInOut",
         }}
@@ -222,8 +227,8 @@ export default function Hero() {
             stroke="currentColor"
             strokeWidth="2"
             className="text-zinc-600"
-            animate={!reduceMotion ? { y: [0, 8, 0] } : undefined}
-            transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+            animate={!reduceMotion && !isMobile ? { y: [0, 8, 0] } : undefined}
+            transition={{ repeat: isMobile ? 0 : Infinity, duration: 1.5, ease: "easeInOut" }}
           >
             <path d="M12 5v14M19 12l-7 7-7-7" />
           </motion.svg>

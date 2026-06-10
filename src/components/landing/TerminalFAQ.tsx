@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useIsMobile } from "../../hooks/useMobile"
 
 interface HistoryEntry {
   id: string
@@ -75,8 +76,7 @@ function Typewriter({ text, onDone }: { text: string; onDone?: () => void }) {
       }
     }, 12)
     return () => clearInterval(interval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text])
+  }, [text, onDone])
 
   return <span>{displayed}</span>
 }
@@ -87,6 +87,7 @@ export default function TerminalFAQ() {
   const [typing, setTyping] = useState(false)
   const [showAnswer, setShowAnswer] = useState(false)
   const terminalRef = useRef<HTMLDivElement>(null)
+  const isMobile = useIsMobile()
 
   const handleSelect = (q: (typeof questions)[0]) => {
     setSelectedId(q.id)
@@ -123,7 +124,7 @@ export default function TerminalFAQ() {
     <section id="faq" className="py-20 md:py-32 relative">
       <div className="container mx-auto px-4 sm:px-6">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={isMobile ? { opacity: 1 } : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.5 }}
@@ -139,7 +140,7 @@ export default function TerminalFAQ() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={isMobile ? { opacity: 1 } : { opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-50px" }}
           transition={{ duration: 0.6 }}
@@ -183,11 +184,10 @@ export default function TerminalFAQ() {
                   return (
                     <motion.button
                       key={q.id}
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={isMobile ? { opacity: 1 } : { opacity: 0, y: 10 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true }}
-                      transition={{ duration: 0.3, delay: i * 0.04 }}
-                      whileHover={{ scale: 1.02 }}
+                      transition={{ duration: 0.2, delay: i * 0.02 }}
                       onClick={() => handleSelect(q)}
                       className={`touch-target text-left px-4 py-2.5 rounded-lg border text-sm font-mono transition-all duration-200 min-h-[44px] ${
                         isSelected
@@ -211,7 +211,7 @@ export default function TerminalFAQ() {
                     initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.25 }}
+                    transition={{ duration: 0.2 }}
                     className="mb-4 pb-4 border-b border-white/[0.04] last:border-0"
                   >
                     <div className="text-blue-500 mb-1.5">

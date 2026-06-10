@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
+import { useIsMobile } from "../../hooks/useMobile"
 import { Check, CheckCheck, Loader2, Play, X, FileText, Film, ImageIcon, Music, Download, CornerUpLeft, Pencil, Trash2 } from "lucide-react"
 import AudioPlayer from "./AudioPlayer"
 import BotNotificationCard, { parseBotNotification } from "./BotNotificationCard"
@@ -34,6 +35,7 @@ function getFileIcon(mimeType: string | null) {
 export default function ChatMessageBubble({ message, isOwn, onImageClick, currentlyPlayingAudio, onPlayAudio, onReply, onEdit, onDelete }: ChatMessageBubbleProps) {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [showActions, setShowActions] = useState(false)
+  const isMobile = useIsMobile()
   const botPayload = !isOwn ? parseBotNotification(message.content || "") : null
 
   if (botPayload) {
@@ -54,9 +56,9 @@ export default function ChatMessageBubble({ message, isOwn, onImageClick, curren
     if (!message.deliveredAt) {
       statusIcon = <Loader2 size={10} className="animate-spin text-blue-200/60" />
     } else if (!message.readAt) {
-      statusIcon = <Check size={12} className="text-blue-200/60" />
+      statusIcon = <CheckCheck size={12} className="text-blue-200/60" />
     } else {
-      statusIcon = <CheckCheck size={12} className="text-blue-300" />
+      statusIcon = <CheckCheck size={12} className="text-blue-400" />
     }
   }
 
@@ -65,9 +67,9 @@ export default function ChatMessageBubble({ message, isOwn, onImageClick, curren
   return (
     <>
       <motion.div
-        initial={{ opacity: 0, y: 12, scale: 0.95 }}
+        initial={isMobile ? false : { opacity: 0, y: 12, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
+        transition={{ duration: 0.15, ease: "easeOut" }}
         className={`group flex ${isOwn ? "justify-end" : "justify-start"} mb-2`}
         onClick={() => setShowActions((prev) => !prev)}
       >
@@ -99,9 +101,12 @@ export default function ChatMessageBubble({ message, isOwn, onImageClick, curren
                 </div>
               </button>
               {message.caption && (
-                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words mt-1.5">
-                  {message.caption}
-                </p>
+                <>
+                  <div className="mx-1 mt-2 h-px bg-white/[0.12]" />
+                  <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                    {message.caption}
+                  </p>
+                </>
               )}
             </div>
           ) : message.messageType === "audio" && message.mediaUrl ? (
@@ -128,9 +133,12 @@ export default function ChatMessageBubble({ message, isOwn, onImageClick, curren
                 />
               </button>
               {message.caption && (
-                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words mt-1.5">
-                  {message.caption}
-                </p>
+                <>
+                  <div className="mx-1 mt-2 h-px bg-white/[0.12]" />
+                  <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                    {message.caption}
+                  </p>
+                </>
               )}
             </div>
           ) : message.messageType === "sticker" && message.mediaUrl ? (
@@ -170,9 +178,12 @@ export default function ChatMessageBubble({ message, isOwn, onImageClick, curren
                 <Download size={16} className="shrink-0 opacity-60" />
               </a>
               {message.caption && (
-                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words mt-1.5">
-                  {message.caption}
-                </p>
+                <>
+                  <div className="mx-1 mt-2 h-px bg-white/[0.12]" />
+                  <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                    {message.caption}
+                  </p>
+                </>
               )}
             </div>
           ) : (

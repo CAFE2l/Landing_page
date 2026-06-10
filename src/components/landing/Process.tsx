@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, useReducedMotion } from "framer-motion"
+import { useIsMobile } from "../../hooks/useMobile"
 import SectionHeading from "./SectionHeading"
 
 interface StepData {
@@ -77,6 +78,7 @@ function StepProgress({ index }: { index: number }) {
 
 export default function Process() {
   const reduceMotion = useReducedMotion()
+  const isMobile = useIsMobile()
 
   return (
     <section id="process" className="py-20 md:py-32 relative">
@@ -107,8 +109,8 @@ export default function Process() {
                   key={step.id}
                   initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.4 }}
-                  transition={{ delay: i * 0.3, duration: 0.4 }}
+                  viewport={{ once: true, amount: isMobile ? 0.1 : 0.4 }}
+                  transition={{ delay: i * 0.2, duration: 0.35 }}
                 >
                   <p className="text-white font-semibold mb-2 break-words">
                     <span className="text-[#3b82f6]">$</span> {step.command}
@@ -121,7 +123,7 @@ export default function Process() {
                         initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
                         whileInView={{ opacity: 1 }}
                         viewport={{ once: true }}
-                        transition={{ delay: i * 0.3 + 0.2 + j * 0.1, duration: 0.3 }}
+                        transition={{ delay: i * 0.2 + 0.2 + j * 0.1, duration: 0.3 }}
                         className="text-[#94a3b8]"
                       >
                         <span className="text-zinc-600 mr-2">&rarr;</span>

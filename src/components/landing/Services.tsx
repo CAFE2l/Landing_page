@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion"
 import { Layout, Globe, Code2, Smartphone } from "lucide-react"
+import { useIsMobile } from "../../hooks/useMobile"
 import SectionHeading from "./SectionHeading"
 
 const services = [
@@ -40,8 +41,19 @@ const fadeUp = {
   }),
 }
 
-export default function Services() {
+interface ServicesProps {
+  onLearnMore?: (index: number) => void
+}
+
+export default function Services({ onLearnMore }: ServicesProps) {
   const reduceMotion = useReducedMotion()
+  const isMobile = useIsMobile()
+
+  const handleLearnMore = (i: number, e: React.MouseEvent) => {
+    e.preventDefault()
+    onLearnMore?.(i)
+    document.getElementById("service-details")?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
 
   return (
     <section id="services" className="py-20 md:py-28 relative">
@@ -59,10 +71,10 @@ export default function Services() {
               custom={i}
               initial={reduceMotion ? { opacity: 1 } : "hidden"}
               whileInView="visible"
-              viewport={{ once: true, amount: 0.2 }}
+              viewport={{ once: true, amount: isMobile ? 0.05 : 0.2 }}
               variants={!reduceMotion ? fadeUp : undefined}
-              whileHover={!reduceMotion ? { y: -8, transition: { duration: 0.25 } } : undefined}
-              className="group relative rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-sm transition-all duration-400 hover:bg-white/[0.06] hover:border-blue-500/25 hover:shadow-[0_0_40px_rgba(37,99,235,0.12)]"
+              whileHover={!reduceMotion && !isMobile ? { y: -8, transition: { duration: 0.25 } } : undefined}
+              className="group relative rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-sm transition-all duration-300 hover:bg-white/[0.06] hover:border-blue-500/25 hover:shadow-[0_0_40px_rgba(37,99,235,0.12)]"
             >
               <div className="relative overflow-hidden rounded-t-2xl bg-[#060d14]">
                 <div className="aspect-[16/10]">
@@ -71,11 +83,12 @@ export default function Services() {
                     alt={service.title}
                     className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
                     loading="lazy"
+                    decoding="async"
                   />
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628]/95 via-[#0a1628]/40 to-transparent" />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-transparent" />
-                <div className="absolute inset-0 ring-1 ring-inset ring-white/[0.06] group-hover:ring-blue-500/20 rounded-t-2xl transition-all duration-400" />
+                <div className="absolute inset-0 ring-1 ring-inset ring-white/[0.06] group-hover:ring-blue-500/20 rounded-t-2xl transition-all duration-300" />
               </div>
 
               <div className="p-5 sm:p-6">
@@ -90,7 +103,8 @@ export default function Services() {
                   {service.desc}
                 </p>
                 <a
-                  href="#contact"
+                  href="#service-details"
+                  onClick={(e) => handleLearnMore(i, e)}
                   className="touch-target inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 group-hover:text-[#0ea5e9] transition-colors duration-200"
                 >
                   Learn more

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { shouldDisableMouseEffects } from "../../lib/performance"
 
 export default function CursorSpotlight() {
   const [pos, setPos] = useState({ x: -999, y: -999 })
@@ -10,9 +11,12 @@ export default function CursorSpotlight() {
   }, [])
 
   useEffect(() => {
+    if (shouldDisableMouseEffects()) return
     window.addEventListener("mousemove", handleMouse, { passive: true })
     return () => window.removeEventListener("mousemove", handleMouse)
   }, [handleMouse])
+
+  if (shouldDisableMouseEffects()) return null
 
   return (
     <div

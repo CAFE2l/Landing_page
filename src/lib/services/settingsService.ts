@@ -299,13 +299,16 @@ export async function fetchActivityLogs(): Promise<ActivityLogEntry[]> {
         .limit(20)
 
       if (!error && data) {
-        const logs: ActivityLogEntry[] = (data as Record<string, unknown>[]).map((row) => ({
-          id: String(row.id),
-          action: (row.action as ActivityAction) ?? "login",
-          actor: String(row.actor ?? "Admin"),
-          details: String(row.details ?? ""),
-          timestamp: String(row.created_at ?? nowISO()),
-        }))
+        const logs: ActivityLogEntry[] = (data as Record<string, unknown>[]).map((row) => {
+          const meta = row.metadata as Record<string, unknown> | null ?? {}
+          return {
+            id: String(row.id),
+            action: (row.action as ActivityAction) ?? "login",
+            actor: String(meta.actor ?? "Admin"),
+            details: String(meta.details ?? ""),
+            timestamp: String(row.created_at ?? nowISO()),
+          }
+        })
         saveToStorage(ACTIVITY_KEY, logs)
         return logs
       }
@@ -328,9 +331,8 @@ async function logActivity(action: ActivityAction, actor: string, details: strin
     try {
       await supabase.from("admin_activity_log").insert({
         action,
-        actor,
-        details,
-        created_at: nowISO(),
+        target_type: "settings",
+        metadata: { actor, details },
       })
     } catch { /* ignore */ }
   }

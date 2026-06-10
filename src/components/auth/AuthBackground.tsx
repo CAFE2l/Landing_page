@@ -1,8 +1,9 @@
 "use client"
 
 import { motion } from "framer-motion"
+import { useIsMobile } from "../../hooks/useMobile"
 
-const orbConfig = [
+const desktopOrbConfig = [
   { size: 620, color: "#1d4ed8", left: "-10%", top: "8%", delay: 0 },
   { size: 520, color: "#0ea5e9", left: "62%", top: "-12%", delay: 1.2 },
   { size: 700, color: "#6366f1", left: "58%", top: "52%", delay: 2.1 },
@@ -10,7 +11,12 @@ const orbConfig = [
   { size: 500, color: "#0ea5e9", left: "36%", top: "18%", delay: 1.7 },
 ]
 
-const particlePositions = Array.from({ length: 35 }, (_, index) => ({
+const mobileOrbConfig = [
+  { size: 300, color: "#1d4ed8", left: "5%", top: "10%", delay: 0 },
+  { size: 350, color: "#6366f1", left: "55%", top: "50%", delay: 1 },
+]
+
+const desktopParticles = Array.from({ length: 35 }, (_, index) => ({
   left: `${(index * 37 + 11) % 100}%`,
   top: `${(index * 53 + 17) % 100}%`,
   size: 2 + (index % 3),
@@ -27,6 +33,11 @@ const corners = [
 ]
 
 export default function AuthBackground() {
+  const isMobile = useIsMobile()
+  const orbConfig = isMobile ? mobileOrbConfig : desktopOrbConfig
+  const particles = isMobile ? [] : desktopParticles
+  const blurPx = isMobile ? 60 : 120
+
   return (
     <div className="absolute inset-0 overflow-hidden bg-[#020408]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(37,99,235,0.14),transparent_34%),radial-gradient(circle_at_80%_70%,rgba(14,165,233,0.08),transparent_28%)]" />
@@ -36,15 +47,16 @@ export default function AuthBackground() {
       {orbConfig.map((orb) => (
         <motion.div
           key={`${orb.color}-${orb.left}-${orb.top}`}
-          className="absolute rounded-full blur-[120px]"
+          className="absolute rounded-full"
           style={{
             width: orb.size,
             height: orb.size,
             left: orb.left,
             top: orb.top,
             backgroundColor: orb.color,
+            filter: `blur(${blurPx}px)`,
           }}
-          animate={{
+          animate={isMobile ? undefined : {
             x: [0, 30, -20, 0],
             y: [0, -40, 20, 0],
             scale: [1, 1.1, 0.95, 1],
@@ -59,7 +71,7 @@ export default function AuthBackground() {
         />
       ))}
 
-      {particlePositions.map((particle, index) => (
+      {particles.map((particle, index) => (
         <motion.span
           key={index}
           className="absolute rounded-full bg-[#3b82f6]"
@@ -82,7 +94,7 @@ export default function AuthBackground() {
 
       <motion.div
         className="absolute left-0 h-px w-full bg-gradient-to-r from-transparent via-[#3b82f6]/40 to-transparent"
-        animate={{ top: ["-2%", "102%"] }}
+        animate={isMobile ? undefined : { top: ["-2%", "102%"] }}
         transition={{ duration: 6, repeat: Infinity, ease: "linear", repeatDelay: 2 }}
       />
 

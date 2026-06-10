@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
+import { useIsMobile } from "../../hooks/useMobile"
 import {
   MessageCircle, X, Minus, ExternalLink, Loader2,
   Bell, Users, ChevronLeft, RefreshCw,
@@ -53,6 +54,7 @@ export default function ChatWidget() {
   const { user } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<Tab>("chats")
   const [conversations, setConversations] = useState<ChatConv[]>([])
@@ -264,11 +266,15 @@ export default function ChatWidget() {
           <AnimatePresence>
             {open && (
               <motion.div
-                initial={{ opacity: 0, y: 40, scale: 0.95 }}
+                initial={isMobile ? false : { opacity: 0, y: 40, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 40, scale: 0.95 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="fixed inset-x-0 bottom-0 top-0 z-[9999] flex flex-col overflow-hidden rounded-none border-0 bg-[#0A0A0F] sm:inset-auto sm:bottom-5 sm:right-5 sm:h-[580px] sm:max-h-[calc(100vh-96px)] sm:w-[440px] sm:rounded-2xl sm:border sm:border-white/[0.08] sm:shadow-2xl sm:shadow-black/60"
+                exit={isMobile ? undefined : { opacity: 0, y: 40, scale: 0.95 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+                className={`fixed z-[9999] flex flex-col overflow-hidden bg-[#0A0A0F] ${
+                  isMobile
+                    ? "inset-x-0 bottom-0 top-0 rounded-none border-0"
+                    : "sm:inset-auto sm:bottom-5 sm:right-5 sm:h-[580px] sm:max-h-[calc(100vh-96px)] sm:w-[440px] sm:rounded-2xl sm:border sm:border-white/[0.08] sm:shadow-2xl sm:shadow-black/60"
+                }`}
               >
                 {/* ===== Compact Header ===== */}
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06] bg-[#0A0A0F]/80 backdrop-blur-md shrink-0">
@@ -344,11 +350,7 @@ export default function ChatWidget() {
                           </span>
                         )}
                         {tab === t && (
-                          <motion.div
-                            layoutId="activeTab"
-                            className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-[#4F6EF7]"
-                            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                          />
+                          <div className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-[#4F6EF7]" />
                         )}
                       </button>
                     ))}
@@ -454,10 +456,9 @@ export default function ChatWidget() {
                           {conversations.map((conv) => (
                             <motion.button
                               key={conv.id}
-                              layout
-                              initial={{ opacity: 0, y: 8 }}
+                              initial={isMobile ? false : { opacity: 0, y: 8 }}
                               animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -8 }}
+                              exit={isMobile ? undefined : { opacity: 0, y: -8 }}
                               transition={{ duration: 0.15 }}
                               onClick={() => handleSelectConversation(conv)}
                               className="flex w-full items-center gap-3 px-4 py-3 min-h-[48px] touch-target hover:bg-white/[0.03] transition-colors text-left"
@@ -576,7 +577,7 @@ export default function ChatWidget() {
                         {groups.map((group) => (
                           <motion.button
                             key={group.id}
-                            initial={{ opacity: 0, y: 8 }}
+                            initial={isMobile ? false : { opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.15 }}
                             onClick={() => handleSelectGroup(group)}
