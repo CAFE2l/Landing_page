@@ -354,6 +354,10 @@ export async function confirmPayment(
   const order = await fetchServiceOrder(orderId)
   if (!order) return false
 
+  const isRemaining = method.includes("remaining") || order.projectStatus === "awaiting_remaining_payment"
+  const amount = isRemaining ? (order.remainingAmount ?? 0) : order.upfrontAmount
+  const targetStatus = isRemaining ? "remaining_payment_claimed" as ProjectStatus : "payment_claimed" as ProjectStatus
+
   const displayName = getOrderDisplayName(order)
   const normalizedMethod = method.includes("wise") ? "wise" : method.includes("paypal") ? "paypal" : "manual"
   const paymentStatus: PaymentStatus = normalizedMethod === "wise" ? "wise_manual_review" : "client_claimed_paid"
@@ -363,7 +367,7 @@ export async function confirmPayment(
     .update({
       payment_method: normalizedMethod,
       payment_status: paymentStatus,
-      project_status: "payment_claimed",
+      project_status: targetStatus,
       payment_claimed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -379,7 +383,7 @@ export async function confirmPayment(
     type: "payment_confirmation",
     title: normalizedMethod === "wise" ? "Wise payment needs review" : "Client claimed payment",
     message: `${displayName} clicked I've Paid via ${normalizedMethod.toUpperCase()} for order ${order.id.slice(0, 8)}`,
-    payload: { orderId, method: normalizedMethod, status: paymentStatus, amount: order.upfrontAmount },
+    payload: { orderId, method: normalizedMethod, status: paymentStatus, amount },
   })
 
   // Notify the client via bot DM
@@ -389,7 +393,7 @@ export async function confirmPayment(
       ``,
       `We received your payment notification for:`,
       `Service: ${order.serviceName}`,
-      `Amount: $${order.upfrontAmount}`,
+      `Amount: $${amount}`,
       `Method: ${normalizedMethod.toUpperCase()}`,
       ``,
       `Our team will verify and confirm your payment shortly. You can track your order status in your profile under "My Orders".`,
@@ -397,10 +401,10 @@ export async function confirmPayment(
     await sendBotMessageToUser(order.userId, userMsg, `✅ Payment notification received for ${order.serviceName}`)
     await createUserNotification({
       userId: order.userId,
-      type: "payment_claimed",
-      title: "Payment Claimed",
-      message: `Your payment of $${order.upfrontAmount} via ${normalizedMethod.toUpperCase()} has been received and is being verified.`,
-      payload: { orderId, method: normalizedMethod, amount: order.upfrontAmount },
+      type: isRemaining ? "remaining_payment_requested" : "payment_claimed",
+      title: isRemaining ? "Remaining Payment Claimed" : "Payment Claimed",
+      message: `Your payment of $${amount} via ${normalizedMethod.toUpperCase()} has been received and is being verified.`,
+      payload: { orderId, method: normalizedMethod, amount },
       actionUrl: "/dashboard/orders",
     })
   }
@@ -413,11 +417,12 @@ export async function confirmPayment(
     .maybeSingle()
 
   if (adminProfile?.id) {
-    await supabase.rpc("notify_payment_bot", {
+    const rpcName = isRemaining ? "notify_remaining_payment_bot" : "notify_payment_bot"
+    await supabase.rpc(rpcName, {
       p_order_id: order.id,
       p_display_name: displayName,
       p_service_name: order.serviceName,
-      p_amount: order.upfrontAmount,
+      p_amount: amount,
       p_method: normalizedMethod === "wise" ? "wise_manual_review" : "client_claimed_paid",
       p_admin_id: adminProfile.id,
     })

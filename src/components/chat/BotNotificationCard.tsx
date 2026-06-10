@@ -18,7 +18,12 @@ import {
   XCircle,
 } from "lucide-react"
 import toast from "react-hot-toast"
-import { updateServiceOrder } from "../../lib/serviceOrdersService"
+import {
+  updateServiceOrder,
+  confirmUpfrontPaymentRpc,
+  confirmRemainingPayment,
+  startProject as startProjectRpc,
+} from "../../lib/serviceOrdersService"
 import { cn } from "../../lib/utils"
 
 export type BotNotificationType =
@@ -34,7 +39,8 @@ export type BotNotificationType =
 
 export type BotNotificationAction =
   | "view_order"
-  | "mark_paid"
+  | "mark_upfront_paid"
+  | "mark_remaining_paid"
   | "reply_client"
   | "view_proof"
   | "move_in_progress"
@@ -157,7 +163,7 @@ function parseOldBotText(content: string): BotNotificationPayload | null {
     paymentMethod: method,
     status: "Awaiting verification",
     priority: "high",
-    actions: ["view_order", "mark_paid", "open_dashboard"],
+    actions: ["view_order", "mark_upfront_paid", "open_dashboard"],
   }
 }
 
@@ -244,28 +250,31 @@ export default function BotNotificationCard({
       else toast("No payment proof attached.")
       return
     }
-    if (action === "mark_paid" || action === "move_in_progress") {
+    if (action === "mark_upfront_paid" || action === "mark_remaining_paid" || action === "move_in_progress") {
       if (!payload.orderId) {
         toast.error("Missing order ID.")
         return
       }
       setWorkingAction(action)
-      const ok = await updateServiceOrder(payload.orderId, action === "mark_paid"
-        ? {
-            projectStatus: "paid",
-            paymentStatus: payload.paymentMethod?.toLowerCase() === "wise" ? "wise_manual_review" : "paypal_confirmed",
-            paymentMethod: payload.paymentMethod?.toLowerCase() === "wise" ? "wise" : "manual",
-            upfrontPaid: true,
-          }
-        : { projectStatus: "in_progress" })
+      let ok = false
+      if (action === "mark_upfront_paid") {
+        ok = await confirmUpfrontPaymentRpc(payload.orderId)
+        if (ok) toast.success("Upfront payment confirmed.")
+      } else if (action === "mark_remaining_paid") {
+        ok = await confirmRemainingPayment(payload.orderId)
+        if (ok) toast.success("Remaining payment confirmed.")
+      } else {
+        ok = await startProjectRpc(payload.orderId)
+        if (ok) toast.success("Project started.")
+      }
       setWorkingAction(null)
-      if (ok) toast.success(action === "mark_paid" ? "Payment marked as paid." : "Order moved to in progress.")
     }
   }
 
   const actionLabel: Record<BotNotificationAction, string> = {
     view_order: "View Order",
-    mark_paid: "Mark as Paid",
+    mark_upfront_paid: "Mark Upfront as Paid",
+    mark_remaining_paid: "Mark Remaining as Paid",
     reply_client: "Reply Client",
     view_proof: "View Proof",
     move_in_progress: "Move to In Progress",
@@ -328,7 +337,7 @@ export default function BotNotificationCard({
                     <Clock size={12} className="animate-spin" />
                   ) : action === "open_dashboard" || action === "view_order" ? (
                     <ExternalLink size={12} />
-                  ) : action === "mark_paid" ? (
+                  ) : action === "mark_upfront_paid" || action === "mark_remaining_paid" ? (
                     <CheckCircle2 size={12} />
                   ) : action === "move_in_progress" ? (
                     <Rocket size={12} />

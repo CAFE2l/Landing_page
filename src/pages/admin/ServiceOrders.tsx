@@ -55,14 +55,9 @@ const TABS: { key: StatusTab; label: string }[] = [
 ]
 
 const STATUS_ACTIONS: { from: ProjectStatus[]; to: ProjectStatus; label: string; icon: typeof ChevronDown; needsUrl?: boolean; isPreview?: boolean }[] = [
-  { from: ["pending_checkout"], to: "awaiting_upfront_payment", label: "Request Upfront Payment", icon: DollarSign },
-  { from: ["awaiting_upfront_payment", "upfront_payment_claimed"], to: "upfront_paid", label: "Confirm Upfront Payment", icon: CheckCircle2 },
   { from: ["upfront_paid"], to: "in_progress", label: "Start Project", icon: Rocket },
   { from: ["in_progress", "ready_for_delivery", "awaiting_remaining_payment", "remaining_payment_claimed", "remaining_paid"], to: "in_progress", label: "Send Preview Link", icon: Link2, needsUrl: true, isPreview: true },
   { from: ["in_progress"], to: "ready_for_delivery", label: "Mark Ready for Delivery", icon: CheckCircle2 },
-  { from: ["ready_for_delivery"], to: "awaiting_remaining_payment", label: "Request Remaining Payment", icon: DollarSign },
-  { from: ["awaiting_remaining_payment", "remaining_payment_claimed"], to: "remaining_paid", label: "Confirm Remaining Payment", icon: CheckCircle2 },
-  { from: ["remaining_paid"], to: "fully_paid", label: "Mark Fully Paid", icon: CheckCircle2 },
   { from: ["fully_paid"], to: "delivered", label: "Send Final Delivery", icon: CheckCircle2, needsUrl: true },
   { from: ["delivered"], to: "completed", label: "Mark Completed", icon: CheckCircle2 },
   { from: ["pending_checkout", "awaiting_upfront_payment", "upfront_payment_claimed", "upfront_paid", "in_progress", "ready_for_delivery", "awaiting_remaining_payment", "remaining_payment_claimed", "remaining_paid", "fully_paid", "delivered"], to: "cancelled", label: "Cancel Order", icon: XCircle },
@@ -311,31 +306,12 @@ function OrderCard({
       toast.error("Cannot mark completed — remaining balance not fully paid")
       return
     }
-    if (action.to === "delivered" && !canMarkDelivered(order)) {
-      toast.error("Cannot deliver — remaining balance not fully paid")
-      return
-    }
 
     setUpdating(true)
-    const updates: Parameters<typeof updateServiceOrder>[1] = { projectStatus: action.to }
-
-    if (action.to === "upfront_paid") {
-      updates.upfrontPaid = true
-      updates.upfrontAmount = order.upfrontAmount
-      updates.paymentStatus = order.paymentMethod === "wise" ? "wise_manual_review" : "paypal_confirmed"
-      updates.paymentMethod = order.paymentMethod || "manual"
-    } else if (action.to === "remaining_paid") {
-      updates.remainingPaid = true
-      updates.remainingAmount = order.remainingAmount
-    } else if (action.to === "fully_paid") {
-      updates.remainingPaid = true
-      updates.remainingAmount = order.remainingAmount
-    }
-
-    const ok = await updateServiceOrder(order.id, updates)
+    const ok = await updateServiceOrder(order.id, { projectStatus: action.to })
     setUpdating(false)
     if (ok) {
-      toast.success(`${PROJECT_STATUS_LABELS[action.to]}`)
+      toast.success(PROJECT_STATUS_LABELS[action.to] || action.to)
       onUpdate()
     }
   }
