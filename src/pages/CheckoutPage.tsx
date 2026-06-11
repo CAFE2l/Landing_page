@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Link, useNavigate, useParams } from "react-router-dom"
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom"
 import { motion } from "framer-motion"
 import {
   AlertCircle,
@@ -158,8 +158,9 @@ function PaymentMethodCard({
   )
 }
 
-function OrderSummary({ order }: { order: ServiceOrder }) {
+function OrderSummary({ order, paymentStage }: { order: ServiceOrder; paymentStage: PaymentStage }) {
   const displayName = getOrderDisplayName(order)
+  const isRemaining = paymentStage === "remaining"
   return (
     <div className="rounded-2xl border border-white/[0.1] bg-white/[0.04] p-6 shadow-[0_8px_40px_rgba(0,0,0,0.3)] backdrop-blur-xl">
       <div className="flex items-center gap-3 border-b border-white/[0.06] pb-4">
@@ -193,37 +194,48 @@ function OrderSummary({ order }: { order: ServiceOrder }) {
           <span className="text-zinc-500">Total Price</span>
           <span className="font-semibold text-white">${order.totalPrice}</span>
         </div>
-        <div className="flex items-center justify-between rounded-lg border border-yellow-500/20 bg-yellow-500/10 px-3 py-2">
+        <div className={cn("flex items-center justify-between rounded-lg border px-3 py-2", isRemaining ? "border-green-500/20 bg-green-500/10" : "border-yellow-500/20 bg-yellow-500/10")}>
           <span className="flex items-center gap-2 font-semibold text-yellow-300">
             <DollarSign size={15} />
             Upfront Payment (50%)
           </span>
-          <span className="text-lg font-bold text-yellow-300">${order.upfrontAmount}</span>
+          <span className={cn("text-lg font-bold", order.upfrontPaid ? "text-green-300" : "text-yellow-300")}>
+            ${order.upfrontAmount} {order.upfrontPaid ? "Paid" : ""}
+          </span>
         </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-zinc-500">Due on Delivery (50%)</span>
-          <span className="text-zinc-400">${order.remainingAmount}</span>
+        <div className={cn("flex items-center justify-between rounded-lg border px-3 py-2 text-sm", isRemaining ? "border-orange-500/25 bg-orange-500/10" : "border-white/[0.06] bg-white/[0.02]")}>
+          <span className={cn(isRemaining ? "font-semibold text-orange-200" : "text-zinc-500")}>Remaining Balance (50%)</span>
+          <span className={cn(isRemaining ? "text-lg font-bold text-orange-200" : "text-zinc-400")}>
+            ${order.remainingAmount} {order.remainingPaid ? "Paid" : ""}
+          </span>
         </div>
       </div>
     </div>
   )
 }
 
+type PaymentStage = "upfront" | "remaining"
+
 function PaymentInstructions({
   order,
   method,
   notifying,
   onNotify,
+  paymentStage,
 }: {
   order: ServiceOrder
   method: PaymentMethod
   notifying: boolean
   onNotify: () => Promise<void>
+  paymentStage: PaymentStage
 }) {
   const isPayPal = method === "paypal"
+  const isRemaining = paymentStage === "remaining"
+  const amount = isRemaining ? order.remainingAmount : order.upfrontAmount
+  const stageLabel = isRemaining ? "remaining balance" : "upfront payment"
   const details = isPayPal
-    ? `PayPal email: ${PAYPAL_EMAIL}\nAmount: $${order.upfrontAmount} USD\nReference: ${order.id}`
-    : `Wise recipient: ${WISE_DETAILS.accountHolder}\nEmail: ${WISE_DETAILS.email}\nCurrency: ${WISE_DETAILS.currency}\nAmount: $${order.upfrontAmount} USD\nReference: ${order.id}`
+    ? `PayPal email: ${PAYPAL_EMAIL}\nAmount: $${amount} USD\nPayment stage: ${paymentStage}\nReference: ${order.id}`
+    : `Wise recipient: ${WISE_DETAILS.accountHolder}\nEmail: ${WISE_DETAILS.email}\nCurrency: ${WISE_DETAILS.currency}\nAmount: $${amount} USD\nPayment stage: ${paymentStage}\nReference: ${order.id}`
 
   return (
     <div className="rounded-2xl border border-white/[0.1] bg-white/[0.04] p-6 shadow-[0_8px_40px_rgba(0,0,0,0.25)] backdrop-blur-xl">
@@ -231,7 +243,7 @@ function PaymentInstructions({
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-300">Payment confirmation</p>
         <h3 className="mt-2 text-xl font-semibold text-white">{isPayPal ? "Pay with PayPal" : "Pay with Wise"}</h3>
         <p className="mt-1 text-sm leading-relaxed text-zinc-500">
-          Notify us only after completing the payment. Your project starts after payment confirmation.
+          Notify us only after completing the {stageLabel}. {isRemaining ? "Final delivery unlocks after admin verification." : "Your project starts after payment confirmation."}
         </p>
       </div>
 
@@ -259,7 +271,9 @@ function PaymentInstructions({
 
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
         <div className="min-w-0 rounded-xl border border-white/[0.07] bg-white/[0.03] px-4 py-3 text-sm text-zinc-400">
-          Amount to send: <span className="font-semibold text-white">${order.upfrontAmount} USD</span>
+          Amount to send: <span className="font-semibold text-white">${amount} USD</span>
+          <br />
+          Payment type: <span className="font-semibold text-white">{isRemaining ? "Remaining" : "Upfront"}</span>
           <br />
           Reference: <span className="break-all font-mono text-xs text-zinc-300">{order.id}</span>
         </div>
@@ -276,7 +290,7 @@ function PaymentInstructions({
         className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2563eb] to-[#6d28d9] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(37,99,235,0.24)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {notifying ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-        {notifying ? "Sending notification..." : "I've Paid — Notify CAFÉ"}
+        {notifying ? "Sending notification..." : isRemaining ? "I've Paid Remaining Balance" : "I've Paid — Notify CAFÉ"}
       </button>
     </div>
   )
@@ -284,11 +298,24 @@ function PaymentInstructions({
 
 export default function CheckoutPage() {
   const { orderId } = useParams<{ orderId: string }>()
+  const location = useLocation()
   const [order, setOrder] = useState<ServiceOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [notifying, setNotifying] = useState(false)
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null)
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(() => {
+    const method = new URLSearchParams(location.search).get("paymentMethod")
+    return method === "wise" || method === "paypal" ? method : null
+  })
   const navigate = useNavigate()
+  const paymentStage: PaymentStage = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    return params.get("paymentStage") === "remaining" ? "remaining" : "upfront"
+  }, [location.search])
+
+  useEffect(() => {
+    const method = new URLSearchParams(location.search).get("paymentMethod")
+    setSelectedMethod(method === "wise" || method === "paypal" ? method : null)
+  }, [location.search])
 
   useEffect(() => {
     if (!orderId) return
@@ -305,26 +332,30 @@ export default function CheckoutPage() {
     const params = new URLSearchParams(window.location.search)
     if (params.get("paypal") === "success") {
       toast.success("PayPal returned successfully. Final confirmation happens by webhook or admin verification.")
-      window.history.replaceState({}, "", `/checkout/${orderId}`)
+      window.history.replaceState({}, "", `/checkout/${orderId}${paymentStage === "remaining" ? "?paymentStage=remaining" : ""}`)
     }
     if (params.get("paypal") === "cancel") {
       toast.error("Payment was cancelled.")
-      window.history.replaceState({}, "", `/checkout/${orderId}`)
+      window.history.replaceState({}, "", `/checkout/${orderId}${paymentStage === "remaining" ? "?paymentStage=remaining" : ""}`)
     }
-  }, [orderId])
+  }, [orderId, paymentStage])
 
   const currentStep = useMemo(() => {
     if (!order) return 1
-    if (order.upfrontPaid || order.projectStatus === "paid") return 3
-    if (order.projectStatus === "payment_claimed") return 3
+    if (paymentStage === "remaining") {
+      if (order.remainingPaid || order.projectStatus === "remaining_payment_claimed" || order.projectStatus === "fully_paid") return 3
+      if (selectedMethod) return 2
+      return 1
+    }
+    if (order.upfrontPaid || order.projectStatus === "upfront_payment_claimed") return 3
     if (selectedMethod) return 2
     return 1
-  }, [order, selectedMethod])
+  }, [order, paymentStage, selectedMethod])
 
   const notifyPaid = async () => {
     if (!order || !selectedMethod) return
     setNotifying(true)
-    const ok = await confirmPayment(order.id, selectedMethod)
+    const ok = await confirmPayment(order.id, paymentStage === "remaining" ? `${selectedMethod}_remaining` : selectedMethod)
     setNotifying(false)
     if (!ok) return
     toast.success("Thanks. CAFÉ was notified and will verify your payment.")
@@ -363,8 +394,11 @@ export default function CheckoutPage() {
     )
   }
 
-  const paid = order.upfrontPaid || order.projectStatus === "paid"
-  const claimed = order.projectStatus === "payment_claimed"
+  const isRemainingStage = paymentStage === "remaining"
+  const paid = isRemainingStage ? order.remainingPaid || ["fully_paid", "delivered", "completed"].includes(order.projectStatus) : order.upfrontPaid
+  const claimed = isRemainingStage ? order.projectStatus === "remaining_payment_claimed" : order.projectStatus === "upfront_payment_claimed"
+  const canPayRemaining = order.projectStatus === "awaiting_remaining_payment" && order.remainingAmount > 0
+  const stageAmount = isRemainingStage ? order.remainingAmount : order.upfrontAmount
 
   return (
     <div className="relative min-h-screen text-[#f0f0f5]">
@@ -381,28 +415,34 @@ export default function CheckoutPage() {
           <div className="mb-5 sm:mb-6">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-300">
               <CreditCard size={12} />
-              {paid ? "Payment confirmed" : claimed ? "Awaiting verification" : "Secure checkout"}
+              {paid ? "Payment confirmed" : claimed ? "Awaiting verification" : isRemainingStage ? "Remaining payment" : "Secure checkout"}
             </div>
             <h1 className="mb-2 text-2xl font-bold sm:text-3xl">
-              {paid ? "Payment confirmed" : claimed ? "Payment notification sent" : "Choose payment method"}
+              {paid ? "Payment confirmed" : claimed ? "Payment notification sent" : isRemainingStage ? "Complete remaining payment" : "Choose payment method"}
             </h1>
             <p className="max-w-xl text-sm leading-relaxed text-zinc-400">
               {paid
-                ? "Your project is ready to enter production."
+                ? isRemainingStage ? "Your remaining payment has been confirmed. Final delivery can now be released." : "Your project is ready to enter production."
                 : claimed
-                  ? "CAFÉ has been notified. We will verify your payment before starting production."
-                  : "Choose how you want to pay. Payment instructions appear only after you select a method."}
+                  ? isRemainingStage ? "CAFÉ has been notified. We will verify your remaining payment before final delivery unlocks." : "CAFÉ has been notified. We will verify your payment before starting production."
+                  : isRemainingStage ? "Only the remaining balance is due here. Choose a method and notify CAFÉ after payment." : "Choose how you want to pay. Payment instructions appear only after you select a method."}
             </p>
           </div>
+
+          {isRemainingStage && !canPayRemaining && !claimed && !paid && (
+            <div className="mb-6 rounded-2xl border border-red-400/20 bg-red-400/10 p-5 text-sm text-red-100/80">
+              Remaining payment is not available for this order yet. The admin must send a preview and request the remaining balance first.
+            </div>
+          )}
 
           {paid && (
             <div className="mb-6 rounded-2xl border border-green-500/20 bg-green-500/10 p-5 text-center shadow-[0_0_30px_rgba(34,197,94,0.08)]">
               <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-500/15">
                 <CheckCircle2 size={26} className="text-green-400" />
               </div>
-              <h2 className="mb-2 text-2xl font-bold">Your project can start</h2>
+              <h2 className="mb-2 text-2xl font-bold">{isRemainingStage ? "Remaining payment confirmed" : "Your project can start"}</h2>
               <p className="mx-auto max-w-md text-sm text-green-100/75">
-                Your upfront payment of ${order.upfrontAmount} has been confirmed.
+                Your {isRemainingStage ? "remaining" : "upfront"} payment of ${stageAmount} has been confirmed.
               </p>
             </div>
           )}
@@ -414,20 +454,20 @@ export default function CheckoutPage() {
               </div>
               <h2 className="mb-2 text-2xl font-bold">Awaiting payment verification</h2>
               <p className="mx-auto max-w-md text-sm text-amber-100/75">
-                We received your notification. Your project starts after payment confirmation.
+                We received your notification. {isRemainingStage ? "Final delivery unlocks after admin verification." : "Your project starts after payment confirmation."}
               </p>
             </div>
           )}
 
           <div className="space-y-6">
-            <OrderSummary order={order} />
+            <OrderSummary order={order} paymentStage={paymentStage} />
 
-            {!paid && !claimed && (
+            {!paid && !claimed && (!isRemainingStage || canPayRemaining) && (
               <>
                 <div className="rounded-2xl border border-white/[0.1] bg-white/[0.04] p-4 backdrop-blur-xl sm:p-6">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-300">Step 3</p>
                   <h2 className="mt-2 text-xl font-semibold text-white">Choose how you want to pay</h2>
-                  <p className="mt-1 text-sm text-zinc-500">Notify us only after completing the payment.</p>
+                  <p className="mt-1 text-sm text-zinc-500">Notify us only after completing the {isRemainingStage ? "remaining balance" : "payment"}.</p>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
                     <PaymentMethodCard method="paypal" selected={selectedMethod === "paypal"} onSelect={() => setSelectedMethod("paypal")} />
@@ -441,6 +481,7 @@ export default function CheckoutPage() {
                     method={selectedMethod}
                     notifying={notifying}
                     onNotify={notifyPaid}
+                    paymentStage={paymentStage}
                   />
                 )}
               </>

@@ -15,7 +15,10 @@ import {
   deleteServiceOrder,
   updateServiceOrder,
   updatePreviewLink,
-  sendFinalDelivery,
+  startProject,
+  markReadyForDelivery,
+  releaseFinalDelivery,
+  markCompleted,
   subscribeToServiceOrders,
   getOrderDisplayName,
   getOrderAvatarUrl,
@@ -54,13 +57,14 @@ const TABS: { key: StatusTab; label: string }[] = [
   { key: "cancelled", label: "Cancelled" },
 ]
 
-const STATUS_ACTIONS: { from: ProjectStatus[]; to: ProjectStatus; label: string; icon: typeof ChevronDown; needsUrl?: boolean; isPreview?: boolean }[] = [
-  { from: ["upfront_paid"], to: "in_progress", label: "Start Project", icon: Rocket },
-  { from: ["in_progress", "ready_for_delivery", "awaiting_remaining_payment", "remaining_payment_claimed", "remaining_paid"], to: "in_progress", label: "Send Preview Link", icon: Link2, needsUrl: true, isPreview: true },
-  { from: ["in_progress"], to: "ready_for_delivery", label: "Mark Ready for Delivery", icon: CheckCircle2 },
-  { from: ["fully_paid"], to: "delivered", label: "Send Final Delivery", icon: CheckCircle2, needsUrl: true },
-  { from: ["delivered"], to: "completed", label: "Mark Completed", icon: CheckCircle2 },
-  { from: ["pending_checkout", "awaiting_upfront_payment", "upfront_payment_claimed", "upfront_paid", "in_progress", "ready_for_delivery", "awaiting_remaining_payment", "remaining_payment_claimed", "remaining_paid", "fully_paid", "delivered"], to: "cancelled", label: "Cancel Order", icon: XCircle },
+const STATUS_ACTIONS: { from: ProjectStatus[]; to?: ProjectStatus; action: "start" | "ready" | "preview" | "view_payment" | "delivery" | "complete" | "cancel"; label: string; icon: typeof ChevronDown; needsUrl?: boolean; isPreview?: boolean }[] = [
+  { from: ["upfront_paid"], to: "in_progress", action: "start", label: "Start Project", icon: Rocket },
+  { from: ["in_progress"], to: "ready_for_delivery", action: "ready", label: "Mark Ready for Delivery", icon: CheckCircle2 },
+  { from: ["ready_for_delivery"], to: "awaiting_remaining_payment", action: "preview", label: "Send Preview Link", icon: Link2, needsUrl: true, isPreview: true },
+  { from: ["awaiting_remaining_payment"], action: "view_payment", label: "View Payment Request", icon: DollarSign },
+  { from: ["fully_paid"], to: "delivered", action: "delivery", label: "Release Final Delivery", icon: CheckCircle2, needsUrl: true },
+  { from: ["delivered"], to: "completed", action: "complete", label: "Mark Completed", icon: CheckCircle2 },
+  { from: ["pending_checkout", "awaiting_upfront_payment", "upfront_payment_claimed", "upfront_paid", "in_progress", "ready_for_delivery", "awaiting_remaining_payment", "remaining_payment_claimed", "remaining_paid", "fully_paid", "delivered"], to: "cancelled", action: "cancel", label: "Cancel Order", icon: XCircle },
 ]
 
 const PIPELINE = ["pending_checkout", "upfront_paid", "in_progress", "fully_paid", "delivered", "completed"] as const
@@ -302,16 +306,26 @@ function OrderCard({
       return
     }
 
-    if (action.to === "completed" && !canMarkCompleted(order)) {
+    if (action.action === "view_payment") {
+      setExpanded(true)
+      toast("Payment request is waiting for client confirmation.")
+      return
+    }
+
+    if (action.action === "complete" && !canMarkCompleted(order)) {
       toast.error("Cannot mark completed — remaining balance not fully paid")
       return
     }
 
     setUpdating(true)
-    const ok = await updateServiceOrder(order.id, { projectStatus: action.to })
+    let ok = false
+    if (action.action === "start") ok = await startProject(order.id)
+    if (action.action === "ready") ok = await markReadyForDelivery(order.id)
+    if (action.action === "complete") ok = await markCompleted(order.id)
+    if (action.action === "cancel" && action.to) ok = await updateServiceOrder(order.id, { projectStatus: action.to })
     setUpdating(false)
     if (ok) {
-      toast.success(PROJECT_STATUS_LABELS[action.to] || action.to)
+      toast.success(action.to ? PROJECT_STATUS_LABELS[action.to] || action.label : action.label)
       onUpdate()
     }
   }
@@ -325,7 +339,7 @@ function OrderCard({
     if (mode === "preview") {
       ok = await updatePreviewLink(targetOrder.id, url)
     } else {
-      ok = await sendFinalDelivery(targetOrder.id, url)
+      ok = await releaseFinalDelivery(targetOrder.id, url)
     }
     setUpdating(false)
     if (ok) {
@@ -430,7 +444,8 @@ function OrderCard({
             {/* Remaining balance warning */}
             {(() => {
               const p = calcPaymentProgress(order)
-              return !p.isFullyPaid && p.remaining > 0 ? (
+              const showRemainingNotice = ["awaiting_remaining_payment", "remaining_payment_claimed", "fully_paid", "delivered", "completed"].includes(order.projectStatus)
+              return showRemainingNotice && !p.isFullyPaid && p.remaining > 0 ? (
                 <div className="flex items-center gap-2 rounded-xl border border-amber-500/15 bg-amber-500/8 px-3 py-2">
                   <AlertCircle size={12} className="shrink-0 text-amber-400" />
                   <p className="text-[11px] text-amber-300/90">
@@ -597,13 +612,12 @@ function OrderCard({
                     className="absolute right-0 top-full z-20 mt-1.5 w-58 origin-top-right rounded-xl border border-white/[0.08] bg-[#0a0a10] py-1 shadow-2xl"
                   >
                     {availableActions.map((action) => {
-                      const progress = calcPaymentProgress(order)
                       const isDisabled =
                         (action.to === "completed" && !canMarkCompleted(order)) ||
                         (action.to === "delivered" && !canMarkDelivered(order))
                       return (
                         <button
-                          key={action.to + (action.label)}
+                          key={`${action.action}-${action.label}`}
                           onClick={() => !isDisabled && handleStatusUpdate(action)}
                           disabled={isDisabled}
                           className={cn(

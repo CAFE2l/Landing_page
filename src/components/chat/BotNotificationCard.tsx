@@ -41,6 +41,7 @@ export type BotNotificationAction =
   | "view_order"
   | "mark_upfront_paid"
   | "mark_remaining_paid"
+  | "reject_payment"
   | "reply_client"
   | "view_proof"
   | "move_in_progress"
@@ -163,7 +164,7 @@ function parseOldBotText(content: string): BotNotificationPayload | null {
     paymentMethod: method,
     status: "Awaiting verification",
     priority: "high",
-    actions: ["view_order", "mark_upfront_paid", "open_dashboard"],
+    actions: ["view_order", "mark_upfront_paid", "reject_payment"],
   }
 }
 
@@ -217,19 +218,25 @@ export default function BotNotificationCard({
 }) {
   const navigate = useNavigate()
   const [workingAction, setWorkingAction] = useState<string | null>(null)
+  const [completedAction, setCompletedAction] = useState<BotNotificationAction | null>(null)
+  const [completedAt, setCompletedAt] = useState<string | null>(null)
   const config = TYPE_CONFIG[payload.type]
   const Icon = config.icon
   const actions: BotNotificationAction[] = payload.actions?.length ? payload.actions : ["open_dashboard"]
   const displayedAt = formatTime(payload.updatedAt || payload.createdAt || timestamp)
+  const paymentResolved = completedAction === "mark_upfront_paid" || completedAction === "mark_remaining_paid" || completedAction === "reject_payment"
+  const resolvedStatus = paymentResolved
+    ? completedAction === "reject_payment" ? "Rejected" : "Confirmed"
+    : payload.status
 
   const fields = useMemo(() => [
     ["Client", payload.clientName],
     ["Service", payload.serviceName],
     ["Amount", payload.amount != null ? `$${payload.amount}` : null],
     ["Method", payload.paymentMethod],
-    ["Status", payload.status],
+    ["Status", resolvedStatus],
     ["Order ID", shortId(payload.orderId)],
-  ].filter(([, value]) => !!value), [payload])
+  ].filter(([, value]) => !!value), [payload, resolvedStatus])
 
   const runAction = async (action: BotNotificationAction) => {
     if (action === "view_order") {
@@ -250,7 +257,7 @@ export default function BotNotificationCard({
       else toast("No payment proof attached.")
       return
     }
-    if (action === "mark_upfront_paid" || action === "mark_remaining_paid" || action === "move_in_progress") {
+    if (action === "mark_upfront_paid" || action === "mark_remaining_paid" || action === "move_in_progress" || action === "reject_payment") {
       if (!payload.orderId) {
         toast.error("Missing order ID.")
         return
@@ -263,9 +270,16 @@ export default function BotNotificationCard({
       } else if (action === "mark_remaining_paid") {
         ok = await confirmRemainingPayment(payload.orderId)
         if (ok) toast.success("Remaining payment confirmed.")
+      } else if (action === "reject_payment") {
+        ok = await updateServiceOrder(payload.orderId, { projectStatus: "payment_failed", paymentStatus: "payment_failed" })
+        if (ok) toast.success("Payment rejected.")
       } else {
         ok = await startProjectRpc(payload.orderId)
         if (ok) toast.success("Project started.")
+      }
+      if (ok) {
+        setCompletedAction(action)
+        setCompletedAt(new Date().toISOString())
       }
       setWorkingAction(null)
     }
@@ -275,6 +289,7 @@ export default function BotNotificationCard({
     view_order: "View Order",
     mark_upfront_paid: "Mark Upfront as Paid",
     mark_remaining_paid: "Mark Remaining as Paid",
+    reject_payment: "Reject Payment",
     reply_client: "Reply Client",
     view_proof: "View Proof",
     move_in_progress: "Move to In Progress",
@@ -330,7 +345,7 @@ export default function BotNotificationCard({
                 <button
                   key={action}
                   onClick={() => void runAction(action)}
-                  disabled={workingAction === action}
+                  disabled={workingAction === action || (paymentResolved && (action === "mark_upfront_paid" || action === "mark_remaining_paid" || action === "reject_payment"))}
                   className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 text-xs font-semibold text-white/58 transition hover:border-[#4F6EF7]/35 hover:bg-[#4F6EF7]/12 hover:text-white disabled:opacity-50"
                 >
                   {workingAction === action ? (
@@ -345,6 +360,8 @@ export default function BotNotificationCard({
                     <MessageCircle size={12} />
                   ) : action === "view_proof" ? (
                     <FileText size={12} />
+                  ) : action === "reject_payment" ? (
+                    <XCircle size={12} />
                   ) : (
                     <AlertTriangle size={12} />
                   )}
@@ -353,6 +370,12 @@ export default function BotNotificationCard({
               ))}
             </div>
 
+            {completedAt && (
+              <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-green-400/20 bg-green-400/10 px-2.5 py-1 text-[10px] font-semibold text-green-200">
+                <CheckCircle2 size={11} />
+                {completedAction === "reject_payment" ? "Rejected" : "Confirmed"} at {formatTime(completedAt)}
+              </p>
+            )}
             {displayedAt && <p className="mt-3 text-[10px] text-white/28">{displayedAt}</p>}
           </div>
         </div>

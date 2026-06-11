@@ -32,6 +32,9 @@ const TYPE_LABELS: Record<UserNotificationType, string> = {
   payment_confirmed: "Payment Confirmed",
   payment_failed: "Payment Failed",
   project_started: "Project Started",
+  project_ready: "Project Ready",
+  remaining_payment_requested: "Remaining Payment Requested",
+  remaining_payment_confirmed: "Remaining Payment Confirmed",
   project_delivered: "Project Delivered",
   feedback_requested: "Feedback Requested",
   admin_message: "Message from CAFÉ",
@@ -119,9 +122,11 @@ export function subscribeToUserNotifications(
   userId: string,
   onNotification: (notification: UserNotification) => void,
 ) {
-  if (!supabase || !supabaseConfigured) return () => {}
-  const channel = supabase
-    .channel(`user-notifications:${userId}`)
+  const client = supabase
+  if (!client || !supabaseConfigured) return () => {}
+  const channelId = `user-notifications:${userId}:${Date.now()}:${Math.random().toString(36).slice(2)}`
+  const channel = client
+    .channel(channelId)
     .on(
       "postgres_changes",
       {
@@ -136,7 +141,7 @@ export function subscribeToUserNotifications(
     )
     .subscribe()
   return () => {
-    supabase.removeChannel(channel)
+    client.removeChannel(channel)
   }
 }
 

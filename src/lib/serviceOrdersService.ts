@@ -86,6 +86,11 @@ function addAuditEntry(order: ServiceOrder, action: string, details?: string): A
   return [...(order.auditLog || []), entry]
 }
 
+function notifyOrderChanged(orderId: string): void {
+  if (typeof window === "undefined") return
+  window.dispatchEvent(new CustomEvent("service-orders:changed", { detail: { orderId } }))
+}
+
 const ORDER_SELECT = `
   *,
   profiles (
@@ -349,29 +354,67 @@ export async function confirmPayment(
   orderId: string,
   method: string,
 ): Promise<boolean> {
-  if (!supabase || !supabaseConfigured) return false
+  const client = supabase
+  if (!client || !supabaseConfigured) return false
 
   const order = await fetchServiceOrder(orderId)
   if (!order) return false
 
-  const isRemaining = method.includes("remaining") || order.projectStatus === "awaiting_remaining_payment"
+  const isRemaining = method.includes("remaining")
+  if (isRemaining && order.projectStatus !== "awaiting_remaining_payment") {
+    toast.error("Remaining payment is not available for this order yet.")
+    return false
+  }
+  if (!isRemaining && !["pending_checkout", "awaiting_upfront_payment"].includes(order.projectStatus)) {
+    toast.error("Upfront payment is not available for this order.")
+    return false
+  }
+
   const amount = isRemaining ? (order.remainingAmount ?? 0) : order.upfrontAmount
-  const targetStatus = isRemaining ? "remaining_payment_claimed" as ProjectStatus : "payment_claimed" as ProjectStatus
+  if (isRemaining && amount <= 0) {
+    toast.error("No remaining balance is due for this order.")
+    return false
+  }
+
+  const targetStatus = isRemaining ? "remaining_payment_claimed" as ProjectStatus : "upfront_payment_claimed" as ProjectStatus
 
   const displayName = getOrderDisplayName(order)
   const normalizedMethod = method.includes("wise") ? "wise" : method.includes("paypal") ? "paypal" : "manual"
   const paymentStatus: PaymentStatus = normalizedMethod === "wise" ? "wise_manual_review" : "client_claimed_paid"
+  const now = new Date().toISOString()
+  const paymentRecord: PaymentRecord = {
+    amount,
+    method: normalizedMethod,
+    status: "claimed",
+    paidAt: null,
+    transactionId: null,
+  }
 
-  const { error } = await supabase
-    .from("service_orders")
-    .update({
-      payment_method: normalizedMethod,
-      payment_status: paymentStatus,
-      project_status: targetStatus,
-      payment_claimed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", orderId)
+  const fallbackUpdate = () => client
+      .from("service_orders")
+      .update({
+        payment_method: normalizedMethod,
+        payment_status: paymentStatus,
+        project_status: targetStatus,
+        payment_claimed_at: now,
+        ...(isRemaining ? { remaining_payment: paymentRecord } : { upfront_payment: paymentRecord }),
+        audit_log: addAuditEntry(order, isRemaining ? "claim_remaining_payment" : "claim_upfront_payment", `${normalizedMethod} payment claimed for $${amount}`),
+        updated_at: now,
+      })
+      .eq("id", orderId)
+      .eq("project_status", isRemaining ? "awaiting_remaining_payment" : order.projectStatus)
+
+  const { error } = isRemaining
+    ? await (async () => {
+        const rpcResult = await client.rpc("claim_remaining_payment", {
+          p_order_id: orderId,
+          p_method: normalizedMethod,
+        })
+        if (!rpcResult.error) return rpcResult
+        if (!rpcResult.error.message?.includes("claim_remaining_payment")) return rpcResult
+        return fallbackUpdate()
+      })()
+    : await fallbackUpdate()
 
   if (error) {
     console.error("confirmPayment update failed", error)
@@ -410,7 +453,7 @@ export async function confirmPayment(
   }
 
   // Get the real admin user ID to send the bot message to
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile } = await client
     .from("profiles")
     .select("id")
     .eq("email", "gutiajs@gmail.com")
@@ -418,7 +461,7 @@ export async function confirmPayment(
 
   if (adminProfile?.id) {
     const rpcName = isRemaining ? "notify_remaining_payment_bot" : "notify_payment_bot"
-    await supabase.rpc(rpcName, {
+    await client.rpc(rpcName, {
       p_order_id: order.id,
       p_display_name: displayName,
       p_service_name: order.serviceName,
@@ -428,6 +471,7 @@ export async function confirmPayment(
     })
   }
 
+  notifyOrderChanged(orderId)
   return true
 }
 
@@ -435,6 +479,7 @@ type BotNotificationAction =
   | "view_order"
   | "mark_upfront_paid"
   | "mark_remaining_paid"
+  | "reject_payment"
   | "reply_client"
   | "view_proof"
   | "move_in_progress"
@@ -658,7 +703,7 @@ export async function sendBotPaymentNotification(order: ServiceOrder, event: str
   const confirmed = event === "approved_via_paypal" || event.includes("confirmed")
   const failed = event.includes("failed") || event.includes("denied")
   const type = failed ? "payment_failed" : confirmed ? "payment_confirmed" : "payment_claimed"
-  const title = failed ? "Payment Failed" : confirmed ? "Payment Confirmed" : "Payment Notification"
+  const title = failed ? "Payment Failed" : confirmed ? "Payment Confirmed" : "Upfront Payment Claimed"
   const description = failed
     ? "Payment failed or was denied. Review the order before contacting the client."
     : confirmed
@@ -681,7 +726,7 @@ export async function sendBotPaymentNotification(order: ServiceOrder, event: str
         ? ["view_order", "reply_client", "open_dashboard"]
         : confirmed
           ? ["view_order", "move_in_progress", "open_dashboard"]
-          : ["view_order", "mark_upfront_paid", "open_dashboard"],
+          : ["view_order", "mark_upfront_paid", "reject_payment"],
     }),
     `${title} - ${displayName} - $${order.upfrontAmount}`,
   )
@@ -862,17 +907,18 @@ export async function updateServiceOrder(
     }
 
     if (updates.projectStatus === "delivered" && order.userId) {
-      await sendBotDeliveryMessage(order, updates.deliveryUrl || order.deliveryUrl)
+      await sendBotDeliveryMessage(order, updates.deliveryUrl || order.deliveryUrl || undefined)
     }
   }
 
+  notifyOrderChanged(id)
   return true
 }
 
 // ========== Send Preview Link ==========
 
 export async function updatePreviewLink(orderId: string, previewUrl: string): Promise<boolean> {
-  return updateServiceOrder(orderId, { previewUrl })
+  return updateServiceOrder(orderId, { previewUrl, projectStatus: "awaiting_remaining_payment" })
 }
 
 // ========== Send Final Delivery ==========
@@ -890,6 +936,19 @@ export async function confirmUpfrontPaymentRpc(orderId: string): Promise<boolean
   if (!supabase || !supabaseConfigured) return false
   const { error } = await supabase.rpc("confirm_upfront_payment", { p_order_id: orderId })
   if (error) { toast.error(error.message); return false }
+  const order = await fetchServiceOrder(orderId)
+  if (order?.userId) {
+    await sendBotPaymentConfirmation(order)
+    await createUserNotification({
+      userId: order.userId,
+      type: "payment_confirmed",
+      title: "Upfront Payment Confirmed",
+      message: `Your upfront payment of $${order.upfrontAmount} for ${order.serviceName} has been confirmed. Your project is ready to start.`,
+      payload: { orderId, amount: order.upfrontAmount, serviceName: order.serviceName },
+      actionUrl: "/dashboard/orders",
+    })
+  }
+  notifyOrderChanged(orderId)
   return true
 }
 
@@ -897,6 +956,19 @@ export async function confirmRemainingPayment(orderId: string): Promise<boolean>
   if (!supabase || !supabaseConfigured) return false
   const { error } = await supabase.rpc("confirm_remaining_payment", { p_order_id: orderId })
   if (error) { toast.error(error.message); return false }
+  const order = await fetchServiceOrder(orderId)
+  if (order?.userId) {
+    await sendBotRemainingPaymentConfirmed(order)
+    await createUserNotification({
+      userId: order.userId,
+      type: "remaining_payment_confirmed",
+      title: "Remaining Payment Confirmed",
+      message: `Your final payment of $${order.remainingAmount} for ${order.serviceName} has been confirmed. Final delivery can now be released.`,
+      payload: { orderId, amount: order.remainingAmount, serviceName: order.serviceName },
+      actionUrl: "/dashboard/orders",
+    })
+  }
+  notifyOrderChanged(orderId)
   return true
 }
 
@@ -904,6 +976,18 @@ export async function startProject(orderId: string): Promise<boolean> {
   if (!supabase || !supabaseConfigured) return false
   const { error } = await supabase.rpc("start_project", { p_order_id: orderId })
   if (error) { toast.error(error.message); return false }
+  const order = await fetchServiceOrder(orderId)
+  if (order?.userId) {
+    await createUserNotification({
+      userId: order.userId,
+      type: "project_started",
+      title: "Project Started",
+      message: `Your ${order.serviceName} project is now in progress. We'll keep you updated.`,
+      payload: { orderId, serviceName: order.serviceName },
+      actionUrl: "/dashboard/orders",
+    })
+  }
+  notifyOrderChanged(orderId)
   return true
 }
 
@@ -911,6 +995,7 @@ export async function markReadyForDelivery(orderId: string): Promise<boolean> {
   if (!supabase || !supabaseConfigured) return false
   const { error } = await supabase.rpc("mark_ready_for_delivery", { p_order_id: orderId })
   if (error) { toast.error(error.message); return false }
+  notifyOrderChanged(orderId)
   return true
 }
 
@@ -918,6 +1003,9 @@ export async function releaseFinalDelivery(orderId: string, deliveryUrl: string)
   if (!supabase || !supabaseConfigured) return false
   const { error } = await supabase.rpc("release_final_delivery", { p_order_id: orderId, p_delivery_url: deliveryUrl })
   if (error) { toast.error(error.message); return false }
+  const order = await fetchServiceOrder(orderId)
+  if (order?.userId) await sendBotDeliveryMessage(order, deliveryUrl)
+  notifyOrderChanged(orderId)
   return true
 }
 
@@ -925,6 +1013,7 @@ export async function markCompleted(orderId: string): Promise<boolean> {
   if (!supabase || !supabaseConfigured) return false
   const { error } = await supabase.rpc("mark_completed", { p_order_id: orderId })
   if (error) { toast.error(error.message); return false }
+  notifyOrderChanged(orderId)
   return true
 }
 
@@ -1024,7 +1113,11 @@ export function subscribeToServiceOrders(onChange: () => void) {
     .channel(`service-orders:${Date.now()}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "service_orders" }, onChange)
     .subscribe()
-  return () => { client.removeChannel(channel) }
+  if (typeof window !== "undefined") window.addEventListener("service-orders:changed", onChange)
+  return () => {
+    if (typeof window !== "undefined") window.removeEventListener("service-orders:changed", onChange)
+    client.removeChannel(channel)
+  }
 }
 
 // ========== CAFÉ Website Bot ==========

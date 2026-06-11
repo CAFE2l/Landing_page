@@ -11,6 +11,7 @@ import {
   fetchUserServiceOrders,
   getOrderDisplayName,
   getOrderAvatarUrl,
+  subscribeToServiceOrders,
 } from "../lib/serviceOrdersService"
 import type { ServiceOrder } from "../lib/types/serviceOrders"
 import {
@@ -20,11 +21,16 @@ import {
 } from "../lib/types/serviceOrders"
 import TechPremiumBackground from "../components/ui/TechPremiumBackground"
 import Navbar from "../components/landing/Navbar"
-import { cn, timeAgo } from "../lib/utils"
+import { cn } from "../lib/utils"
 
 function OrderCard({ order }: { order: ServiceOrder }) {
   const displayName = getOrderDisplayName(order)
   const avatarUrl = getOrderAvatarUrl(order)
+  const awaitingRemaining = order.projectStatus === "awaiting_remaining_payment"
+  const remainingClaimed = order.projectStatus === "remaining_payment_claimed"
+  const checkoutHref = awaitingRemaining
+    ? `/checkout/${order.id}?paymentStage=remaining`
+    : `/checkout/${order.id}`
 
   return (
     <motion.div
@@ -74,16 +80,43 @@ function OrderCard({ order }: { order: ServiceOrder }) {
           </p>
         </div>
         <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2 py-2">
-          <p className="text-[10px] text-zinc-600 uppercase">Created</p>
-          <p className="font-semibold text-zinc-400">{timeAgo(order.createdAt)}</p>
+          <p className="text-[10px] text-zinc-600 uppercase">Remaining</p>
+          <p className={cn("font-semibold", order.remainingPaid ? "text-green-400" : awaitingRemaining ? "text-orange-300" : "text-zinc-400")}>
+            ${order.remainingAmount}
+          </p>
         </div>
       </div>
 
+      {(awaitingRemaining || remainingClaimed) && (
+        <div className="mb-4 rounded-xl border border-orange-400/20 bg-orange-400/10 p-3 text-xs">
+          <p className="font-semibold text-orange-200">
+            {remainingClaimed ? "Awaiting remaining payment verification" : "Remaining Payment Required"}
+          </p>
+          <p className="mt-1 leading-relaxed text-orange-100/70">
+            {remainingClaimed
+              ? "CAFÉ will confirm your payment before final delivery unlocks."
+              : `Preview is ready. Pay the remaining $${order.remainingAmount} to unlock final delivery.`}
+          </p>
+        </div>
+      )}
+
+      {order.previewUrl && (
+        <a
+          href={order.previewUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-violet-300/20 bg-violet-300/10 px-4 py-2.5 text-sm font-medium text-violet-100 transition-colors hover:bg-violet-300/15"
+        >
+          Preview Link
+          <ArrowRight size={14} />
+        </a>
+      )}
+
       <Link
-        to={`/checkout/${order.id}`}
+        to={checkoutHref}
         className="touch-target inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm font-medium text-blue-300 hover:bg-blue-500/15 transition-colors"
       >
-        View Details
+        {awaitingRemaining ? "Pay Remaining Balance" : remainingClaimed ? "View Payment Status" : "View Details"}
         <ArrowRight size={14} />
       </Link>
     </motion.div>
@@ -100,9 +133,11 @@ export default function OrdersDashboardPage() {
       setLoading(false)
       return
     }
-    fetchUserServiceOrders(user.id)
+    const loadOrders = () => fetchUserServiceOrders(user.id)
       .then(setOrders)
       .finally(() => setLoading(false))
+    loadOrders()
+    return subscribeToServiceOrders(loadOrders)
   }, [user?.id])
 
   if (authLoading) {

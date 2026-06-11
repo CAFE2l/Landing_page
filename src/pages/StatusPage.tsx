@@ -214,33 +214,31 @@ function StoryAvatar({
   return (
     <motion.button
       type="button"
-      whileHover={isMobile ? undefined : { y: -4, scale: 1.06 }}
+      whileHover={isMobile ? undefined : { y: -3 }}
       whileTap={{ scale: 0.94 }}
       onClick={onClick}
-      className="group w-[72px] shrink-0 text-center sm:w-[80px]"
+      className="group grid w-[76px] shrink-0 grid-rows-[72px_auto_auto] place-items-center overflow-hidden text-center sm:w-[84px] sm:grid-rows-[78px_auto_auto]"
     >
       <span
         className={cn(
-          "relative mx-auto block rounded-full transition duration-300",
-          viewed
-            ? "p-[1.5px]"
-            : "p-[2px]",
+          "relative flex h-[68px] w-[68px] items-center justify-center rounded-full transition duration-300 sm:h-[72px] sm:w-[72px]",
+          active && !viewed ? meta.glow : "",
         )}
       >
         <span
           className={cn(
-            "block rounded-full p-[1.5px]",
+            "flex h-[64px] w-[64px] items-center justify-center rounded-full p-[2px] sm:h-[68px] sm:w-[68px]",
             viewed
-              ? "bg-white/[0.12]"
-              : "bg-gradient-to-br shadow-[0_0_14px_rgba(79,70,229,0.18)]",
+              ? "bg-white/[0.14]"
+              : "bg-gradient-to-br shadow-[0_0_18px_rgba(79,70,229,0.22)]",
             viewed ? "" : meta.ring,
           )}
         >
-          <span className={cn("block rounded-full bg-[#020408]", viewed ? "opacity-70" : "p-[0.5px]")}>
+          <span className={cn("flex h-[58px] w-[58px] items-center justify-center rounded-full bg-[#020408] p-[3px] sm:h-[62px] sm:w-[62px]", viewed ? "opacity-70" : "")}>
             <UserAvatar
               user={{ name: group.name, avatarUrl: group.avatarUrl }}
               size="lg"
-              className="h-[54px] w-[54px] sm:h-[60px] sm:w-[60px]"
+              className="h-full w-full"
               ring={false}
             />
           </span>
@@ -250,15 +248,14 @@ function StoryAvatar({
             initial={{ scale: 0.8, opacity: 0.4 }}
             animate={{ scale: [1, 1.12, 1], opacity: [0.5, 0.9, 0.5] }}
             transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
-            className={cn("absolute inset-0 rounded-full bg-gradient-to-br", meta.ring, "blur-[10px]")}
-            style={{ zIndex: -1 }}
+            className={cn("pointer-events-none absolute inset-[4px] rounded-full bg-gradient-to-br opacity-40 blur-md", meta.ring)}
           />
         )}
       </span>
-      <span className={cn("mt-1.5 block truncate text-[11px] font-semibold transition sm:text-xs", viewed ? "text-white/40" : "text-white/80 group-hover:text-white")}>
+      <span className={cn("mt-1 block w-full truncate px-1 text-[11px] font-semibold leading-tight transition sm:text-xs", viewed ? "text-white/40" : "text-white/80 group-hover:text-white")}>
         {group.name}
       </span>
-      <span className="mt-0.5 block truncate text-[9px] text-white/30 sm:text-[10px]">{meta.short}</span>
+      <span className="mt-0.5 block w-full truncate px-1 text-[9px] leading-tight text-white/36 sm:text-[10px]">{meta.short}</span>
     </motion.button>
   )
 }
@@ -285,6 +282,7 @@ function StoryBar({
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768
 
   const checkScroll = useCallback(() => {
     const el = scrollRef.current
@@ -310,8 +308,11 @@ function StoryBar({
     scrollRef.current?.scrollBy({ left: dir === "left" ? -240 : 240, behavior: "smooth" })
   }
 
+  const placeholderCount = 6
+
   return (
-    <div className="relative">
+    <div className="relative inline-flex max-w-full overflow-hidden rounded-[24px] border border-white/[0.10] bg-[#050914]/80 px-3 py-3 shadow-[0_22px_70px_rgba(0,0,0,0.28)] backdrop-blur-2xl sm:rounded-[28px] sm:px-4 sm:py-4">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(79,110,247,0.08)_45%,rgba(255,255,255,0.03))]" />
       <AnimatePresence>
         {canScrollLeft ? (
           <motion.button
@@ -320,7 +321,7 @@ function StoryBar({
             exit={{ opacity: 0, x: -10 }}
             type="button"
             onClick={() => scroll("left")}
-            className="absolute left-0 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white/70 backdrop-blur-md transition hover:bg-black/80 hover:text-white sm:flex"
+            className="absolute left-2 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.08] bg-black/72 text-white/78 shadow-lg backdrop-blur-md transition hover:bg-black/90 hover:text-white sm:flex"
           >
             <ChevronLeft size={16} />
           </motion.button>
@@ -332,7 +333,7 @@ function StoryBar({
             exit={{ opacity: 0, x: 10 }}
             type="button"
             onClick={() => scroll("right")}
-            className="absolute right-0 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white/70 backdrop-blur-md transition hover:bg-black/80 hover:text-white sm:flex"
+            className="absolute right-2 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.08] bg-black/72 text-white/78 shadow-lg backdrop-blur-md transition hover:bg-black/90 hover:text-white sm:flex"
           >
             <ChevronRight size={16} />
           </motion.button>
@@ -341,29 +342,29 @@ function StoryBar({
 
       <div
         ref={scrollRef}
-        className="flex gap-3 overflow-x-auto pb-1 scrollbar-none sm:gap-4"
+        className="relative z-[1] flex max-w-full gap-2 overflow-x-auto overflow-y-hidden scrollbar-none sm:gap-3"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         <motion.button
           type="button"
-          whileHover={{ scale: 1.06 }}
+          whileHover={isMobile ? undefined : { y: -3 }}
           whileTap={{ scale: 0.94 }}
           onClick={onCreate}
           disabled={!signedIn}
-          className="group w-[72px] shrink-0 text-center disabled:cursor-not-allowed disabled:opacity-45 sm:w-[80px]"
+          className="group grid w-[76px] shrink-0 grid-rows-[72px_auto_auto] place-items-center overflow-hidden text-center disabled:cursor-not-allowed disabled:opacity-45 sm:w-[84px] sm:grid-rows-[78px_auto_auto]"
         >
-          <span className="mx-auto flex h-[58px] w-[58px] items-center justify-center rounded-full border border-dashed border-[#7EA1FF]/50 bg-[#4F6EF7]/12 text-[#B9C8FF] shadow-[0_0_30px_rgba(79,110,247,0.16)] transition group-hover:border-[#9bb3ff]/80 group-hover:bg-[#4F6EF7]/18 sm:h-[64px] sm:w-[64px]">
+          <span className="flex h-[68px] w-[68px] items-center justify-center rounded-full border border-dashed border-[#7EA1FF]/55 bg-[#4F6EF7]/12 p-[5px] text-[#B9C8FF] shadow-[0_0_24px_rgba(79,110,247,0.14)] transition group-hover:border-[#9bb3ff]/80 group-hover:bg-[#4F6EF7]/18 sm:h-[72px] sm:w-[72px]">
             <Plus size={22} />
           </span>
-          <span className="mt-1.5 block text-[11px] font-semibold text-white/80 sm:text-xs">Your Story</span>
-          <span className="mt-0.5 block text-[9px] text-white/30 sm:text-[10px]">tap</span>
+          <span className="mt-1 block w-full truncate px-1 text-[11px] font-semibold leading-tight text-white/80 sm:text-xs">Your Story</span>
+          <span className="mt-0.5 block w-full truncate px-1 text-[9px] leading-tight text-white/36 sm:text-[10px]">tap</span>
         </motion.button>
 
         {loading
-          ? Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="w-[72px] shrink-0 text-center sm:w-[80px]">
-                <div className="mx-auto h-[54px] w-[54px] animate-pulse rounded-full bg-white/[0.06] sm:h-[60px] sm:w-[60px]" />
-                <div className="mx-auto mt-1.5 h-3 w-12 animate-pulse rounded bg-white/[0.06]" />
+          ? Array.from({ length: placeholderCount }).map((_, i) => (
+              <div key={i} className="grid w-[76px] shrink-0 grid-rows-[72px_auto_auto] place-items-center overflow-hidden text-center sm:w-[84px] sm:grid-rows-[78px_auto_auto]">
+                <div className="h-[64px] w-[64px] animate-pulse rounded-full bg-white/[0.07] sm:h-[68px] sm:w-[68px]" />
+                <div className="mx-auto mt-1 h-3 w-12 animate-pulse rounded bg-white/[0.06]" />
                 <div className="mx-auto mt-0.5 h-2 w-8 animate-pulse rounded bg-white/[0.04]" />
               </div>
             ))

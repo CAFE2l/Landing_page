@@ -172,6 +172,11 @@ function mapOrder(row: Record<string, unknown>): ServiceOrder {
     paymentAmount: row.payment_amount == null ? null : Number(row.payment_amount),
     paymentClaimedAt: (row.payment_claimed_at as string) || null,
     paymentConfirmedAt: (row.payment_confirmed_at as string) || null,
+    upfrontPayment: row.upfront_payment && typeof row.upfront_payment === "object" ? row.upfront_payment as ServiceOrder["upfrontPayment"] : null,
+    remainingPayment: row.remaining_payment && typeof row.remaining_payment === "object" ? row.remaining_payment as ServiceOrder["remainingPayment"] : null,
+    previewUrl: (row.preview_url as string) || null,
+    deliveryUrl: (row.delivery_url as string) || null,
+    auditLog: Array.isArray(row.audit_log) ? row.audit_log as ServiceOrder["auditLog"] : [],
     projectType: (row.project_type as string) || null,
     projectGoal: (row.project_goal as string) || null,
     projectDescription: String(row.project_description || ""),
@@ -350,7 +355,7 @@ export async function fetchAdminCommandCenter(): Promise<AdminCommandCenterData>
   const paidOrders = orders.filter((order) => order.upfrontPaid || ["paid", "paid_upfront"].includes(order.projectStatus))
   const activeProjects = orders.filter((order) => ["paid", "paid_upfront", "in_progress", "waiting_delivery_payment"].includes(order.projectStatus))
   const completedProjects = orders.filter((order) => ["delivered", "completed"].includes(order.projectStatus))
-  const pendingPayments = orders.filter((order) => ["awaiting_payment", "payment_claimed", "payment_pending", "waiting_payment"].includes(order.projectStatus) || ["client_claimed_paid", "wise_manual_review", "payment_pending", "waiting_upfront_payment"].includes(order.paymentStatus))
+  const pendingPayments = orders.filter((order) => ["awaiting_payment", "upfront_payment_claimed", "remaining_payment_claimed", "payment_pending", "waiting_payment"].includes(order.projectStatus) || ["client_claimed_paid", "wise_manual_review", "payment_pending", "waiting_upfront_payment"].includes(order.paymentStatus))
   const revenueThisMonth = paidOrders
     .filter((order) => (order.paymentConfirmedAt || order.updatedAt) >= month)
     .reduce((sum, order) => sum + (order.upfrontPaid ? order.upfrontAmount : 0) + (order.remainingPaid ? order.remainingAmount : 0), 0)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -40,8 +40,8 @@ import {
   fetchFollowingList,
   fetchFollowingIds,
 } from "../lib/socialService";
-import { fetchUserServiceOrders, confirmPayment } from "../lib/serviceOrdersService";
-import type { ServiceOrder } from "../lib/types/serviceOrders";
+import { fetchUserServiceOrders, subscribeToServiceOrders } from "../lib/serviceOrdersService";
+import type { ProjectStatus, ServiceOrder } from "../lib/types/serviceOrders";
 import {
   PROJECT_STATUS_LABELS,
   PROJECT_STATUS_COLORS,
@@ -77,6 +77,45 @@ const tabs = [
 const links = [
   { label: "My Account", icon: LayoutDashboard, href: "/my-account" },
 ];
+
+const CLIENT_ORDER_STEPS = [
+  { key: "requested", label: "Requested" },
+  { key: "upfront_paid", label: "Upfront Paid" },
+  { key: "in_progress", label: "In Progress" },
+  { key: "preview_ready", label: "Preview Ready" },
+  { key: "awaiting_final_payment", label: "Awaiting Final Payment" },
+  { key: "fully_paid", label: "Fully Paid" },
+  { key: "delivered", label: "Delivered" },
+  { key: "completed", label: "Completed" },
+] as const;
+
+type ClientOrderStepKey = typeof CLIENT_ORDER_STEPS[number]["key"];
+
+const STATUS_TO_CLIENT_STEP: Record<ProjectStatus, ClientOrderStepKey> = {
+  pending_checkout: "requested",
+  awaiting_upfront_payment: "requested",
+  upfront_payment_claimed: "requested",
+  upfront_paid: "upfront_paid",
+  in_progress: "in_progress",
+  ready_for_delivery: "preview_ready",
+  awaiting_remaining_payment: "awaiting_final_payment",
+  remaining_payment_claimed: "awaiting_final_payment",
+  remaining_paid: "fully_paid",
+  fully_paid: "fully_paid",
+  delivered: "delivered",
+  completed: "completed",
+  cancelled: "requested",
+  payment_failed: "requested",
+};
+
+function getClientOrderStepIndex(order: ServiceOrder) {
+  const key = STATUS_TO_CLIENT_STEP[order.projectStatus] || "requested";
+  const idx = CLIENT_ORDER_STEPS.findIndex((step) => step.key === key);
+  if (["completed", "delivered"].includes(order.projectStatus) && order.remainingAmount > 0 && !order.remainingPaid) {
+    return CLIENT_ORDER_STEPS.findIndex((step) => step.key === "awaiting_final_payment");
+  }
+  return Math.max(0, idx);
+}
 
 const countries = [
   { name: "Brazil", code: "BR", flag: "🇧🇷" },
@@ -453,17 +492,25 @@ export default function ProfilePage() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (activeTab !== "orders" || !profile?.id) return;
+  const loadOrders = useCallback((showLoader = true) => {
+    if (!profile?.id) return;
+    if (showLoader) {
     setOrdersLoading(true);
+    }
     setOrdersError(null);
     fetchUserServiceOrders(profile.id)
       .then(setOrders)
       .catch(() => setOrdersError("Failed to load orders"))
-      .finally(() => setOrdersLoading(false));
-  }, [activeTab, profile?.id]);
+      .finally(() => {
+        if (showLoader) setOrdersLoading(false);
+      });
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (activeTab !== "orders" || !profile?.id) return;
+    loadOrders(true);
+    return subscribeToServiceOrders(() => loadOrders(false));
+  }, [activeTab, profile?.id, loadOrders]);
 
   const [form, setForm] = useState<ProfileForm>({
     fullName: "",
@@ -1127,13 +1174,7 @@ export default function ProfilePage() {
                     <p className="text-sm text-[#94a3b8] mb-3">{ordersError}</p>
                     <button
                       onClick={() => {
-                        if (!profile?.id) return;
-                        setOrdersLoading(true);
-                        setOrdersError(null);
-                        fetchUserServiceOrders(profile.id)
-                          .then(setOrders)
-                          .catch(() => setOrdersError("Failed to load orders"))
-                          .finally(() => setOrdersLoading(false));
+                        loadOrders(true);
                       }}
                       className="touch-target inline-flex items-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white"
                     >
@@ -1154,6 +1195,10 @@ export default function ProfilePage() {
                   <div className="space-y-3">
                     {orders.map((order) => {
                       const isExpanded = expandedOrderId === order.id;
+                      const currentStepIdx = getClientOrderStepIndex(order);
+                      const awaitingRemaining = order.projectStatus === "awaiting_remaining_payment";
+                      const remainingClaimed = order.projectStatus === "remaining_payment_claimed";
+                      const finalDeliveryLocked = !order.remainingPaid && !["fully_paid", "delivered", "completed"].includes(order.projectStatus);
                       return (
                         <div
                           key={order.id}
@@ -1199,19 +1244,9 @@ export default function ProfilePage() {
                                 <div className="border-t border-[#1a2d4a] px-5 py-4 space-y-3">
                                   {/* Progress timeline */}
                                   <div className="flex items-center gap-1 overflow-x-auto pb-1">
-                                    {([
-                                      { key: "new_request", label: "Requested" },
-                                      { key: "paid_upfront", label: "Upfront Paid" },
-                                      { key: "in_progress", label: "In Progress" },
-                                      { key: "waiting_delivery_payment", label: "Awaiting Final" },
-                                      { key: "delivered", label: "Delivered" },
-                                      { key: "completed", label: "Completed" },
-                                    ] as const).map((step, i, arr) => {
-                                      const statuses = ["new_request", "paid_upfront", "in_progress", "waiting_delivery_payment", "delivered", "completed"];
-                                      const currentIdx = statuses.indexOf(order.projectStatus);
-                                      const stepIdx = statuses.indexOf(step.key);
-                                      const done = currentIdx >= stepIdx;
-                                      const active = currentIdx === stepIdx;
+                                    {CLIENT_ORDER_STEPS.map((step, i, arr) => {
+                                      const done = currentStepIdx >= i;
+                                      const active = currentStepIdx === i;
                                       const cancelled = order.projectStatus === "cancelled";
                                       return (
                                         <div key={step.key} className="flex items-center gap-1 shrink-0">
@@ -1229,7 +1264,7 @@ export default function ProfilePage() {
                                           </div>
                                           {i < arr.length - 1 && (
                                             <div className={`h-px w-6 shrink-0 mb-3 ${
-                                              cancelled ? "bg-red-500/20" : done && currentIdx > stepIdx ? "bg-[#22c55e]/40" : "bg-white/[0.06]"
+                                              cancelled ? "bg-red-500/20" : currentStepIdx > i ? "bg-[#22c55e]/40" : "bg-white/[0.06]"
                                             }`} />
                                           )}
                                         </div>
@@ -1251,8 +1286,8 @@ export default function ProfilePage() {
                                     </div>
                                     <div className="rounded-xl border border-[#1a2d4a] bg-black/20 px-3 py-2.5">
                                       <p className="text-[10px] uppercase tracking-wider text-[#475569] mb-1">Remaining (50%)</p>
-                                      <p className={`font-semibold ${order.remainingPaid ? "text-[#22c55e]" : "text-white/50"}`}>
-                                        ${order.remainingAmount} {order.remainingPaid ? "✓ Paid" : "Not yet"}
+                                      <p className={`font-semibold ${order.remainingPaid ? "text-[#22c55e]" : awaitingRemaining || remainingClaimed ? "text-orange-300" : "text-white/50"}`}>
+                                        ${order.remainingAmount} {order.remainingPaid ? "✓ Paid" : remainingClaimed ? "Claimed" : awaitingRemaining ? "Required" : "Not yet"}
                                       </p>
                                     </div>
                                     {order.desiredDeadline && (
@@ -1267,6 +1302,67 @@ export default function ProfilePage() {
                                     <div className="rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/5 px-3 py-2.5">
                                       <p className="text-[10px] uppercase tracking-wider text-[#60a5fa] mb-1">Note from CAFÉ</p>
                                       <p className="text-sm text-[#94a3b8]">{order.adminNotes}</p>
+                                    </div>
+                                  )}
+
+                                  {awaitingRemaining && (
+                                    <div className="rounded-xl border border-orange-400/25 bg-orange-400/10 p-4">
+                                      <p className="text-sm font-bold text-orange-200">Remaining Payment Required</p>
+                                      <p className="mt-1 text-xs leading-relaxed text-orange-100/75">
+                                        Your project preview is ready. Please complete the remaining 50% payment to unlock final delivery.
+                                      </p>
+                                      <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+                                        <div className="rounded-lg border border-white/[0.07] bg-black/20 px-3 py-2">
+                                          <p className="text-white/35">Total</p>
+                                          <p className="font-semibold text-white">${order.totalPrice}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-green-400/15 bg-green-400/8 px-3 py-2">
+                                          <p className="text-green-100/50">Upfront paid</p>
+                                          <p className="font-semibold text-green-300">${order.upfrontAmount}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-orange-300/20 bg-orange-300/10 px-3 py-2">
+                                          <p className="text-orange-100/55">Remaining</p>
+                                          <p className="font-semibold text-orange-200">${order.remainingAmount}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {remainingClaimed && (
+                                    <div className="rounded-xl border border-amber-400/25 bg-amber-400/10 p-4">
+                                      <p className="text-sm font-bold text-amber-200">Awaiting verification</p>
+                                      <p className="mt-1 text-xs leading-relaxed text-amber-100/75">
+                                        CAFÉ was notified about your remaining payment. Final delivery unlocks after admin confirmation.
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {order.previewUrl && (
+                                    <div className="rounded-xl border border-violet-400/25 bg-violet-400/10 p-4 space-y-3">
+                                      <div>
+                                        <p className="text-sm font-bold text-violet-200">Preview available</p>
+                                        <p className="mt-0.5 text-xs text-white/50">
+                                          You can review the preview before final payment. Final delivery remains locked until the remaining payment is confirmed.
+                                        </p>
+                                      </div>
+                                      <a
+                                        href={order.previewUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center justify-center gap-2 rounded-xl border border-violet-300/25 bg-violet-300/12 px-4 py-2.5 text-sm font-semibold text-violet-100 transition-all hover:bg-violet-300/20"
+                                      >
+                                        <ExternalLink size={14} />
+                                        Open preview
+                                      </a>
+                                    </div>
+                                  )}
+
+                                  {finalDeliveryLocked && order.previewUrl && (
+                                    <div className="rounded-xl border border-white/[0.08] bg-white/[0.035] p-4">
+                                      <p className="text-sm font-semibold text-white/80">Final delivery locked</p>
+                                      <p className="mt-1 text-xs text-white/45">
+                                        Final delivery unlocks after remaining payment is confirmed.
+                                      </p>
                                     </div>
                                   )}
 
@@ -1293,38 +1389,32 @@ export default function ProfilePage() {
                                     </div>
                                   )}
 
-                                  {order.projectStatus === "waiting_delivery_payment" && !order.remainingPaid && (
+                                  {(awaitingRemaining || remainingClaimed) && !order.remainingPaid && (
                                     <div className="rounded-xl border border-[#0070BA]/25 bg-[#0070BA]/8 p-4 space-y-3">
                                       <div>
-                                        <p className="text-xs font-semibold text-white">Final payment due</p>
+                                        <p className="text-xs font-semibold text-white">{remainingClaimed ? "Remaining payment pending verification" : "Pay remaining balance"}</p>
                                         <p className="text-xs text-[#94a3b8] mt-0.5">
-                                          Your project is ready for delivery. Pay the remaining <span className="text-white font-semibold">${order.remainingAmount}</span> to receive it.
+                                          {remainingClaimed
+                                            ? "CAFÉ will confirm your payment before releasing the final delivery."
+                                            : <>Choose PayPal or Wise to pay the remaining <span className="text-white font-semibold">${order.remainingAmount}</span>.</>}
                                         </p>
                                       </div>
-                                      <button
-                                        disabled={payingOrderId === order.id}
-                                        onClick={async () => {
-                                          setPayingOrderId(order.id);
-                                          const ok = await confirmPayment(order.id, "paypal_remaining");
-                                          setPayingOrderId(null);
-                                          if (ok) {
-                                            toast.success("Payment notification sent! CAFÉ will confirm and deliver your project.");
-                                            setOrders((prev) =>
-                                              prev.map((o) =>
-                                                o.id === order.id ? { ...o, remainingPaid: true } : o
-                                              )
-                                            );
-                                          }
-                                        }}
-                                        className="touch-target flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#0070BA] hover:bg-[#003087] disabled:opacity-60 disabled:cursor-not-allowed px-4 py-3 text-sm font-semibold text-white transition-all shadow-[0_4px_20px_rgba(0,112,186,0.35)]"
-                                      >
-                                        {payingOrderId === order.id ? (
-                                          <Loader2 size={16} className="animate-spin" />
-                                        ) : (
+                                      <div className="grid gap-2 sm:grid-cols-2">
+                                        <Link
+                                          to={`/checkout/${order.id}?paymentStage=remaining&paymentMethod=paypal`}
+                                          className={`touch-target flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#0070BA] px-4 py-3 text-sm font-semibold text-white shadow-[0_4px_20px_rgba(0,112,186,0.35)] transition-all hover:bg-[#003087] ${remainingClaimed ? "pointer-events-none opacity-55" : ""}`}
+                                        >
                                           <img src="/imgs/icons/PayPal.png" alt="PayPal" className="h-5 w-auto" />
-                                        )}
-                                        Pay ${order.remainingAmount} with PayPal
-                                      </button>
+                                          {remainingClaimed ? "Payment Pending" : "Pay with PayPal"}
+                                        </Link>
+                                        <Link
+                                          to={`/checkout/${order.id}?paymentStage=remaining&paymentMethod=wise`}
+                                          className={`touch-target flex w-full items-center justify-center gap-2.5 rounded-xl border border-cyan-300/25 bg-cyan-400/12 px-4 py-3 text-sm font-semibold text-cyan-100 transition-all hover:bg-cyan-400/20 ${remainingClaimed ? "pointer-events-none opacity-55" : ""}`}
+                                        >
+                                          <img src="/imgs/icons/wise.png" alt="Wise" className="h-5 w-auto" />
+                                          {remainingClaimed ? "Payment Pending" : "Pay with Wise"}
+                                        </Link>
+                                      </div>
                                     </div>
                                   )}
 
